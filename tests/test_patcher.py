@@ -3,7 +3,7 @@
 Needs files that never go in the repo, named by environment variables; a
 test whose inputs are missing is skipped, not passed:
   ELEKLOADER_STOCK      the stock Digitakt_OS1.53.syx
-  ELEKLOADER_BUNDLE     a format-1 bundle (e.g. sysinfo-bundle-1.8F.dtmod)
+  ELEKLOADER_BUNDLE     a format-1 bundle (e.g. sysinfo-bundle-1.8F.elemod)
   ELEKLOADER_CTOOL_SYX  the build that bundle came from (made by
                         elektron-firmware-tool), for the byte-for-byte checks
 """
@@ -19,9 +19,9 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-from elekloader import devices, dtmod, link, patch, syx     # noqa: E402
+from elekloader import devices, elemod, link, patch, syx     # noqa: E402
 from elekloader.codec import transport                      # noqa: E402
-from elekloader.dtmod import sha                            # noqa: E402
+from elekloader.elemod import sha                            # noqa: E402
 from elekloader.mkmod import stock_parts                    # noqa: E402
 
 STOCK = os.environ.get('ELEKLOADER_STOCK', '')
@@ -74,12 +74,12 @@ def built():
 
 
 def mod(doc, name='t'):
-    return dtmod.Mod(doc, name)
+    return elemod.Mod(doc, name)
 
 
 def small_mod(doc, mid, sites):
     """A mod with only `sites` (dicts as in the file), no blob or resources."""
-    d = {k: copy.deepcopy(doc[k]) for k in ('dtmod', 'target')}
+    d = {k: copy.deepcopy(v) for k, v in doc.items() if k in ('elemod', 'dtmod', 'target')}
     d.update({'id': mid, 'version': '1', 'sites': sites})
     return mod(d, mid)
 
@@ -87,7 +87,7 @@ def small_mod(doc, mid, sites):
 def expect(fn, *words):
     try:
         fn()
-    except (dtmod.ModError, syx.SyxError, patch.PatchError) as e:
+    except (elemod.ModError, syx.SyxError, patch.PatchError) as e:
         msg = str(e)
         for w in words:
             assert w in msg, 'expected %r in: %s' % (w, msg)
@@ -132,7 +132,7 @@ def test_bundle_round_trip():
     verifies and depacks to it."""
     doc = bundle_doc()
     _, img0 = stock()
-    img = dtmod.apply([mod(doc)], img0)
+    img = elemod.apply([mod(doc)], img0)
     assert sha(img) == doc['build']['section3_sha256']
     out, man = built()
     assert man['bundle_matches_build'] is True
@@ -196,14 +196,14 @@ def test_refuses_tampered_stock_hash():
     doc = bundle_doc()
     doc['sites'][3]['stock_sha256'] = sha(b'not these bytes')
     _, img0 = stock()
-    expect(lambda: dtmod.apply([mod(doc)], img0), 'not the ones it expects')
+    expect(lambda: elemod.apply([mod(doc)], img0), 'not the ones it expects')
 
 
 def test_refuses_two_mods_on_one_site():
     doc = bundle_doc()
     _, img0 = stock()
     other = small_mod(doc, 'other', [doc['sites'][0]])
-    expect(lambda: dtmod.apply([mod(doc), other], img0), 'overlap')
+    expect(lambda: elemod.apply([mod(doc), other], img0), 'overlap')
 
 
 def test_refuses_overlapping_range():
@@ -213,7 +213,7 @@ def test_refuses_overlapping_range():
     a = int(s['addr'], 16) + 4                      # the last 2 bytes of that jsr, and 4 more
     o = a - LOAD
     s.update(addr='0x%08x' % a, stock_sha256=sha(img0[o:o + 6]))
-    msg = expect(lambda: dtmod.apply([mod(doc), small_mod(doc, 'other', [s])], img0), 'overlap')
+    msg = expect(lambda: elemod.apply([mod(doc), small_mod(doc, 'other', [s])], img0), 'overlap')
     assert 'whole' in msg or 'mid-instruction' in msg or 'sweeps' in msg or 'decode' in msg
 
 
@@ -223,7 +223,7 @@ def test_refuses_mid_instruction_site():
     a = 0x40000538 + 2                              # inside `jsr 0x40001c94`
     s = {'addr': '0x%08x' % a, 'len': 4, 'kind': 'code', 'new': '4e714e71',
          'stock_sha256': sha(img0[a - LOAD:a - LOAD + 4])}
-    expect(lambda: dtmod.apply([small_mod(doc, 'm', [s])], img0), '0x%08x' % a)
+    expect(lambda: elemod.apply([small_mod(doc, 'm', [s])], img0), '0x%08x' % a)
 
 
 def test_refuses_blob_over_budget():
@@ -247,7 +247,7 @@ def test_refuses_overlapping_regions_and_names():
     other.update(id='other', sites=[], blob=None)
     other['resources'] = {'regions': [{'name': 'mine', 'lo': '0x47be1000', 'hi': '0x47be2000'}],
                           'names': ['sysex:0x7d']}
-    msg = expect(lambda: dtmod.apply([mod(doc), mod(other)], img0), 'overlap', 'sysex:0x7d')
+    msg = expect(lambda: elemod.apply([mod(doc), mod(other)], img0), 'overlap', 'sysex:0x7d')
     assert 'region' in msg
 
 
@@ -255,9 +255,9 @@ def test_requires_and_conflicts():
     doc = bundle_doc()
     _, img0 = stock()
     a = small_mod(doc, 'a', [])
-    b_doc = {k: copy.deepcopy(doc[k]) for k in ('dtmod', 'target')}
+    b_doc = {k: copy.deepcopy(v) for k, v in doc.items() if k in ('elemod', 'dtmod', 'target')}
     b_doc.update(id='b', version='1', sites=[], requires=['core'], conflicts=['a'])
-    expect(lambda: dtmod.apply([a, mod(b_doc)], img0), 'requires core', 'conflicts with a')
+    expect(lambda: elemod.apply([a, mod(b_doc)], img0), 'requires core', 'conflicts with a')
 
 
 def test_order_does_not_matter():
@@ -268,7 +268,7 @@ def test_order_does_not_matter():
     _, img0 = stock()
     s = doc['sites']
     mods = [small_mod(doc, 'm%d' % i, s[i::3]) for i in range(3)]
-    outs = {sha(dtmod.apply(list(p), img0)) for p in itertools.permutations(mods)}
+    outs = {sha(elemod.apply(list(p), img0)) for p in itertools.permutations(mods)}
     assert len(outs) == 1
 
 
@@ -278,7 +278,7 @@ def test_refuses_two_blobs():
     other = bundle_doc()
     other.update(id='other', sites=[])
     other['resources'] = {}
-    expect(lambda: dtmod.apply([mod(doc), mod(other)], img0), 'more than one whole build')
+    expect(lambda: elemod.apply([mod(doc), mod(other)], img0), 'more than one whole build')
 
 
 # ---- tampered outputs ----------------------------------------------------------

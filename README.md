@@ -4,7 +4,7 @@ A mod loader for Elektron firmware. You pick mods and supply the stock OS
 file Elektron publishes for your device. elekloader builds a custom OS
 file on your own machine, and you flash it the way you flash any OS update.
 
-- **Nothing from Elektron is distributed.** A mod (`.dtmod`) carries only
+- **Nothing from Elektron is distributed.** A mod (`.elemod`) carries only
   its author's bytes plus hashes of the stock bytes it expects. Every build
   starts from your own stock file, recognised by its hash.
 - **The bootloader is never touched.** Mods can only change the main OS:
@@ -26,8 +26,8 @@ Python 3.9 or newer, nothing else to install.
 
 ```bash
 python -m elekloader                        # the window
-python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod a.dtmod --mod b.dtmod --out custom.syx --version 2.0a
-python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod a.dtmod --check
+python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod a.elemod --mod b.elemod --out custom.syx --version 2.0a
+python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod a.elemod --check
 ```
 
 With `pip install .` the same commands are `elekloader` and `elekpatch`.
@@ -62,8 +62,8 @@ elektron-firmware-tool when given the same main OS stream.
 
 ## Mods
 
-This repository is the loader. Mods are built elsewhere and installed from
-their `.dtmod` files. [docs/FORMAT.md](docs/FORMAT.md) describes both kinds:
+Users install mods from their `.elemod` files.
+[docs/FORMAT.md](docs/FORMAT.md) describes both kinds:
 
 - **format 1**: a whole custom build as one file;
 - **format 2**: separate, linkable mods. A `core` mod provides a hook
@@ -71,12 +71,35 @@ their `.dtmod` files. [docs/FORMAT.md](docs/FORMAT.md) describes both kinds:
   tables. The loader's linker places them, resolves their symbols and
   checks them.
 
+Files from before version 0.2 used the `.dtmod` extension; they still load.
+
+## Adapting your mod to elekloader
+
+See **[docs/ADAPTING.md](docs/ADAPTING.md)**: the path to take, the rules,
+each command with the output it should print, a table from every refusal
+to its fix, and a definition of done. Coding agents: start with
+[AGENTS.md](AGENTS.md).
+
+The tools, in brief:
+
+```bash
+python -m elekloader.sdk.build examples/hello-marker --stock Digitakt_OS1.53.syx   # sources -> .elemod
+python -m elekloader.lint my-mod-1.0.elemod --stock Digitakt_OS1.53.syx --with core-2.0a.elemod
+python -m elekloader.mkmod ...                                                      # a whole build -> .elemod
+```
+
+`examples/hello-marker/` is a complete mod to start from. It is one C
+function on the draw event, and it puts a small square in the corner of
+every screen. Building code needs the device's cross toolchain; for the
+Digitakt mk1 that is m68k binutils and gcc.
+
 ## Tests
 
 ```bash
 python tests/test_units.py        # needs nothing
 ELEKLOADER_STOCK=Digitakt_OS1.53.syx ELEKLOADER_MODS=path/to/mods python tests/test_link.py
-ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=bundle.dtmod ELEKLOADER_CTOOL_SYX=its-build.syx python tests/test_patcher.py
+ELEKLOADER_STOCK=... ELEKLOADER_MODS=... python tests/test_sdk.py   # the example needs the cross compiler
+ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=bundle.elemod ELEKLOADER_CTOOL_SYX=its-build.syx python tests/test_patcher.py
 ```
 
 A test whose input files are not given is skipped, not passed. Firmware

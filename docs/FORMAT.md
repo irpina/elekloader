@@ -1,7 +1,7 @@
-# The .dtmod format
+# The .elemod format
 
-A `.dtmod` is a JSON file. Every mod names its **target**: the stock
-release it was made for, by hash.
+A `.elemod` is a JSON file. How to make one is [ADAPTING.md](ADAPTING.md).
+Every mod names its **target**: the stock release it was made for, by hash.
 
 ```json
 "target": {"device": "digitakt-mk1", "product": "Digitakt mk1", "os": "1.53",
@@ -16,7 +16,7 @@ made for different releases.
 
 | field | |
 |---|---|
-| `dtmod` | 1 or 2 |
+| `elemod` | 1 or 2: the format (files from before 0.2 say `"dtmod"` and end in `.dtmod`; both still load) |
 | `id`, `version` | the mod's name and version; `requires`/`conflicts` name other ids |
 | `title`, `description`, `category`, `author` | for people |
 | `sites` | changes to the stock image (below) |

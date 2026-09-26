@@ -1,7 +1,7 @@
-"""Your stock OS .syx + .dtmod files -> a custom firmware .syx (the command line).
+"""Your stock OS .syx + .elemod files -> a custom firmware .syx (the command line).
 
     python -m elekloader.patch --stock Digitakt_OS1.53.syx \
-        --mod core-2.0a.dtmod --mod sysinfo-2.0a.dtmod ... --out CUSTOM.syx \
+        --mod core-2.0a.elemod --mod sysinfo-2.0a.elemod ... --out CUSTOM.syx \
         [--version 2.0a] [--check]
 
 In this order, stopping at the first failure:
@@ -9,7 +9,7 @@ In this order, stopping at the first failure:
      its main OS the known image;
   2. every mod must be made for that release, and every site's stock bytes
      must hash to what the mod expects;
-  3. the static conflict check (dtmod.check, link.check);
+  3. the static conflict check (elemod.check, link.check);
   4. apply the sites, or link the mods;
   5. repack the main OS and rebuild the .syx: only the main OS section and
      the 4-character version field change;
@@ -29,8 +29,8 @@ import os
 import sys
 import time
 
-from . import devices, dtmod, link, syx
-from .dtmod import sha
+from . import devices, elemod, link, syx
+from .elemod import sha
 
 
 class PatchError(Exception):
@@ -54,8 +54,8 @@ def build(stock_path, mod_paths, version=None, check_only=False, log=print):
     mods = []
     for p in mod_paths:
         try:
-            m = dtmod.load_any(p)
-        except (OSError, dtmod.ModError) as e:
+            m = elemod.load_any(p)
+        except (OSError, elemod.ModError) as e:
             raise PatchError(str(e))
         if m.dev.key != dev.key or m.rel != rel:
             raise PatchError('%s is made for %s %s; your stock firmware is %s %s'
@@ -71,13 +71,13 @@ def build(stock_path, mod_paths, version=None, check_only=False, log=print):
     try:
         if v2:
             if len(v2) != len(mods):
-                raise dtmod.ModError('a whole-build bundle (format 1) cannot be combined '
+                raise elemod.ModError('a whole-build bundle (format 1) cannot be combined '
                                      'with separate mods (format 2)')
             linked = link.link(mods, img0)
             img = linked.image
         else:
-            img = dtmod.apply(mods, img0)
-    except dtmod.ModError as e:
+            img = elemod.apply(mods, img0)
+    except elemod.ModError as e:
         raise PatchError(str(e))
     log('the mods combine: no overlaps, stock bytes as expected, code sites whole instructions')
     if linked:
@@ -153,7 +153,7 @@ def save(out, man, path):
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='elekloader.patch', description=__doc__.split('\n')[0])
     ap.add_argument('--stock', required=True, help='your stock OS .syx')
-    ap.add_argument('--mod', action='append', default=[], help='a .dtmod (repeat for more)')
+    ap.add_argument('--mod', action='append', default=[], help='a .elemod (repeat for more)')
     ap.add_argument('--out', help='the .syx to write')
     ap.add_argument('--version', help='the 4 characters the unit shows as its OS version '
                                       '(default: the mod\'s)')

@@ -48,6 +48,7 @@ class Device:
     sram_code: tuple = (0, 0)    # the linker's area for .fast code
     fast_table: str = ''         # the table .fast sections are copied through
     recovery: str = ''           # how to get back to stock, said to the user
+    toolchain: dict = field(default_factory=dict)   # for the SDK: prefix, asflags, cflags
     notes: str = ''
 
     def release_for(self, syx_sha256=None, main_sha256=None):
@@ -95,7 +96,7 @@ def identify(syx_sha256):
 
 
 def for_target(target):
-    """-> (Device, Release) a .dtmod's "target" names."""
+    """-> (Device, Release) a .elemod's "target" names."""
     if not isinstance(target, dict):
         raise UnknownFirmware('no target')
     key = target.get('device')
@@ -111,7 +112,7 @@ def for_target(target):
 
 
 def target_of(device, release):
-    """-> the "target" object a .dtmod for this firmware carries."""
+    """-> the "target" object a .elemod for this firmware carries."""
     return {'device': device.key, 'product': device.name, 'os': release.version,
             'syx_sha256': release.syx_sha256, 'section3_sha256': release.main_sha256,
             'section3_len': release.main_len}

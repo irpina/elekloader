@@ -1,7 +1,7 @@
-"""A built custom firmware .syx -> a format-1 .dtmod (one mod = one whole build).
+"""A built custom firmware .syx -> a format-1 .elemod (one mod = one whole build).
 
     python -m elekloader.mkmod --stock Digitakt_OS1.53.syx --build CUSTOM.syx \
-        [--manifest CUSTOM.syx.json] [--elf CUSTOM.syx.elf] --meta META.json --out CUSTOM.dtmod
+        [--manifest CUSTOM.syx.json] [--elf CUSTOM.syx.elf] --meta META.json --out CUSTOM.elemod
 
 For builds made the monolithic way: one patch list and one blob appended at
 the stock main OS's end.
@@ -29,8 +29,8 @@ import os
 import struct
 import sys
 
-from . import devices, dtmod, syx
-from .dtmod import sha
+from . import devices, elemod, syx
+from .elemod import sha
 
 
 def die(msg):
@@ -94,7 +94,7 @@ def main(argv=None):
     ap.add_argument('--manifest', help='its build manifest (default BUILD.json)')
     ap.add_argument('--elf', help='its ELF, for the regions (default BUILD.elf if present)')
     ap.add_argument('--meta', required=True, help='the mod\'s id, title, resources (JSON)')
-    ap.add_argument('--out', required=True, help='the .dtmod to write')
+    ap.add_argument('--out', required=True, help='the .elemod to write')
     ap.add_argument('--stock-min', type=int, default=8,
                     help='store blob runs of at least this many bytes found in stock as '
                          'copies from the user\'s image (default 8; even)')
@@ -117,7 +117,7 @@ def main(argv=None):
         die('the build\'s section table differs from stock')
     for sid in stock.stored:
         if sid != dev.main_section and built.section(sid) != stock.section(sid):
-            die('the build changes section %d; a .dtmod can only carry the main OS' % sid)
+            die('the build changes section %d; a .elemod can only carry the main OS' % sid)
     hd = [i for i in range(0x1C) if built.header[i] != stock.header[i]]
     if any(not 0x14 <= i < 0x18 for i in hd):
         die('the build\'s ELE3 header differs outside the version field')
@@ -140,12 +140,12 @@ def main(argv=None):
             die('manifest patch %s: not the stock bytes' % p['addr'])
         if img1[o:o + len(new)] != new:
             die('manifest patch %s: not what the build has there' % p['addr'])
-        ok_end = dtmod.insn_check(img0, addr, len(old), dev, sweeps=0)[0]
+        ok_end = elemod.insn_check(img0, addr, len(old), dev, sweeps=0)[0]
         kind = 'data' if addr in data_sites or not ok_end else 'code'
         if kind == 'code':
             for which, im in (('stock', img0),
                               ('new', bytes(cover[:o] + new + cover[o + len(new):]))):
-                ok, note = dtmod.insn_check(im, addr, len(old), dev)
+                ok, note = elemod.insn_check(im, addr, len(old), dev)
                 if not ok:
                     die('site 0x%08x (%s bytes): %s; if it is data, list it under '
                         '"data_sites" in the meta file' % (addr, which, note))
@@ -158,7 +158,7 @@ def main(argv=None):
 
     blob = img1[len(img0):]
     doc = {
-        'dtmod': dtmod.FORMAT,
+        'elemod': elemod.FORMAT,
         'id': meta['id'],
         'version': meta.get('version') or built.version,
         'title': meta.get('title', meta['id']),
@@ -194,9 +194,9 @@ def main(argv=None):
         doc['notes'] = meta['notes']
     doc['signature'] = None
 
-    mod = dtmod.Mod(doc, os.path.basename(a.out))
-    if dtmod.apply([mod], img0) != img1:
-        die('the .dtmod does not reproduce the build\'s main OS')
+    mod = elemod.Mod(doc, os.path.basename(a.out))
+    if elemod.apply([mod], img0) != img1:
+        die('the .elemod does not reproduce the build\'s main OS')
     raw = (json.dumps(doc, indent=1) + '\n').encode('utf-8')
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with open(a.out, 'wb') as fh:

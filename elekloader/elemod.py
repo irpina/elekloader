@@ -1,8 +1,8 @@
-"""The .dtmod file: shared validation, format 1 (whole-build bundles), the
+"""The .elemod file: shared validation, format 1 (whole-build bundles), the
 instruction-boundary check, and apply for bundles. Format 2 (separate,
 linkable mods) is in link.py. The format itself is docs/FORMAT.md.
 
-A .dtmod is JSON. It carries only its author's bytes plus hashes of the
+A .elemod is JSON. It carries only its author's bytes plus hashes of the
 stock bytes it expects. It can only describe changes to the device's main
 OS: there is no field for any other section, so the bootloader and the
 other sections stay stock by construction (syx.verify checks the output
@@ -19,6 +19,24 @@ import os
 from . import devices
 
 FORMAT = 1
+KEY, LEGACY_KEY = 'elemod', 'dtmod'        # the format marker; files from before 0.2 say dtmod
+EXTS = ('.elemod', '.dtmod')               # what the loader lists; the SDK writes .elemod
+
+
+def format_of(doc):
+    """-> the file's format number (1 or 2), from "elemod" or the legacy "dtmod"."""
+    if not isinstance(doc, dict):
+        return None
+    return doc.get(KEY, doc.get(LEGACY_KEY))
+
+
+def mod_files(folder):
+    """-> the mod files in a folder, sorted: .elemod, and legacy .dtmod."""
+    import glob
+    out = []
+    for ext in EXTS:
+        out += glob.glob(os.path.join(folder, '*' + ext))
+    return sorted(out)
 
 
 class ModError(ValueError):
@@ -139,15 +157,15 @@ def read_json(path):
 
 
 def load_any(path):
-    """-> a format-1 Mod or a format-2 link.Mod2, by the file's "dtmod"."""
+    """-> a format-1 Mod or a format-2 link.Mod2, by the file's "elemod"."""
     doc, raw = read_json(path)
-    if isinstance(doc, dict) and doc.get('dtmod') == 2:
+    if format_of(doc) == 2:
         from . import link
         return link.Mod2(doc, os.path.basename(path), raw)
     return Mod(doc, os.path.basename(path), raw)
 
 
-COMMON = {'dtmod', 'id', 'version', 'title', 'description', 'category', 'author', 'target',
+COMMON = {'elemod', 'dtmod', 'id', 'version', 'title', 'description', 'category', 'author', 'target',
           'sites', 'resources', 'requires', 'conflicts', 'build', 'signature', 'notes'}
 
 
@@ -157,8 +175,8 @@ class Mod:
     def __init__(self, doc, name='<mod>', raw=None):
         self.doc, self.name = doc, name
         self.sha256 = sha(raw) if raw is not None else None
-        if not isinstance(doc, dict) or doc.get('dtmod') != FORMAT:
-            raise ModError('%s: not a dtmod %d file' % (name, FORMAT))
+        if format_of(doc) != FORMAT:
+            raise ModError('%s: not a format-%d .elemod file' % (name, FORMAT))
         for k in ('id', 'version', 'target', 'sites'):
             if k not in doc:
                 raise ModError('%s: no "%s"' % (name, k))

@@ -9,7 +9,7 @@ a game's (Vortex, Nexus Mod Manager). Tkinter, no other dependency.
   another, or is made for other firmware.
 - The details pane: what a mod is, every change it makes, and what it
   needs.
-- Install from file copies a .dtmod into your library; Uninstall removes it
+- Install from file copies a .elemod into your library; Uninstall removes it
   from there.
 - Profiles are named sets of enabled mods.
 - Build firmware links the enabled mods onto your stock .syx, verifies the
@@ -33,7 +33,7 @@ import sys
 import threading
 import time
 
-from . import devices, dtmod, link, patch, syx
+from . import devices, elemod, link, patch, syx
 
 APP = 'elekloader'
 
@@ -75,7 +75,7 @@ class LoaderModel:
                 info['sha256'] = s.sha256
                 dev, rel = devices.identify(s.sha256)
                 img = s.section(dev.main_section)
-                if dtmod.sha(img) == rel.main_sha256:
+                if elemod.sha(img) == rel.main_sha256:
                     self.img, self.dev, self.rel = img, dev, rel
                     info.update(ok=True, device=dev.name, os=rel.version)
                 else:
@@ -90,10 +90,10 @@ class LoaderModel:
 
     # the library
     def files(self):
-        out = sorted(glob.glob(os.path.join(self.library, '*.dtmod')))
+        out = elemod.mod_files(self.library)
         seen = {os.path.basename(p) for p in out}
         for d in self.also:
-            for p in sorted(glob.glob(os.path.join(d, '*.dtmod'))):
+            for p in elemod.mod_files(d):
                 if os.path.basename(p) not in seen:
                     out.append(p)
                     seen.add(os.path.basename(p))
@@ -103,8 +103,8 @@ class LoaderModel:
         return os.path.dirname(os.path.abspath(path)) == os.path.abspath(self.library)
 
     def install(self, src):
-        """Copy a .dtmod into the library (it must load). -> its new path."""
-        dtmod.load_any(src)
+        """Copy a .elemod into the library (it must load). -> its new path."""
+        elemod.load_any(src)
         os.makedirs(self.library, exist_ok=True)
         dst = os.path.join(self.library, os.path.basename(src))
         shutil.copyfile(src, dst)
@@ -112,21 +112,21 @@ class LoaderModel:
 
     def uninstall(self, path):
         if not self.installed_by_hand(path):
-            raise dtmod.ModError('only mods installed from a file can be uninstalled here')
+            raise elemod.ModError('only mods installed from a file can be uninstalled here')
         os.remove(path)
 
     def mod(self, path):
         st = os.stat(path)
         key = (path, st.st_mtime, st.st_size)
         if key not in self._mods:
-            self._mods[key] = dtmod.load_any(path)
+            self._mods[key] = elemod.load_any(path)
         return self._mods[key]
 
     def describe(self, path):
         base = {'path': path, 'file': os.path.basename(path)}
         try:
             m = self.mod(path)
-        except (OSError, dtmod.ModError) as e:
+        except (OSError, elemod.ModError) as e:
             return dict(base, error=str(e), id=os.path.basename(path), label=base['file'])
         d = dict(base, id=m.id, version=m.version, label=m.label(),
                  for_device=m.dev.key, for_label='%s %s' % (m.dev.name, m.rel.version),
@@ -192,10 +192,10 @@ class LoaderModel:
                 if v2 and len(v2) != len(mods):
                     whole = [descs[p]['label'] for p in paths
                              if not isinstance(self.mod(p), link.Mod2)]
-                    raise dtmod.ModError('x:\n  %s is a whole build: it cannot be combined '
+                    raise elemod.ModError('x:\n  %s is a whole build: it cannot be combined '
                                          'with separate mods' % ', '.join(whole))
                 if not v2:
-                    img = dtmod.apply(mods, self.img)
+                    img = elemod.apply(mods, self.img)
                     for p in paths:
                         status[p] = ('ok', 'Enabled')
                     return {'ok': True, 'format': 1, 'ms': round(1000 * (time.time() - t)),
@@ -203,7 +203,7 @@ class LoaderModel:
                             'blob': len(img) - len(self.img),
                             'sites': sum(len(m.sites) for m in mods)}
                 L = link.link(mods, self.img)
-            except (OSError, dtmod.ModError) as e:
+            except (OSError, elemod.ModError) as e:
                 lines = [x.strip() for x in str(e).split('\n')[1:]] or [str(e)]
                 for p in paths:
                     d = descs[p]
@@ -852,12 +852,12 @@ class LoaderWindow:
     def install(self):
         from tkinter import filedialog, messagebox
         ps = filedialog.askopenfilenames(parent=self.win, title='Install mods',
-                                         filetypes=[('elekloader mods', '*.dtmod')])
+                                         filetypes=[('elekloader mods', '*.elemod *.dtmod')])
         for p in ps:
             try:
                 dst = self.model.install(p)
                 self.enabled.add(dst)
-            except (OSError, dtmod.ModError) as e:
+            except (OSError, elemod.ModError) as e:
                 messagebox.showerror('elekloader', 'Not installed:\n\n%s' % e,
                                      parent=self.win)
         if ps:
@@ -893,7 +893,7 @@ class LoaderWindow:
                     if isinstance(x, link.Mod2) and (m.dev is None or (x.dev.key == m.dev.key
                                                                        and x.rel == m.rel)):
                         on.append(n)
-                except (OSError, dtmod.ModError):
+                except (OSError, elemod.ModError):
                     pass
             m.profiles = {'Default': sorted(on)}
             m.profile = 'Default'
@@ -946,7 +946,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog='elekloader', description=__doc__.split('\n')[0])
     ap.add_argument('--stock', help='your stock OS .syx (default: the one chosen last time)')
     ap.add_argument('--mods', action='append', default=[],
-                    help='also list the .dtmod files in this folder (repeatable)')
+                    help='also list the .elemod files in this folder (repeatable)')
     ap.add_argument('--library', default=LIBRARY, help='where Install puts mods')
     a = ap.parse_args(argv)
     try:

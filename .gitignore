@@ -10,5 +10,6 @@ dist/
 *.syx.json
 *.map.json
 *.bin
+*.elemod
 *.dtmod
 out/

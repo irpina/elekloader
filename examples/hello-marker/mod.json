@@ -1,0 +1,14 @@
+{
+ "id": "hello-marker",
+ "version": "1.0",
+ "title": "Hello marker",
+ "category": "Examples",
+ "description": "Draws a small white square in the top-right corner of every screen: the smallest mod that runs code on the device. A template to start from (docs/ADAPTING.md).",
+ "device": "digitakt-mk1",
+ "os": "1.53",
+ "sources": ["hello.c"],
+ "subscribe": [
+  {"event": "ev_draw", "fn": "hello_draw", "order": 60}
+ ],
+ "requires": ["core"]
+}

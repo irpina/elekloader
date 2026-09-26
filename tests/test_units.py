@@ -7,7 +7,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-from elekloader import devices, dtmod, syx               # noqa: E402
+from elekloader import devices, elemod, syx               # noqa: E402
 from elekloader.codec import aplib, elz, transport       # noqa: E402
 
 FRAMING0 = bytes.fromhex('f000203c0a007f010500017200000000f7')[:15] + b'\xf7'
@@ -80,7 +80,7 @@ def test_inplace_depack_gap():
 
 def test_overlaps():
     spans = [(0, 100, 'a'), (10, 20, 'b'), (50, 60, 'c'), (100, 110, 'd')]
-    pairs = {(a[2], b[2]) for a, b in dtmod.overlaps(spans)}
+    pairs = {(a[2], b[2]) for a, b in elemod.overlaps(spans)}
     assert pairs == {('a', 'b'), ('a', 'c')}
 
 
@@ -106,13 +106,13 @@ def test_devices():
 
 def test_parts_stay_in_the_image():
     d, r = devices.identify(devices.devices()[0].releases['1.53'].syx_sha256)
-    ok = dtmod.parse_parts([['hex', '00ff'], ['stock', '0x40000400', 8]], 't', d, r)
+    ok = elemod.parse_parts([['hex', '00ff'], ['stock', '0x40000400', 8]], 't', d, r)
     assert ok == [('hex', b'\x00\xff'), ('stock', 0x40000400, 8)]
     for bad in (['stock', '0x40000000', 8], ['stock', '0x%08x' % (d.image_end(r) - 4), 8],
                 ['stock', '0x40000400', 0], ['nope']):
         try:
-            dtmod.parse_parts([bad], 't', d, r)
-        except dtmod.ModError:
+            elemod.parse_parts([bad], 't', d, r)
+        except elemod.ModError:
             continue
         raise AssertionError('accepted %r' % bad)
 

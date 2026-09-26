@@ -41,4 +41,10 @@ DEVICE = Device(
     sram_code=(0x8000F700, 0x80010000),
     fast_table='fa_copies',
     recovery='hold FUNC while powering on for the startup menu, then send the stock .syx',
+    toolchain={
+        'prefix': 'm68k-linux-gnu-',                # binutils + gcc for m68k/ColdFire
+        'asflags': ['-mcpu=54455'],                 # ColdFire V4 (the MCF54418's ISA)
+        'cflags': ['-mcpu=54455', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib',
+                   '-fno-pic', '-fno-pie', '-fomit-frame-pointer', '-Wall'],
+    },
 )

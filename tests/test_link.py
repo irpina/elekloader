@@ -18,9 +18,9 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-from elekloader import devices, dtmod, link, patch, syx     # noqa: E402
+from elekloader import devices, elemod, link, patch, syx     # noqa: E402
 from elekloader.codec import transport                      # noqa: E402
-from elekloader.dtmod import sha                            # noqa: E402
+from elekloader.elemod import sha                            # noqa: E402
 from elekloader.mkmod import stock_parts                    # noqa: E402
 
 STOCK = os.environ.get('ELEKLOADER_STOCK', '')
@@ -46,8 +46,17 @@ def image():
     return _c['img']
 
 
+def doc_path(mid):
+    paths = sorted(glob.glob(os.path.join(MODS, '%s-*.elemod' % mid))
+                   + glob.glob(os.path.join(MODS, '%s-*.dtmod' % mid))) if MODS else []
+    if not paths:
+        raise Skip('no %s mod in %s' % (mid, MODS))
+    return paths[-1]
+
+
 def doc(mid):
-    paths = sorted(glob.glob(os.path.join(MODS, '%s-*.dtmod' % mid))) if MODS else []
+    paths = sorted(glob.glob(os.path.join(MODS, '%s-*.elemod' % mid))
+                   + glob.glob(os.path.join(MODS, '%s-*.dtmod' % mid))) if MODS else []
     if not paths:
         raise Skip('no %s mod in %s' % (mid, MODS))
     with open(paths[-1]) as fh:
@@ -61,7 +70,7 @@ def mods(*ids):
 def expect(fn, *words):
     try:
         fn()
-    except dtmod.ModError as e:
+    except elemod.ModError as e:
         for w in words:
             assert w in str(e), 'expected %r in: %s' % (w, e)
         return str(e)
@@ -194,7 +203,7 @@ def test_full_build_verifies():
     image()
     for i in IDS:
         doc(i)
-    paths = [sorted(glob.glob(os.path.join(MODS, '%s-*.dtmod' % i)))[-1] for i in IDS]
+    paths = [doc_path(i) for i in IDS]
     out, man = patch.build(STOCK, paths, '2.0t', log=lambda *a: None)
     assert man['output']['main']['inplace_min_gap'] > 0
     o = syx.Syx(out)

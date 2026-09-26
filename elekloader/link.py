@@ -20,8 +20,9 @@ A relocation target is one of:
 """
 import struct
 
-from .dtmod import (ModError, sha, _int, _hex, common_checks, insn_check, overlaps, summarize,
+from .elemod import (ModError, sha, _int, _hex, common_checks, insn_check, overlaps, summarize,
                     parse_parts, parse_resources, parse_sites, parts_bytes, resolve_target,
+                    format_of,
                     COMMON)
 
 FORMAT2 = 2
@@ -42,8 +43,8 @@ class Mod2:
     def __init__(self, doc, name='<mod>', raw=None):
         self.doc, self.name = doc, name
         self.sha256 = sha(raw) if raw is not None else None
-        if not isinstance(doc, dict) or doc.get('dtmod') != FORMAT2:
-            raise ModError('%s: not a format-2 dtmod' % name)
+        if format_of(doc) != FORMAT2:
+            raise ModError('%s: not a format-2 .elemod file' % name)
         extra = set(doc) - COMMON - {'sections', 'symbols', 'exports', 'imports', 'weak',
                                      'relocs', 'collections', 'contribute', 'copied'}
         if extra:
