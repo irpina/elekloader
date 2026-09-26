@@ -71,6 +71,14 @@ Users install mods from their `.elemod` files.
   tables. The loader's linker places them, resolves their symbols and
   checks them.
 
+Every set of format-2 mods needs the **core** mod. Its sources are in
+[mods/core](mods/core); build it once with the SDK (below) and install
+`core-2.0a.elemod` next to the mods you use:
+
+```bash
+python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx   # -> mods/core/out/core-2.0a.elemod
+```
+
 Files from before version 0.2 used the `.dtmod` extension; they still load.
 
 ## Adapting your mod to elekloader

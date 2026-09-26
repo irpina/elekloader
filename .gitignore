@@ -13,3 +13,4 @@ dist/
 *.elemod
 *.dtmod
 out/
+mods/*/out/
