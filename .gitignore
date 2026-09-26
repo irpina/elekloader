@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+
+# Firmware, and anything built from it, never goes in this repository.
+*.syx
+*.syx.json
+*.map.json
+*.bin
+*.dtmod
+out/

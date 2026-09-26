@@ -1,0 +1,280 @@
+"""Elektron OS .syx files: read, rebuild with a new main OS, verify.
+
+The writer changes one thing: the stored bytes of the device's main OS
+section. Every other section's stored bytes, the ELE3 header (but its
+4-character version field) and the framing messages (but their message
+count) are copied from the stock file.
+
+For the Digitakt mk1, the layout is the one elektron-firmware-tool writes,
+which the device has accepted since CFW 1.5S: sections from 0x80, each
+padded to 16 bytes; the preamble's length is the 16-aligned end of the last
+section; no trailer; the final 101-byte chunk is padded with zeros. Given
+that tool's section-3 stream, write() reproduces its .syx byte for byte
+(tests/test_patcher.py).
+
+verify() re-reads an output file with the decoder, not the writer. It
+refuses the file unless every other section is stock and the main OS
+depacks, in place as the bootloader does it, to the expected image.
+"""
+import hashlib
+import struct
+
+from .codec import aplib, elz, transport
+
+COUNT_OFF, TABLE_OFF, ENTRY_SZ = 0x1C, 0x20, 16
+CHUNK = transport.CHUNK_SIZE      # decoded bytes per data message (101)
+FIRST_COUNTER = transport.FIRST_COUNTER
+
+
+class SyxError(ValueError):
+    pass
+
+
+def sha(b):
+    return hashlib.sha256(b).hexdigest()
+
+
+def _messages(raw):
+    out, i = [], 0
+    while i < len(raw):
+        if raw[i] != 0xF0:
+            raise SyxError('byte %d is not F0' % i)
+        j = raw.find(b'\xf7', i)
+        if j < 0:
+            raise SyxError('message at %d has no F7' % i)
+        out.append(raw[i:j + 1])
+        i = j + 1
+    return out
+
+
+def _decode(msgs):
+    """Data messages -> the decoded stream (8-in-7)."""
+    out = bytearray()
+    for m in msgs:
+        payload = m[10:126]
+        k = 0
+        while k < len(payload):
+            ms = payload[k]
+            k += 1
+            for n in range(7):
+                if k >= len(payload):
+                    break
+                out.append(payload[k] | (0x80 if (ms >> (6 - n)) & 1 else 0))
+                k += 1
+    return bytes(out)
+
+
+def classify(raw):
+    """Stored section bytes -> 'packed' | 'raw-header' | 'raw'."""
+    ln, sm = struct.unpack_from('>II', raw, 0) if len(raw) >= 8 else (0, 1)
+    if ln + 8 <= len(raw) and (sum(raw[8:8 + ln]) & 0xFFFFFFFF) == sm:
+        return 'packed'
+    if len(raw) >= 8 and sm == 0:
+        return 'raw-header'
+    return 'raw'
+
+
+def unstore(raw):
+    kind = classify(raw)
+    if kind == 'packed':
+        return elz.depack_section(raw)
+    if kind == 'raw-header':
+        return bytes(raw[8:])
+    return bytes(raw)
+
+
+class Syx:
+    """A parsed Elektron OS .syx (bytes in memory)."""
+
+    def __init__(self, raw):
+        self.raw = bytes(raw)
+        self.sha256 = sha(self.raw)
+        msgs = _messages(self.raw)
+        if len(msgs) < 3 or len(msgs[0]) != 16 or len(msgs[-1]) != 16:
+            raise SyxError('no 16-byte framing messages at both ends')
+        self.framing = (msgs[0], msgs[-1])
+        self.data = msgs[1:-1]
+        if any(len(m) != 128 for m in self.data):
+            raise SyxError('a data message is not 128 bytes')
+        if any(m[1:4] != transport.MFR for m in msgs):
+            raise SyxError('manufacturer id is not Elektron')
+        self.device_id = msgs[0][4]
+        self.k = msgs[0][8]                     # the transfer constant
+        dec = _decode(self.data)
+        self.total, self.checksum = struct.unpack_from('>II', dec, 0)
+        if dec[8:12] != b'ELE3' or 8 + self.total > len(dec):
+            raise SyxError('no ELE3 container')
+        self.container = dec[8:8 + self.total]
+        self.tail = dec[8 + self.total:]        # the final chunk's padding
+        self.header = self.container[:COUNT_OFF]
+        n = struct.unpack_from('>I', self.container, COUNT_OFF)[0]
+        if TABLE_OFF + n * ENTRY_SZ > 0x80:
+            raise SyxError('%d sections do not fit the table' % n)
+        self.table = [struct.unpack_from('>IIII', self.container, TABLE_OFF + ENTRY_SZ * i)
+                      for i in range(n)]
+        self.stored = {}
+        for sid, off, clen, _dest in self.table:
+            if sid in self.stored or off + clen > self.total:
+                raise SyxError('section %d: duplicate or outside the container' % sid)
+            self.stored[sid] = self.container[off:off + clen]
+
+    @classmethod
+    def load(cls, path):
+        with open(path, 'rb') as fh:
+            return cls(fh.read())
+
+    @property
+    def version(self):
+        return self.header[0x14:0x18].decode('ascii', 'replace')
+
+    def section(self, sid):
+        """-> the section's decoded bytes."""
+        return unstore(self.stored[sid])
+
+
+def pack_main(image):
+    """Main OS image -> its stored section (the aPLib-shaped packer)."""
+    return aplib.pack_section(bytes(image))
+
+
+def write(stock, stored_main, dev, version=None):
+    """-> .syx bytes: `stock` (a Syx) with the main OS section's stored bytes
+    replaced by `stored_main` and, if given, the ELE3 version field set."""
+    if dev.trailer is not None:
+        raise SyxError('%s files are sealed (%s); elekloader cannot write them yet'
+                       % (dev.name, dev.trailer))
+    header = bytearray(stock.header)
+    if version is not None:
+        v = version.encode('ascii')
+        if len(v) != 4:
+            raise SyxError('the version field is exactly 4 characters')
+        header[0x14:0x18] = v
+    cont = bytearray(stock.container[:0x80])   # the table area as stock has it
+    cont[:COUNT_OFF] = header
+    for i, (sid, _o, _l, dest) in enumerate(stock.table):
+        data = stored_main if sid == dev.main_section else stock.stored[sid]
+        struct.pack_into('>IIII', cont, TABLE_OFF + ENTRY_SZ * i, sid, len(cont), len(data), dest)
+        cont += data
+        cont += bytes(-len(cont) % 16)
+    stream = struct.pack('>II', len(cont), transport.content_checksum(bytes(cont))) + bytes(cont)
+    return transport.encode_syx(stream, stock.device_id, stock.framing[0], stock.framing[1])
+
+
+def inplace_depack(stored, dev):
+    """Depack the main OS the way the bootloader does it in place: the stored
+    section staged at dev.stage, the output written from dev.main_load over
+    it. -> (image, the smallest distance in bytes between the writer and the
+    next unread stream byte). A distance > 0 throughout means the in-place
+    result is the same as depacking elsewhere."""
+    length = struct.unpack_from('>I', stored, 0)[0]
+    s = elz.Bits(stored, 8, 8 + length)
+    out = bytearray()
+    base = dev.stage - dev.main_load       # the stream's offset from the load address
+    gap = None
+    last = 1
+    while True:
+        if s.bit():
+            g = base + s.p - len(out)
+            if gap is None or g < gap:
+                gap = g
+            out.append(s.byte())
+            continue
+        g = s.gamma()
+        if g == elz.REUSE:
+            off = last
+        else:
+            raw = ((g << 8) + s.byte()) & 0xFFFFFFFF
+            if raw == elz.BIAS:
+                break
+            off = (raw - elz.BIAS) & 0xFFFFFFFF
+            last = off
+        short = 2 * s.bit() + s.bit()
+        n = short if short else s.gamma() + 2
+        if off > elz.FAR:
+            n += 1
+        if off == 0 or off > len(out):
+            raise SyxError('the main OS: a match reaches before the output')
+        g = base + s.p - (len(out) + n)    # the last byte this match writes
+        if gap is None or g < gap:
+            gap = g
+        for _ in range(n + 1):
+            out.append(out[-off])
+    if s.p != 8 + length:
+        raise SyxError('the main OS: the end marker is not at the declared length')
+    return bytes(out), gap
+
+
+def verify(out, stock, want_main, dev, version=None):
+    """Refuse (SyxError) unless `out` (bytes) is `stock` (a Syx) with only the
+    main OS changed, and it depacks in place to `want_main`. -> facts."""
+    o = Syx(out)                       # every message's shape and the ELE3 magic
+    main = dev.main_section
+    for m in o.data:
+        if m[4] != stock.device_id:
+            raise SyxError('a data message has device id 0x%02x' % m[4])
+    bad = sum(1 for m in o.data if transport.packet_checksum(m[1:-1], o.k) != m[-2])
+    if bad:
+        raise SyxError('%d data messages fail their checksum' % bad)
+    for i, m in enumerate(o.data):
+        c = (m[7] << 14) | (m[8] << 7) | m[9]
+        if c != FIRST_COUNTER + i:
+            raise SyxError('data message %d carries counter %d' % (i, c))
+    for fo, fs in zip(o.framing, stock.framing):
+        n = (fo[12] << 14) | (fo[13] << 7) | fo[14]
+        if n != len(o.data):
+            raise SyxError('framing count %d != %d data messages' % (n, len(o.data)))
+        if fo[:12] + fo[15:] != fs[:12] + fs[15:]:
+            raise SyxError('a framing message differs from stock beyond its count')
+    got = transport.content_checksum(o.container)
+    if got != o.checksum:
+        raise SyxError('content checksum 0x%08x != preamble 0x%08x' % (got, o.checksum))
+    if len(o.tail) >= CHUNK or any(o.tail):
+        raise SyxError('%d bytes after the container, or not zero' % len(o.tail))
+    if [(s, d) for s, _o, _l, d in o.table] != [(s, d) for s, _o, _l, d in stock.table]:
+        raise SyxError('section order or destinations differ from stock')
+    at = 0x80
+    for sid, off, clen, _d in o.table:
+        if off != at:
+            raise SyxError('section %d at 0x%x, not 0x%x' % (sid, off, at))
+        at = off + clen + (-(off + clen) % 16)
+    if o.total != at:
+        raise SyxError('container length %d is not the 16-aligned end %d' % (o.total, at))
+    if dev.flash_at + o.total > dev.flash_limit:
+        raise SyxError('the container ends at flash 0x%x > 0x%x'
+                       % (dev.flash_at + o.total, dev.flash_limit))
+    hd = [i for i in range(COUNT_OFF) if o.header[i] != stock.header[i]]
+    if any(not 0x14 <= i < 0x18 for i in hd):
+        raise SyxError('ELE3 header differs outside the version field: %s' % hd)
+    if version is not None and o.version != version:
+        raise SyxError('version field %r, not %r' % (o.version, version))
+    if o.container[TABLE_OFF + ENTRY_SZ * len(o.table):0x80] != \
+            stock.container[TABLE_OFF + ENTRY_SZ * len(stock.table):0x80]:
+        raise SyxError('the table area after the entries differs from stock')
+    for sid in stock.stored:
+        if sid == main:
+            continue
+        if o.stored[sid] != stock.stored[sid]:
+            raise SyxError('section %d is not stock' % sid)
+        if o.section(sid) != stock.section(sid):
+            raise SyxError('section %d does not depack as stock' % sid)
+    s3 = o.stored[main]
+    if classify(s3) != 'packed':
+        raise SyxError('the main OS is not a packed stream with a valid byte sum')
+    img, gap = inplace_depack(s3, dev)
+    if img != bytes(want_main):
+        raise SyxError('the main OS does not depack to the patched image')
+    if elz.depack_section(s3) != img:
+        raise SyxError('the main OS: the depacker disagrees with the in-place depack')
+    if gap <= 0:
+        raise SyxError('the main OS: the in-place depack overwrites unread input (gap %d)' % gap)
+    return {
+        'sha256': sha(out), 'bytes': len(out), 'messages': len(o.data) + 2,
+        'content_checksum': '0x%08x' % o.checksum, 'container_len': o.total,
+        'flash_end': '0x%06x' % (dev.flash_at + o.total),
+        'flash_headroom': dev.flash_limit - dev.flash_at - o.total,
+        'ele3_version': o.version,
+        'main': {'section': main, 'stored': len(s3), 'image': len(img), 'sha256': sha(img),
+                 'staged_to': '0x%08x' % (dev.stage + len(s3)), 'inplace_min_gap': gap},
+        'sections': {str(s): {'stored': l, 'stored_sha256': sha(o.stored[s]), 'stock': s != main}
+                     for s, _o, l, _d in o.table},
+    }

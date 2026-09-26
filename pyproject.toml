@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "elekloader"
+version = "0.1.0"
+description = "Custom firmware for Elektron devices, built from mods on your own machine"
+readme = "README.md"
+license = {text = "GPL-2.0-only"}
+requires-python = ">=3.9"
+dependencies = []
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Sound/Audio",
+]
+
+[project.scripts]
+elekpatch = "elekloader.patch:main"
+
+[project.gui-scripts]
+elekloader = "elekloader.gui:main"
+
+[tool.setuptools.packages.find]
+include = ["elekloader*"]

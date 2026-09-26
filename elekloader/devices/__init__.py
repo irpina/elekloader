@@ -1,0 +1,121 @@
+"""Device profiles: everything elekloader knows about one Elektron product.
+
+A profile names the stock releases it supports (by hash, so a file is
+recognised by its content, not its name) and the facts the patcher,
+the linker and the verifier need about that product's firmware:
+
+  - the container: which section is the main OS, its load address, how it
+    is stored, whether the file carries a trailer;
+  - the bootloader: where it stages the main OS before unpacking it in
+    place (the verifier simulates that), and the flash budget;
+  - the CPU: which instruction decoder checks patch sites;
+  - where mods may live at run time (the free memory areas), and where the
+    linker puts their code and data.
+
+To add a device, write a module here with a Device subclass and add it to
+DEVICES (docs/DEVICES.md).
+"""
+from dataclasses import dataclass, field
+
+
+class UnknownFirmware(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class Release:
+    version: str                 # the OS version, as Elektron names it
+    syx_sha256: str              # the stock .syx file
+    main_sha256: str             # its main OS section, depacked
+    main_len: int                # ... and that section's length
+
+
+@dataclass
+class Device:
+    key: str                     # 'digitakt-mk1'
+    name: str                    # 'Digitakt mk1'
+    sysex_id: int                # the device byte of its SysEx messages
+    releases: dict               # version -> Release
+    main_section: int            # the container's main OS section id
+    main_load: int               # where the main OS runs
+    stage: int                   # where the bootloader stages it before unpacking
+    flash_at: int                # where the container starts in flash
+    flash_limit: int             # where it must end
+    trailer: str                 # None: no trailer (mk1); 'hmac': sealed (not yet)
+    isa: str                     # 'coldfire'
+    areas: dict = field(default_factory=dict)   # name -> (lo, hi): free at run time
+    ddr: tuple = (0, 0)          # the linker's area for .run, tables and .bss
+    sram_code: tuple = (0, 0)    # the linker's area for .fast code
+    fast_table: str = ''         # the table .fast sections are copied through
+    recovery: str = ''           # how to get back to stock, said to the user
+    notes: str = ''
+
+    def release_for(self, syx_sha256=None, main_sha256=None):
+        for r in self.releases.values():
+            if syx_sha256 and r.syx_sha256 == syx_sha256:
+                return r
+            if main_sha256 and r.main_sha256 == main_sha256:
+                return r
+        return None
+
+    def image_end(self, release):
+        """Where an appended blob loads: the stock main OS's end."""
+        return self.main_load + release.main_len
+
+    def decoder(self):
+        if self.isa == 'coldfire':
+            from ..isa import coldfire
+            return coldfire
+        raise UnknownFirmware('no instruction decoder for %s' % self.isa)
+
+
+def _all():
+    from . import digitakt_mk1
+    return [digitakt_mk1.DEVICE]
+
+
+DEVICES = None
+
+
+def devices():
+    global DEVICES
+    if DEVICES is None:
+        DEVICES = _all()
+    return DEVICES
+
+
+def identify(syx_sha256):
+    """-> (Device, Release) for a stock .syx, by its hash."""
+    for d in devices():
+        r = d.release_for(syx_sha256=syx_sha256)
+        if r:
+            return d, r
+    raise UnknownFirmware('not a stock firmware elekloader knows (sha256 %s). Supported: %s'
+                          % (syx_sha256, supported()))
+
+
+def for_target(target):
+    """-> (Device, Release) a .dtmod's "target" names."""
+    if not isinstance(target, dict):
+        raise UnknownFirmware('no target')
+    key = target.get('device')
+    for d in devices():
+        if key and d.key != key:
+            continue
+        r = d.release_for(syx_sha256=target.get('syx_sha256'))
+        if r and r.main_sha256 == target.get('section3_sha256', r.main_sha256) \
+                and r.main_len == target.get('section3_len', r.main_len):
+            return d, r
+    raise UnknownFirmware('made for a firmware elekloader does not know (%s %s)'
+                          % (target.get('product', '?'), target.get('os', '?')))
+
+
+def target_of(device, release):
+    """-> the "target" object a .dtmod for this firmware carries."""
+    return {'device': device.key, 'product': device.name, 'os': release.version,
+            'syx_sha256': release.syx_sha256, 'section3_sha256': release.main_sha256,
+            'section3_len': release.main_len}
+
+
+def supported():
+    return ', '.join('%s %s' % (d.name, v) for d in devices() for v in d.releases)
