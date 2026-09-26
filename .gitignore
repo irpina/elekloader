@@ -14,3 +14,4 @@ dist/
 *.dtmod
 out/
 mods/*/out/
+elekloader/bundled/

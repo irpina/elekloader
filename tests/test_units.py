@@ -14,6 +14,28 @@ FRAMING0 = bytes.fromhex('f000203c0a007f010500017200000000f7')[:15] + b'\xf7'
 FRAMING1 = bytes.fromhex('f000203c0a007f020500017200000000f7')[:15] + b'\xf7'
 
 
+def test_requirements_are_ticked_with_a_mod():
+    from elekloader.gui import with_requirements
+    d = {
+        'lib/slicer.elemod': {'id': 'slicer', 'fits': True, 'requires': ['core']},
+        'lib/health.elemod': {'id': 'health', 'fits': True, 'requires': ['core']},
+        'app/core-2.0a.elemod': {'id': 'core', 'fits': True, 'requires': []},
+        'lib/core-1.0.elemod': {'id': 'core', 'fits': False, 'requires': []},
+        'lib/opts.elemod': {'id': 'opts', 'fits': True, 'requires': ['core', 'fast']},
+    }
+    # core comes with the first mod that needs it: the one made for this firmware
+    assert with_requirements(d, set(), 'lib/slicer.elemod') == {
+        'lib/slicer.elemod', 'app/core-2.0a.elemod'}
+    # an enabled core is not doubled
+    on = {'lib/slicer.elemod', 'app/core-2.0a.elemod'}
+    assert with_requirements(d, on, 'lib/health.elemod') == on | {'lib/health.elemod'}
+    # a requirement nothing provides is left for the check to report
+    assert with_requirements(d, set(), 'lib/opts.elemod') == {
+        'lib/opts.elemod', 'app/core-2.0a.elemod'}
+    # a mod that requires nothing adds only itself
+    assert with_requirements(d, set(), 'app/core-2.0a.elemod') == {'app/core-2.0a.elemod'}
+
+
 def test_8in7_round_trip():
     rnd = random.Random(1)
     for n in (0, 1, 6, 7, 8, 13, 14, 101, 250):

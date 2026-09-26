@@ -10,7 +10,10 @@ a game's (Vortex, Nexus Mod Manager). Tkinter, no other dependency.
 - The details pane: what a mod is, every change it makes, and what it
   needs.
 - Install from file copies a .elemod into your library; Uninstall removes it
-  from there.
+  from there. Mods built into the app (the bundled/ folder next to this
+  file: the Windows build carries core there) are listed too, and can't be
+  uninstalled.
+- Ticking a mod also ticks the mods it requires, when they are listed.
 - Profiles are named sets of enabled mods.
 - Build firmware links the enabled mods onto your stock .syx, verifies the
   result, and saves it.
@@ -46,6 +49,31 @@ def settings_dir():
 
 LIBRARY = os.path.join(settings_dir(), 'mods')
 SETTINGS = os.path.join(settings_dir(), 'settings.json')
+# Mods built into the app: the Windows build puts core here. A source checkout
+# has none (built .elemod files are never committed).
+BUNDLED = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bundled')
+
+
+def with_requirements(descs, enabled, path):
+    """-> `enabled` plus `path`, plus the mods it requires (and theirs) that are
+    listed and made for the stock firmware, when none enabled already provides
+    them. descs: {path: describe(path)}. Of several files with the id, the last
+    (by file name) is taken; a requirement nothing provides is left for the
+    check to report."""
+    out = set(enabled) | {path}
+    todo = [path]
+    while todo:
+        d = descs.get(todo.pop(), {})
+        for rid in d.get('requires', []):
+            if any(descs.get(p, {}).get('id') == rid for p in out):
+                continue
+            cands = sorted((p for p, x in descs.items()
+                            if x.get('id') == rid and x.get('fits') and 'error' not in x),
+                           key=os.path.basename)
+            if cands:
+                out.add(cands[-1])
+                todo.append(cands[-1])
+    return out
 
 
 # ---- the logic ----------------------------------------------------------------------
@@ -591,7 +619,7 @@ class LoaderWindow:
         if p in self.enabled:
             self.enabled.discard(p)
         else:
-            self.enabled.add(p)
+            self.enabled = with_requirements(self.descs, self.enabled, p)
         self._remember()
         self._fill(*self._last_status())
         self.changed()
@@ -948,7 +976,32 @@ def main(argv=None):
     ap.add_argument('--mods', action='append', default=[],
                     help='also list the .elemod files in this folder (repeatable)')
     ap.add_argument('--library', default=LIBRARY, help='where Install puts mods')
+    ap.add_argument('--selftest', metavar='OUT.json',
+                    help='write the version and the built-in mods to OUT.json and exit '
+                         '(for checking a build; opens no window)')
     a = ap.parse_args(argv)
+    also = ([BUNDLED] if os.path.isdir(BUNDLED) else []) + a.mods
+    if a.selftest:
+        from . import __version__
+        mods = []
+        for p in elemod.mod_files(BUNDLED):
+            m = elemod.load_any(p)
+            mods.append({'file': os.path.basename(p), 'id': m.id, 'version': m.version,
+                         'sha256': m.sha256})
+        import tempfile
+        import tkinter as tk
+        root = tk.Tk()                       # the window's toolkit works (hidden, destroyed)
+        root.withdraw()
+        root.update()
+        root.destroy()
+        with tempfile.TemporaryDirectory() as tmp:
+            listed = LoaderModel(None, os.path.join(tmp, 'mods'), also,
+                                 os.path.join(tmp, 'settings.json')).files()
+        with open(a.selftest, 'w') as fh:
+            json.dump({'version': __version__, 'frozen': bool(getattr(sys, 'frozen', False)),
+                       'tk': str(tk.TkVersion), 'bundled': mods,
+                       'listed': [os.path.basename(p) for p in listed]}, fh, indent=1)
+        return
     try:
         from ctypes import windll
         windll.shcore.SetProcessDpiAwareness(1)
@@ -956,7 +1009,7 @@ def main(argv=None):
         pass
     import tkinter as tk
     root = tk.Tk()
-    LoaderWindow(root, LoaderModel(a.stock, a.library, a.mods))
+    LoaderWindow(root, LoaderModel(a.stock, a.library, also))
     root.mainloop()
 
 
