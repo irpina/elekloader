@@ -20,29 +20,72 @@ file on your own machine, and you flash it the way you flash any OS update.
 | Digitakt (mk1) | 1.53 | supported |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
 
-## Running it
+## Install
 
-Python 3.9 or newer, nothing else to install.
+**Windows:** download `elekloader-<version>-windows.zip` from
+[Releases](https://github.com/irpina/elekloader/releases/latest), unzip it
+and run `elekloader.exe`. There is nothing to install and no Python needed.
+The **core** mod is built in: it is listed in the window, and ticked for you
+with any mod that needs it. The exe is not signed, so Windows may say it
+protected your PC: choose **More info**, then **Run anyway**.
+
+**Any system, from source:** Python 3.9 or newer, nothing else to install
+(on Linux, Tkinter may be a separate package, such as `python3-tk`).
+Download or clone this repository, then:
 
 ```bash
 python -m elekloader                        # the window
-python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod a.elemod --mod b.elemod --out custom.syx --version 2.0a
-python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod a.elemod --check
+python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.0a.elemod --mod a.elemod --out custom.syx --version 2.0a
+python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.0a.elemod --mod a.elemod --check
 ```
 
 With `pip install .` the same commands are `elekloader` and `elekpatch`.
+From source, core is not built in. Take `core-2.0a.elemod` from
+[Releases](https://github.com/irpina/elekloader/releases/latest) (or build
+it, below), and install it like any mod.
 
-The window works like a game's mod manager:
-- **The mod list.** Tick mods to enable them. Each shows its status as you
-  go: Enabled, Conflict, Needs another mod, or made for other firmware.
-- **The details pane.** Each mod's description, every change it makes
-  (patch sites, the events it handles, its memory) and what it requires.
-- **Install from file**, **profiles**, and the memory budgets.
-- **Build firmware.** It builds, verifies and saves the `.syx`, and shows
-  its sha256 and the verification results.
+You also need the **stock OS file** for your device, exactly as Elektron
+publishes it. For the Digitakt mk1, that is `Digitakt_OS1.53.syx` from
+[Elektron's Digitakt downloads](https://www.elektron.se/support-downloads/digitakt).
+elekloader recognises it by its hash.
 
-Your mod library, profiles and the stock file you chose last are kept in
-`%APPDATA%\elekloader` (Windows) or `~/.elekloader`.
+## Build a custom OS
+
+1. **Change stock firmware...** (top right): choose your stock OS file.
+   The header then shows the device and OS version with a tick.
+2. **+ Install from file...**: add the `.elemod` files of the mods you want.
+   They are copied into your library.
+3. **Tick the mods** (or double-click them). Each mod's status shows as you
+   go: Enabled, Conflict, Needs another mod, or made for other firmware.
+   The check below the list says when the set combines: "No conflicts ...
+   Ready to build".
+4. **OS version shown**: the 4 characters the unit will show as its OS
+   version.
+5. **BUILD FIRMWARE**: choose where to save the `.syx`. elekloader builds it,
+   verifies it (see below), and shows its sha256.
+
+The details pane shows each mod's description, every change it makes
+(patch sites, the events it handles, its memory) and what it requires.
+Profiles save a set of ticked mods. Your library, profiles and the stock
+file you chose last are kept in `%APPDATA%\elekloader` (Windows) or
+`~/.elekloader`.
+
+## Flash it
+
+Send the `.syx` to the unit the way Elektron describes for OS updates
+([How to update your device](https://support.elektron.se/support/solutions/articles/43000662890-how-to-update-your-device)).
+For the Digitakt mk1:
+1. Connect it over USB and open Elektron Transfer.
+2. Select the unit and **Connect**.
+3. Drag the `.syx` onto **Drop files here**.
+4. Press **YES** on the unit.
+
+Don't turn the unit off until the upgrade is done.
+
+**Recovery:** the bootloader is never changed, so the stock OS file always
+restores the unit. If a custom OS will not start, hold **FUNC** while
+powering on for the startup menu, and press **TRIG 4** for OS UPGRADE.
+Then send the stock `.syx` with Transfer's legacy OS upgrade mode.
 
 ## What a build guarantees
 
@@ -71,9 +114,9 @@ Users install mods from their `.elemod` files.
   tables. The loader's linker places them, resolves their symbols and
   checks them.
 
-Every set of format-2 mods needs the **core** mod. Its sources are in
-[mods/core](mods/core); build it once with the SDK (below) and install
-`core-2.0a.elemod` next to the mods you use:
+Every set of format-2 mods needs the **core** mod. The Windows app has it
+built in, and each release carries `core-2.0a.elemod`. Its sources are in
+[mods/core](mods/core); to build it yourself, use the SDK (below):
 
 ```bash
 python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx   # -> mods/core/out/core-2.0a.elemod
@@ -100,6 +143,20 @@ python -m elekloader.mkmod ...                                                  
 function on the draw event, and it puts a small square in the corner of
 every screen. Building code needs the device's cross toolchain; for the
 Digitakt mk1 that is m68k binutils and gcc.
+
+## The Windows app
+
+`packaging/build_windows.py --core core-2.0a.elemod` builds
+`elekloader.exe` with PyInstaller (`packaging/requirements-build.txt`). The
+exe carries core in `elekloader/bundled`. The script checks the exe with
+its `--selftest` (the version, Tk, the built-in core and its hash) before it
+zips it.
+
+The **windows-build** workflow (Actions, run by hand with a release's tag)
+does the same on GitHub's Windows runner. It takes `core-*.elemod` from that
+release and attaches the zip and `SHA256SUMS.txt` to it. core is built where
+the stock OS file is and attached to the release first. No firmware
+reaches the workflow.
 
 ## Tests
 

@@ -1,0 +1,50 @@
+# The Windows app, built for a release: elekloader.exe with the core mod
+# built in, zipped, and attached to that release with its checksums.
+#
+# Run it by hand (Actions > windows-build > Run workflow) with the release's
+# tag, once the release exists and carries core-*.elemod. That file is built
+# from mods/core with the SDK, which needs the stock OS file, so it is made
+# where that file is and attached to the release first; no firmware ever
+# reaches this workflow.
+name: windows-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release's tag (vX.Y.Z); the tag must exist and equal v + elekloader's version"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows-build:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: The tag is the version
+        run: |
+          v=$(python -c "import elekloader; print(elekloader.__version__)")
+          test "$TAG" = "v$v" || { echo "tag $TAG is not v$v"; exit 1; }
+      - name: Unit tests
+        run: python tests/test_units.py
+      - name: Build tools
+        run: python -m pip install -r packaging/requirements-build.txt
+      - name: The core mod, from the release
+        run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "core-*.elemod" --dir build/core
+      - name: Build, self-test and zip
+        run: python packaging/build_windows.py --core build/core/core-*.elemod --out dist
+      - name: Attach to the release
+        run: gh release upload "$TAG" dist/elekloader-*-windows.zip dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
