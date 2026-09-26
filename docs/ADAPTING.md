@@ -30,7 +30,9 @@ monolithic build; section 4 says how to go from A to B.
 - For linkable mods on the Digitakt mk1: the **core** mod (`core-*.elemod`).
   It owns the shared hook sites, copies every mod's code into RAM at boot,
   and turns the shared sites into events your mod subscribes to. Every
-  format-2 mod set needs exactly one core.
+  format-2 mod set needs exactly one core. Its sources are in `mods/core`:
+  `python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx`
+  writes `mods/core/out/core-2.0a.elemod`.
 
 ## 2. The rules
 

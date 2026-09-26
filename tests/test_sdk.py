@@ -3,8 +3,10 @@
 Needs files named by environment variables; a test whose inputs are
 missing is skipped, not passed:
   ELEKLOADER_STOCK   the stock Digitakt_OS1.53.syx
-  ELEKLOADER_MODS    a folder with the core mod (core-*.elemod or .dtmod)
-Building the example also needs the cross toolchain (m68k-linux-gnu-gcc).
+  ELEKLOADER_MODS    optional: a folder with the core mod (core-*.elemod or
+                     .dtmod); without one, mods/core is built
+Building mods/core or the example also needs the cross toolchain
+(m68k-linux-gnu-as, -gcc and -ld).
 """
 import contextlib
 import glob
@@ -36,12 +38,24 @@ def stock():
     return STOCK
 
 
+_BUILT_CORE = []
+
+
+def built_core():
+    """mods/core, built once with the SDK into a temporary folder."""
+    if not _BUILT_CORE:
+        tc = devices.devices()[0].toolchain
+        if not shutil.which(os.environ.get('ELEKLOADER_CROSS', tc['prefix']) + 'as'):
+            raise Skip('no m68k cross assembler to build mods/core')
+        path, _m = build.build(os.path.join(ROOT, 'mods', 'core'), stock(), tempfile.mkdtemp())
+        _BUILT_CORE.append(path)
+    return _BUILT_CORE[0]
+
+
 def core():
     paths = elemod.mod_files(MODS) if MODS else []
     paths = [p for p in paths if os.path.basename(p).startswith('core-')]
-    if not paths:
-        raise Skip('no core mod in ELEKLOADER_MODS')
-    return paths[-1]
+    return paths[-1] if paths else built_core()
 
 
 def lint_json(*args):
@@ -100,6 +114,17 @@ def test_lint():
         if slicer:
             rc, r = lint_json(path, '--stock', stock(), '--with', core(), '--with', slicer[-1])
             assert rc == 1 and any('overlap' in x for x in r['problems'])
+
+
+def test_core_builds_and_lints():
+    path = built_core()
+    with open(path) as fh:
+        doc = json.load(fh)
+    assert doc['id'] == 'core' and '.boot' in doc['sections'] and len(doc['sites']) == 8
+    assert sorted(doc['collections']) == ['ev_draw', 'ev_enc', 'ev_key', 'ev_render_in',
+                                          'ev_render_out', 'ev_settings', 'ev_tick']
+    rc, r = lint_json(path, '--stock', stock())
+    assert rc == 0 and r['link']['order'][0].startswith('core')
 
 
 def test_example_builds_and_links():

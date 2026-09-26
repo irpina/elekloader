@@ -1,0 +1,22 @@
+{
+ "id": "core", "version": "2.0a",
+ "title": "core", "category": "Framework", "author": "irpina",
+ "description": "The boot copier and the hook bus: every other mod needs it. On its own it changes nothing the unit does.",
+ "device": "digitakt-mk1", "os": "1.53",
+ "sources": ["core.s"],
+ "sites": [
+  {"addr": "0x40000538", "stock": "4eb940001c94", "op": "jsr", "target": "boot"},
+  {"addr": "0x4000a770", "stock": "4eb9400ca34c", "op": "jsr", "target": "core_tick"},
+  {"addr": "0x4000a7d6", "stock": "4eb9400ca382", "op": "jsr", "target": "core_draw"},
+  {"addr": "0x4000b770", "stock": "4eb9400084fe", "op": "jsr", "target": "core_key"},
+  {"addr": "0x4000b7ba", "stock": "4eb940008550", "op": "jsr", "target": "core_enc"},
+  {"addr": "0x40058800", "stock": "205248780002", "op": "jmp", "target": "core_settings"},
+  {"addr": "0x40077428", "stock": "203c7fffffff", "op": "jsr", "target": "core_render_in"},
+  {"addr": "0x400784c8", "stock": "4cee3fffff58", "op": "jsr", "target": "core_render_out"}
+ ],
+ "collections": {
+  "ev_tick": 4, "ev_draw": 4, "ev_key": 4, "ev_enc": 4, "ev_settings": 4,
+  "ev_render_in": 4, "ev_render_out": 4
+ },
+ "resources": {"names": ["timer:DTIM0"]}
+}
