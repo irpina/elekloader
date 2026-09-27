@@ -2,9 +2,10 @@
 
 Everything elekloader knows about a product is in one profile,
 `elekloader/devices/<device>.py`, registered in `devices/__init__.py`
-(`_all()`). The Digitakt mk1 profile is the example; the Octatrack's
-(`octatrack.py`) shows a second file family and a device with no linkable
-mods yet.
+(`_all()`). The Digitakt mk1 profile is the example. The Digitone mk1's
+(`digitone_mk1.py`) is a second device of the same file family, and the
+Octatrack's (`octatrack.py`) a second file family; neither has linkable mods
+yet.
 
 | field | what it is | how it was found for the Digitakt mk1 |
 |---|---|---|
@@ -22,6 +23,27 @@ mods yet.
 | `protected` | main OS ranges no mod may change, with the reason | none on the mk1 |
 | `blob_max` | a cap on the appended blob, if the DDR areas do not give one | none on the mk1 |
 | `toolchain` | the compiler, assembler and flags the SDK uses | the CFW's build |
+
+## The Digitone mk1 and Digitone Keys (1.43)
+
+- **Files.** One `.syx` serves both. It is the Digitakt mk1's family (ELE3,
+  the same SysEx transport and layout) with seven sections: 5, 2 (the
+  bootstrap, with the startup menu), 3 (MAIN OS), 4 (the updater), 6, 7 (the
+  second CPU's image, which renders the FM voices) and 8. The longer table
+  moves the first section to `0xA0`; the reader and writer take that from
+  the stock file. From its own main OS stream, the writer reproduces the
+  stock file byte for byte.
+- **Unpacking.** The bootstrap loads the updater, which reads section 3
+  from flash (offset + `0x80000`) to `0x40200000` and depacks it in place to
+  `0x40000400`: the Digitakt mk1's loader, instruction for instruction
+  (`0x80003518` in the updater). Stock's in-place gap is 403,540 bytes.
+- **Recovery.** The startup menu (FUNC at power-on) has 4 ... OS UPGRADE.
+- **Checked in an emulator.** digikit's firmware check runs the file's own
+  bootstrap and updater, then a cold boot and a scripted session. Stock 1.43,
+  repacked by elekloader, passes it against stock: the updater accepts the
+  stream, and the screens and the audio are identical.
+- **Not known yet.** The free run-time areas and the hook sites a core would
+  use, so only format-1 mods load.
 
 ## The Octatrack (1.40C)
 

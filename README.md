@@ -18,6 +18,7 @@ file on your own machine, and you flash it the way you flash any OS update.
 | Device | OS | Status |
 |---|---|---|
 | Digitakt (mk1) | 1.53 | supported |
+| Digitone (mk1) and Digitone Keys | 1.43 | supported: whole builds (format-1 mods); no linkable mods yet |
 | Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); no linkable mods yet |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
 
@@ -49,6 +50,8 @@ You also need the **stock OS file** for your device, exactly as Elektron
 publishes it:
 - Digitakt mk1: `Digitakt_OS1.53.syx`, from
   [Elektron's Digitakt downloads](https://www.elektron.se/support-downloads/digitakt);
+- Digitone mk1 or Digitone Keys: `Digitone_and_Digitone_Keys_OS1.43.syx`
+  (one file serves both), from Elektron's Digitone downloads;
 - Octatrack MKI or MKII: `OCTATRACK_OS1.40C.syx` or `OCTATRACK_OS1.40C.bin`
   (one file serves both), from Elektron's Octatrack downloads.
 
@@ -69,7 +72,8 @@ the file by its hash.
    The check below the list says when the set combines: "No conflicts ...
    Ready to build".
 4. **OS version shown**: what the unit will show as its OS version: 4
-   characters on the Digitakt mk1, 1 to 10 on the Octatrack.
+   characters on the Digitakt mk1 and the Digitone mk1, 1 to 10 on the
+   Octatrack.
 5. **BUILD FIRMWARE**: choose where to save the `.syx`. elekloader builds it,
    verifies it (see below), and shows its sha256. For the Octatrack it also
    writes the card file, the `.bin` beside it.
@@ -84,7 +88,7 @@ file you chose last are kept in `%APPDATA%\elekloader` (Windows) or
 
 Send the `.syx` to the unit the way Elektron describes for OS updates
 ([How to update your device](https://support.elektron.se/support/solutions/articles/43000662890-how-to-update-your-device)).
-For the Digitakt mk1:
+For the Digitakt mk1 and the Digitone mk1:
 1. Connect it over USB and open Elektron Transfer.
 2. Select the unit and **Connect**.
 3. Drag the `.syx` onto **Drop files here**.
@@ -100,8 +104,9 @@ For the Octatrack, from the card (back it up first):
 4. When it restarts, power-cycle it once more before judging anything.
 
 **Recovery:** the bootloader is never changed, so the stock OS file always
-restores the unit. If a custom OS will not start, hold **FUNC** while
-powering on for the startup menu, and press **TRIG 4** for OS UPGRADE.
+restores the unit. If a custom OS will not start on a Digitakt mk1 or a
+Digitone mk1, hold **FUNC** while powering on for the startup menu, and
+press **TRIG 4** for OS UPGRADE.
 Then send the stock `.syx` with Transfer's legacy OS upgrade mode. On the
 Octatrack: hold **FUNC** while powering on, press **TRIG 3** for MIDI
 UPGRADE, and send the stock `.syx` over 5-pin DIN MIDI (USB MIDI does not
@@ -121,7 +126,9 @@ The output is refused unless every one of these holds:
   bootloader does it: in place, over its own staged copy.
 
 For the Digitakt mk1, the writer produces the same bytes as
-elektron-firmware-tool when given the same main OS stream.
+elektron-firmware-tool when given the same main OS stream. For the Digitone
+mk1 (the same file family, with seven sections), it reproduces the stock
+file from its own main OS stream.
 
 The Octatrack's files are checked the same way: the container header
 differs only in its 10-character version field, every SysEx message's
@@ -196,6 +203,7 @@ ELEKLOADER_STOCK=Digitakt_OS1.53.syx ELEKLOADER_MODS=path/to/mods python tests/t
 ELEKLOADER_STOCK=... ELEKLOADER_MODS=... python tests/test_sdk.py   # the example needs the cross compiler
 ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=bundle.elemod ELEKLOADER_CTOOL_SYX=its-build.syx python tests/test_patcher.py
 ELEKLOADER_OT_SYX=OCTATRACK_OS1.40C.syx ELEKLOADER_OT_BIN=OCTATRACK_OS1.40C.bin python tests/test_octatrack.py
+ELEKLOADER_DN_SYX=Digitone_and_Digitone_Keys_OS1.43.syx python tests/test_digitone.py
 ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
 ```
 
