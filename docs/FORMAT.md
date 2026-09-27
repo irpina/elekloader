@@ -49,8 +49,8 @@ A format-1 mod is one monolithic custom build:
 - one `blob`, appended at the stock main OS's end:
   `{"load", "len", "sha256", "parts": [["hex", "..."], ["stock", addr, n]]}`;
 - `ele3_version`, optional: the version the unit shows. The name is
-  historical; it applies to every device: 4 characters on the Digitakt mk1,
-  1 to 10 on the Octatrack.
+  historical; it applies to every device: 4 characters on the Digitakt mk1
+  and the Digitone mk1, 1 to 10 on the Octatrack.
 
 At most one format-1 mod can be used, and never with format-2 mods.
 

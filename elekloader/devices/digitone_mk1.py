@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+"""Digitone (mk1), and Digitone Keys: one OS file serves both. Two ColdFire
+MCF5441x CPUs; the main OS runs from DDR at 0x40000400. Measured on OS 1.43:
+
+- The container: sections 5, 2 (the bootstrap, with the startup menu),
+  3 (MAIN OS, packed in the aPLib-shaped codec), 4 (the updater, raw, at
+  0x80000400), 6, 7 (the second CPU's image, which renders the FM voices)
+  and 8. Seven table entries, so the sections start at 0xA0 (the Digitakt
+  mk1's five start at 0x80). Only section 3 ever changes.
+- No trailer, the Digitakt mk1's layout otherwise: each section padded to 16
+  bytes, the preamble's length the 16-aligned end of the last, zero padding
+  to the last 101-byte data message. From its own section-3 stream, the
+  writer reproduces the stock file byte for byte.
+- The bootstrap loads the updater, and the updater unpacks MAIN OS. It reads
+  section 3 from flash (its container offset + 0x80000) to 0x40200000, then
+  depacks it from there to 0x40000400, over itself. This is the Digitakt
+  mk1's loader, instruction for instruction, 8 bytes further on
+  (0x80003518). In place, stock's writer stays at least 403,540 bytes behind
+  its reader.
+- The flash limit is the Digitakt mk1's (its bootstrap reads a block at
+  0x380000). The stock container ends at 0x1C2400.
+- Recovery: the bootstrap's startup menu (section 2's strings) has
+  "4 ... OS UPGRADE", as on the Digitakt mk1.
+- Not known yet: the free run-time areas and the hook sites a core would
+  use, so there are no linkable mods for it yet: whole builds (format 1) only.
+"""
+from . import Device, Release
+
+DEVICE = Device(
+    key='digitone-mk1',
+    name='Digitone mk1',
+    sysex_id=0x0D,
+    releases={
+        '1.43': Release(
+            version='1.43',
+            syx_sha256='c5a54cc05b921f2e4bd814834c5365c2a5aa01d7772a9a2961fac1c3095bf9aa',
+            main_sha256='3831a477a2a22befb23c42e47e782853da49566ef5d0a1767fcf6c30e6767414',
+            main_len=2732208),
+    },
+    main_section=3,
+    main_load=0x40000400,
+    stage=0x40200000,
+    flash_at=0x80000,
+    flash_limit=0x380000,
+    trailer=None,
+    isa='coldfire',
+    recovery=('hold FUNC while powering on for the startup menu, press TRIG 4 (OS UPGRADE), '
+              'then send the stock .syx'),
+    toolchain={
+        'prefix': 'm68k-linux-gnu-',                # binutils + gcc for m68k/ColdFire
+        'asflags': ['-mcpu=54455'],                 # ColdFire V4 (the MCF5441x's ISA)
+        'cflags': ['-mcpu=54455', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib',
+                   '-fno-pic', '-fno-pie', '-fomit-frame-pointer', '-Wall'],
+    },
+)

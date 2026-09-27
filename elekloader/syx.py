@@ -6,11 +6,13 @@ section. Every other section's stored bytes, the ELE3 header (but its
 count) are copied from the stock file.
 
 For the Digitakt mk1, the layout is the one elektron-firmware-tool writes,
-which the device has accepted since CFW 1.5S: sections from 0x80, each
-padded to 16 bytes; the preamble's length is the 16-aligned end of the last
-section; no trailer; the final 101-byte chunk is padded with zeros. Given
-that tool's section-3 stream, write() reproduces its .syx byte for byte
-(tests/test_patcher.py).
+which the device has accepted since CFW 1.5S: sections from where the stock
+file's first one starts (0x80 after the Digitakt mk1's five table entries,
+0xA0 after the Digitone mk1's seven), each padded to 16 bytes; the
+preamble's length is the 16-aligned end of the last section; no trailer; the
+final 101-byte chunk is padded with zeros. Given that tool's section-3
+stream, write() reproduces its .syx byte for byte (tests/test_patcher.py);
+given a stock file's own stream, it reproduces that file.
 
 verify() re-reads an output file with the decoder, not the writer. It
 refuses the file unless every other section is stock and the main OS
@@ -108,10 +110,14 @@ class Syx:
         self.tail = dec[8 + self.total:]        # the final chunk's padding
         self.header = self.container[:COUNT_OFF]
         n = struct.unpack_from('>I', self.container, COUNT_OFF)[0]
-        if TABLE_OFF + n * ENTRY_SZ > 0x80:
-            raise SyxError('%d sections do not fit the table' % n)
+        if not 0 < n <= 16 or TABLE_OFF + n * ENTRY_SZ > self.total:
+            raise SyxError('%d sections: not a table this container can hold' % n)
         self.table = [struct.unpack_from('>IIII', self.container, TABLE_OFF + ENTRY_SZ * i)
                       for i in range(n)]
+        # the sections follow the table: from the first one's offset on
+        self.data_start = min(off for _s, off, _l, _d in self.table)
+        if TABLE_OFF + n * ENTRY_SZ > self.data_start:
+            raise SyxError('%d sections do not fit the table' % n)
         self.stored = {}
         for sid, off, clen, _dest in self.table:
             if sid in self.stored or off + clen > self.total:
@@ -149,7 +155,7 @@ def write(stock, stored_main, dev, version=None):
         if len(v) != 4:
             raise SyxError('the version field is exactly 4 characters')
         header[0x14:0x18] = v
-    cont = bytearray(stock.container[:0x80])   # the table area as stock has it
+    cont = bytearray(stock.container[:stock.data_start])   # the table area as stock has it
     cont[:COUNT_OFF] = header
     for i, (sid, _o, _l, dest) in enumerate(stock.table):
         data = stored_main if sid == dev.main_section else stock.stored[sid]
@@ -232,7 +238,7 @@ def verify(out, stock, want_main, dev, version=None):
         raise SyxError('%d bytes after the container, or not zero' % len(o.tail))
     if [(s, d) for s, _o, _l, d in o.table] != [(s, d) for s, _o, _l, d in stock.table]:
         raise SyxError('section order or destinations differ from stock')
-    at = 0x80
+    at = stock.data_start
     for sid, off, clen, _d in o.table:
         if off != at:
             raise SyxError('section %d at 0x%x, not 0x%x' % (sid, off, at))
@@ -247,8 +253,8 @@ def verify(out, stock, want_main, dev, version=None):
         raise SyxError('ELE3 header differs outside the version field: %s' % hd)
     if version is not None and o.version != version:
         raise SyxError('version field %r, not %r' % (o.version, version))
-    if o.container[TABLE_OFF + ENTRY_SZ * len(o.table):0x80] != \
-            stock.container[TABLE_OFF + ENTRY_SZ * len(stock.table):0x80]:
+    if o.container[TABLE_OFF + ENTRY_SZ * len(o.table):stock.data_start] != \
+            stock.container[TABLE_OFF + ENTRY_SZ * len(stock.table):stock.data_start]:
         raise SyxError('the table area after the entries differs from stock')
     for sid in stock.stored:
         if sid == main:

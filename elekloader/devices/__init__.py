@@ -81,8 +81,8 @@ class Device:
 
 
 def _all():
-    from . import digitakt_mk1, octatrack
-    return [digitakt_mk1.DEVICE, octatrack.DEVICE]
+    from . import digitakt_mk1, digitone_mk1, octatrack
+    return [digitakt_mk1.DEVICE, digitone_mk1.DEVICE, octatrack.DEVICE]
 
 
 DEVICES = None

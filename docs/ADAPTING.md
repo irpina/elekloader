@@ -209,7 +209,8 @@ python -m elekloader.mkmod --stock Digitakt_OS1.53.syx --build my-cfw.syx \
 - No manifest? `--diff` (in place of `--manifest` and `--elf`) works the
   sites out by comparing your build with stock. A run of changed bytes is
   a code site only when it covers whole instructions on both sides;
-  anything else is a data site. This is the path for the Octatrack, whose
+  anything else is a data site. This is the path for the Digitone mk1 and
+  the Octatrack, whose
   mods are all whole builds (for example an octabam build):
   `python -m elekloader.mkmod --stock OCTATRACK_OS1.40C.syx --build built.syx --diff --meta meta.json --out my.elemod`.
 - The build may append one blob at the stock main OS's end (0x4025CA40 on

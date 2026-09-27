@@ -93,6 +93,33 @@ def test_transport_and_parser_round_trip():
     assert n == len(s.data)
 
 
+def test_a_longer_section_table_moves_the_data_start():
+    """Seven sections (the Digitone mk1's) end the table at 0x90, and the data
+    starts at 0xA0: the reader finds it there and the writer keeps it."""
+    body = b'another main os ' * 300
+    secs = [(5, 0, b'meta'), (2, 0x02000802, b'boot' * 10), (3, 0x40000400, aplib.pack_section(body)),
+            (4, 0x80000400, b'upd' * 7), (6, 0, b'six'), (7, 0, b'dsp' * 40), (8, 0, b'eight')]
+    cont = bytearray(0xA0)
+    cont[:4] = b'ELE3'
+    cont[0x14:0x18] = b'1.43'
+    struct.pack_into('>I', cont, 0x1C, len(secs))
+    for i, (sid, dest, data) in enumerate(secs):
+        struct.pack_into('>IIII', cont, 0x20 + 16 * i, sid, len(cont), len(data), dest)
+        cont += data
+        cont += bytes(-len(cont) % 16)
+    cont = bytes(cont)
+    stream = struct.pack('>II', len(cont), transport.content_checksum(cont)) + cont
+    raw = transport.encode_syx(stream, 0x0A, FRAMING0, FRAMING1)     # the framing's device byte
+    s = syx.Syx(raw)
+    assert s.data_start == 0xA0 and s.section(3) == body and [t[0] for t in s.table] == [5, 2, 3, 4, 6, 7, 8]
+    dev = devices.devices()[0]
+    assert syx.write(s, s.stored[3], dev) == raw
+    out = syx.write(s, aplib.pack_section(body + b'!'), dev, 'ABCD')
+    o = syx.Syx(out)
+    assert o.data_start == 0xA0 and o.section(3) == body + b'!' and o.version == 'ABCD'
+    assert all(o.stored[k] == s.stored[k] for k in (5, 2, 4, 6, 7, 8))
+
+
 def test_elek_transport_and_card_file_round_trip():
     from elekloader import elek
     body = b'octatrack main os ' * 400
