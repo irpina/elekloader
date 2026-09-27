@@ -2,13 +2,19 @@ elekloader
 Copyright (C) 2026 irpina and contributors
 
 elekloader is free software: you can redistribute it and/or modify it under
-the terms of the GNU General Public License, version 2, as published by the
-Free Software Foundation. See LICENSE.
+the terms of the GNU General Public License as published by the Free
+Software Foundation, either version 2 of the License, or (at your option)
+any later version. See LICENSE for version 2.
+
+elekloader is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+more details.
 
 Code from other projects
 ------------------------
 These files come from digikit (https://github.com/m-dwyer/digikit),
-under the GNU GPL version 2. Each file names its origin in its header.
+under the GNU GPL version 2 or (at your option) any later version. Each file names its origin in its header.
 
   elekloader/codec/elz.py        dt2/elz.py, by Em D
   elekloader/codec/aplib.py      dt2/aplib.py, by Em D; the match-finder and

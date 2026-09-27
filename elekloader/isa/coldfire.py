@@ -1,5 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Vendored from digikit (https://github.com/m-dwyer/digikit), emu/cfisa.py,
-# under the GNU GPL version 2. By irpina. See NOTICE.
+# under the GNU GPL version 2 or (at your option) any later version. By irpina. See NOTICE.
 """ColdFire instruction decoder: lengths, operand classes and control flow.
 
 The emulator runs Unicorn's ColdFire V4e model, which is a superset of the

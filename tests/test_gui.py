@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """The window's first run, with its file dialogs scripted (pytest, or run with
 python). A hidden Tk window: it needs Tk, and the files, named by environment
 variables; a test whose inputs are missing is skipped, not passed:

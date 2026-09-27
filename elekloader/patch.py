@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Your stock OS file + .elemod files -> a custom firmware (the command line).
 
     python -m elekloader.patch --stock Digitakt_OS1.53.syx \

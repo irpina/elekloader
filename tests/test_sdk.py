@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """The mod author's tools: sdk.build and lint (pytest, or run with python).
 
 Needs files named by environment variables; a test whose inputs are

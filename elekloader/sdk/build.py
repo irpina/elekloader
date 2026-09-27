@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Build a mod's sources into a format-2 .elemod (docs/ADAPTING.md).
 
     python -m elekloader.sdk.build MODDIR --stock Digitakt_OS1.53.syx [--out DIR]

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """elekloader's window: a mod manager for Elektron firmware, in the style of
 a game's (Vortex, Nexus Mod Manager). Tkinter, no other dependency.
 

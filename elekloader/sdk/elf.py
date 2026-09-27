@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """A reader for 32-bit big-endian ELF relocatable objects (m68k): sections,
 symbols and RELA relocations, as sdk/build.py needs them."""
 import struct

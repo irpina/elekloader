@@ -7,11 +7,11 @@ name = "elekloader"
 version = "0.3.0"
 description = "Custom firmware for Elektron devices, built from mods on your own machine"
 readme = "README.md"
-license = {text = "GPL-2.0-only"}
+license = {text = "GPL-2.0-or-later"}
 requires-python = ">=3.9"
 dependencies = []
 classifiers = [
-    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "Topic :: Multimedia :: Sound/Audio",

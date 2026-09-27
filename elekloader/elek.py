@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """The Octatrack family's OS files: the ELEK container, the legacy SysEx
 transport (.syx) and the ELUP card file (.bin). Read, rebuild with a new
 main OS, verify.

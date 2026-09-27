@@ -1,3 +1,4 @@
+| SPDX-License-Identifier: GPL-2.0-or-later
 | core: the boot copier and the hook bus every other mod builds on.
 | ColdFire V4 (MCF54418), Digitakt mk1 OS 1.53; assemble with -mcpu=54455.
 |

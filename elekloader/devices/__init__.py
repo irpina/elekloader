@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Device profiles: everything elekloader knows about one Elektron product.
 
 A profile names the stock releases it supports (by hash, so a file is

@@ -125,7 +125,7 @@ small square in the top-right corner of every screen.
 | field | |
 |---|---|
 | `id` | lowercase, unique; also the prefix of your global symbols |
-| `license` | an SPDX identifier. The example uses `GPL-2.0-or-later`, which can be combined with the loader's GPL-2.0. Put the same `SPDX-License-Identifier` line at the top of each source |
+| `license` | an SPDX identifier. The example uses `GPL-2.0-or-later`, the loader's own licence. Put the same `SPDX-License-Identifier` line at the top of each source |
 | `sources` | `.c` and `.s` files, compiled/assembled with the device's flags |
 | `subscribe` | `{"event", "fn", "order"}`: `fn` is one of your global functions |
 | `sites` | patches to the stock image: `{"addr", "stock", "op", "target" or "new"}` (below) |

@@ -1,5 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Vendored from digikit (https://github.com/m-dwyer/digikit), dt2/elz.py,
-# under the GNU GPL version 2. By Em D. See NOTICE.
+# under the GNU GPL version 2 or (at your option) any later version. By Em D. See NOTICE.
 """Decoder for the LZ codec used in Elektron ELE3 firmware sections.
 
 Brought in from Em's sharc-spec work (fw/elz.py) on 2026-09-15.

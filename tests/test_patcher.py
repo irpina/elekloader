@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Format-1 bundles, the writer and the verifier (pytest, or run with python).
 
 Needs files that never go in the repo, named by environment variables; a
