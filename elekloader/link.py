@@ -153,6 +153,9 @@ def check(mods, image):
     if bad and bad[0].startswith('the mods are for different firmware'):
         return bad
     dev = mods[0].dev
+    if not dev.linkable():
+        return ['the %s has no linkable (format-2) mods yet: only whole builds (format 1) '
+                'can be used on it' % dev.name]
     ids = [m.id for m in mods]
     cores = [m for m in mods if '.boot' in m.sections]
     if len(cores) != 1:

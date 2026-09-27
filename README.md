@@ -18,14 +18,15 @@ file on your own machine, and you flash it the way you flash any OS update.
 | Device | OS | Status |
 |---|---|---|
 | Digitakt (mk1) | 1.53 | supported |
+| Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); no linkable mods yet |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
 
 ## Install
 
-**Windows:** download `elekloader-<version>-windows.zip` from
-[Releases](https://github.com/irpina/elekloader/releases/latest), unzip it
-and run `elekloader.exe`. There is nothing to install and no Python needed.
-The **core** mod is built in: it is listed in the window, and ticked for you
+**Windows:** download `elekloader-<version>-windows.exe` from
+[Releases](https://github.com/irpina/elekloader/releases/latest) and run it.
+There is nothing to install and no Python needed. The first time, it asks
+for your stock OS file (below). The **core** mod is built in: it is listed in the window, and ticked for you
 with any mod that needs it. The exe is not signed, so Windows may say it
 protected your PC: choose **More info**, then **Run anyway**.
 
@@ -45,24 +46,33 @@ From source, core is not built in. Take `core-2.0a.elemod` from
 it, below), and install it like any mod.
 
 You also need the **stock OS file** for your device, exactly as Elektron
-publishes it. For the Digitakt mk1, that is `Digitakt_OS1.53.syx` from
-[Elektron's Digitakt downloads](https://www.elektron.se/support-downloads/digitakt).
-elekloader recognises it by its hash.
+publishes it:
+- Digitakt mk1: `Digitakt_OS1.53.syx`, from
+  [Elektron's Digitakt downloads](https://www.elektron.se/support-downloads/digitakt);
+- Octatrack MKI or MKII: `OCTATRACK_OS1.40C.syx` or `OCTATRACK_OS1.40C.bin`
+  (one file serves both), from Elektron's Octatrack downloads.
+
+The `.zip` Elektron's site gives you works as it is. elekloader recognises
+the file by its hash.
 
 ## Build a custom OS
 
-1. **Change stock firmware...** (top right): choose your stock OS file.
-   The header then shows the device and OS version with a tick.
+1. **Your stock OS file**: the first time, elekloader asks for it (a `.syx`,
+   a `.bin` or Elektron's `.zip`); **Change stock firmware...** (top right)
+   picks another. The header then shows the device and OS version with a
+   tick. Mods made for another device are hidden unless you tick **Show mods
+   for other devices**.
 2. **+ Install from file...**: add the `.elemod` files of the mods you want.
    They are copied into your library.
 3. **Tick the mods** (or double-click them). Each mod's status shows as you
    go: Enabled, Conflict, Needs another mod, or made for other firmware.
    The check below the list says when the set combines: "No conflicts ...
    Ready to build".
-4. **OS version shown**: the 4 characters the unit will show as its OS
-   version.
+4. **OS version shown**: what the unit will show as its OS version: 4
+   characters on the Digitakt mk1, 1 to 10 on the Octatrack.
 5. **BUILD FIRMWARE**: choose where to save the `.syx`. elekloader builds it,
-   verifies it (see below), and shows its sha256.
+   verifies it (see below), and shows its sha256. For the Octatrack it also
+   writes the card file, the `.bin` beside it.
 
 The details pane shows each mod's description, every change it makes
 (patch sites, the events it handles, its memory) and what it requires.
@@ -82,10 +92,20 @@ For the Digitakt mk1:
 
 Don't turn the unit off until the upgrade is done.
 
+For the Octatrack, from the card (back it up first):
+1. **PROJECT > SYSTEM > USB DISK MODE**, and copy the `.bin` to the root of
+   the card.
+2. Eject the card on the computer, then leave USB DISK MODE on the unit.
+3. **PROJECT > SYSTEM > OS UPGRADE**, and confirm.
+4. When it restarts, power-cycle it once more before judging anything.
+
 **Recovery:** the bootloader is never changed, so the stock OS file always
 restores the unit. If a custom OS will not start, hold **FUNC** while
 powering on for the startup menu, and press **TRIG 4** for OS UPGRADE.
-Then send the stock `.syx` with Transfer's legacy OS upgrade mode.
+Then send the stock `.syx` with Transfer's legacy OS upgrade mode. On the
+Octatrack: hold **FUNC** while powering on, press **TRIG 3** for MIDI
+UPGRADE, and send the stock `.syx` over 5-pin DIN MIDI (USB MIDI does not
+work for this).
 
 ## What a build guarantees
 
@@ -102,6 +122,15 @@ The output is refused unless every one of these holds:
 
 For the Digitakt mk1, the writer produces the same bytes as
 elektron-firmware-tool when given the same main OS stream.
+
+The Octatrack's files are checked the same way: the container header
+differs only in its 10-character version field, every SysEx message's
+checksum and the card file's checksum are right, and the `.syx` and `.bin`
+carry the same container. The copy of the bootloader that the OS can
+re-flash (0x400de1e0-0x400e21e0) must stay stock. The in-place unpack is
+not simulated there: where its bootloader stages the image is not known
+yet. From their own main OS stream, the writer reproduces Elektron's
+`.syx` and `.bin` byte for byte.
 
 ## Mods
 
@@ -149,12 +178,13 @@ Digitakt mk1 that is m68k binutils and gcc.
 `packaging/build_windows.py --core core-2.0a.elemod` builds
 `elekloader.exe` with PyInstaller (`packaging/requirements-build.txt`). The
 exe carries core in `elekloader/bundled`. The script checks the exe with
-its `--selftest` (the version, Tk, the built-in core and its hash) before it
-zips it.
+its `--selftest` (the version, Tk, the built-in core and its hash, the
+devices it supports), then writes `elekloader-<version>-windows.exe` and
+`SHA256SUMS.txt`.
 
 The **windows-build** workflow (Actions, run by hand with a release's tag)
 does the same on GitHub's Windows runner. It takes `core-*.elemod` from that
-release and attaches the zip and `SHA256SUMS.txt` to it. core is built where
+release and attaches the exe and `SHA256SUMS.txt` to it. core is built where
 the stock OS file is and attached to the release first. No firmware
 reaches the workflow.
 
@@ -165,6 +195,8 @@ python tests/test_units.py        # needs nothing
 ELEKLOADER_STOCK=Digitakt_OS1.53.syx ELEKLOADER_MODS=path/to/mods python tests/test_link.py
 ELEKLOADER_STOCK=... ELEKLOADER_MODS=... python tests/test_sdk.py   # the example needs the cross compiler
 ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=bundle.elemod ELEKLOADER_CTOOL_SYX=its-build.syx python tests/test_patcher.py
+ELEKLOADER_OT_SYX=OCTATRACK_OS1.40C.syx ELEKLOADER_OT_BIN=OCTATRACK_OS1.40C.bin python tests/test_octatrack.py
+ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
 ```
 
 A test whose input files are not given is skipped, not passed. Firmware

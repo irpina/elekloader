@@ -2,7 +2,9 @@
 
 Everything elekloader knows about a product is in one profile,
 `elekloader/devices/<device>.py`, registered in `devices/__init__.py`
-(`_all()`). The Digitakt mk1 profile is the example.
+(`_all()`). The Digitakt mk1 profile is the example; the Octatrack's
+(`octatrack.py`) shows a second file family and a device with no linkable
+mods yet.
 
 | field | what it is | how it was found for the Digitakt mk1 |
 |---|---|---|
@@ -16,6 +18,24 @@ Everything elekloader knows about a product is in one profile,
 | `areas` | memory that is free at run time: where a mod's regions may lie | the research on what the OS never touches |
 | `ddr`, `sram_code`, `fast_table` | where the linker puts mods' code and data, fast code, and the table that copies it | the areas above |
 | `recovery` | how to get back to stock, shown to the user | FUNC at power-on |
+| `container`, `version_len` | the file family (`'ele3'`, `'elek'`) and the version field's length | the container header |
+| `protected` | main OS ranges no mod may change, with the reason | none on the mk1 |
+| `blob_max` | a cap on the appended blob, if the DDR areas do not give one | none on the mk1 |
+| `toolchain` | the compiler, assembler and flags the SDK uses | the CFW's build |
+
+## The Octatrack (1.40C)
+
+- **Files.** One stock image serves the MKI and MKII. It comes as a `.syx`
+  (the legacy SysEx transport) and as a `.bin` card file (ELUP: a
+  word-feedback cipher with a checksum). Both carry one ELEK container,
+  whose only section is the main OS, at `0x40000400`. `elek.py` rebuilds
+  both stock files byte for byte from their own main OS stream.
+- **Protected.** `0x400de1e0-0x400e21e0` holds the copy of the bootloader
+  that the OS can re-flash. No site, blob or verified output may change it.
+- **Flash.** The container sits at `0x4000` and must end below `0x200000`.
+- **Not known yet.** Where the bootloader stages the image (`stage` is
+  `None`), so the in-place unpack is not simulated; and the free run-time
+  areas, so there is no linker layout and only format-1 mods load.
 
 ## What a new device needs besides its profile
 

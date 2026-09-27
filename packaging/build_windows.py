@@ -8,9 +8,10 @@ Needs Windows and PyInstaller (packaging/requirements-build.txt). The core
 machine may hold. The release workflow takes it from the release it builds
 for.
 
-Writes OUT/elekloader-<version>-windows.zip (elekloader.exe and README.txt)
-and OUT/SHA256SUMS.txt. Before zipping, it runs the exe's --selftest and
-checks that the exe carries exactly the core it was given.
+Writes OUT/elekloader-<version>-windows.exe, the file a release offers, and
+OUT/SHA256SUMS.txt. First it runs the exe's --selftest and checks that the
+exe carries exactly the core it was given and knows every device this
+source tree does.
 """
 import argparse
 import hashlib
@@ -19,43 +20,12 @@ import os
 import shutil
 import subprocess
 import sys
-import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-from elekloader import __version__, elemod     # noqa: E402
-
-README = """elekloader {version} for Windows
-============================
-
-A mod loader for Elektron firmware: pick mods, give it the stock OS file
-Elektron publishes for your device, and it builds a custom OS file on this
-computer. Flash that the way you flash any OS update.
-
-Run elekloader.exe. Nothing to install; your mods, profiles and the stock
-file you chose are kept in %APPDATA%\\elekloader.
-
-Built in: the core mod ({core}), which every linkable mod needs. It is
-listed in the window and ticked for you with any mod that requires it.
-
-1. Change stock firmware... : choose the stock OS file (for the Digitakt
-   mk1: Digitakt_OS1.53.syx, from Elektron's Digitakt downloads).
-2. + Install from file... : add the .elemod files of the mods you want.
-3. Tick them. The check below the list says when they combine.
-4. OS version shown: 4 characters the unit will show as its OS version.
-5. BUILD FIRMWARE: save the .syx. It is verified before it is written.
-
-Recovery: the bootloader is never changed, so the stock OS file always
-restores the unit. On the Digitakt mk1, hold FUNC while powering on for the
-startup menu.
-
-The exe is not signed: Windows may say it protected your PC. Choose "More
-info", then "Run anyway".
-
-https://github.com/irpina/elekloader (GPL-2.0). Not affiliated with Elektron.
-"""
+from elekloader import __version__, devices, elemod     # noqa: E402
 
 
 def sha(path):
@@ -66,7 +36,7 @@ def sha(path):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--core', required=True, help='the core .elemod to build in')
-    ap.add_argument('--out', default=os.path.join(ROOT, 'dist'), help='where the zip goes')
+    ap.add_argument('--out', default=os.path.join(ROOT, 'dist'), help='where the exe goes')
     a = ap.parse_args(argv)
     if sys.platform != 'win32':
         sys.exit('build_windows.py builds a Windows exe: run it on Windows')
@@ -96,22 +66,19 @@ def main(argv=None):
         st = json.load(fh)
     want = [{'file': core_file, 'id': 'core', 'version': core.version, 'sha256': core.sha256}]
     if (st.get('version') != __version__ or not st.get('frozen') or st.get('bundled') != want
-            or st.get('listed') != [core_file] or not st.get('tk')):
+            or st.get('listed') != [core_file] or not st.get('tk')
+            or st.get('supported') != devices.supported()):
         sys.exit('the exe\'s self-test does not match: %s' % json.dumps(st))
-    print('self-test: elekloader %s, frozen, Tk %s, built in and listed: %s %s'
-          % (st['version'], st['tk'], core_file, core.sha256[:16]))
+    print('self-test: elekloader %s, frozen, Tk %s, built in and listed: %s %s; supports %s'
+          % (st['version'], st['tk'], core_file, core.sha256[:16], st['supported']))
 
     os.makedirs(a.out, exist_ok=True)
-    name = 'elekloader-%s-windows.zip' % __version__
-    zpath = os.path.join(a.out, name)
-    with zipfile.ZipFile(zpath, 'w', zipfile.ZIP_DEFLATED) as z:
-        z.write(exe, 'elekloader/elekloader.exe')
-        z.writestr('elekloader/README.txt',
-                   README.format(version=__version__, core=core_file).replace('\n', '\r\n'))
+    name = 'elekloader-%s-windows.exe' % __version__
+    out = os.path.join(a.out, name)
+    shutil.copyfile(exe, out)
     with open(os.path.join(a.out, 'SHA256SUMS.txt'), 'w', newline='\n') as fh:
-        fh.write('%s  %s\n' % (sha(zpath), name))
-        fh.write('%s  elekloader.exe (inside the zip)\n' % sha(exe))
-    print('wrote %s (%d bytes)' % (zpath, os.path.getsize(zpath)))
+        fh.write('%s  %s\n' % (sha(out), name))
+    print('wrote %s (%d bytes)' % (out, os.path.getsize(out)))
     return 0
 
 

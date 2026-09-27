@@ -112,6 +112,7 @@ small square in the top-right corner of every screen.
 {
  "id": "my-mod", "version": "1.0",
  "title": "My mod", "category": "Utilities", "author": "you",
+ "license": "GPL-2.0-or-later",
  "description": "One or two sentences a user reads in the loader.",
  "device": "digitakt-mk1", "os": "1.53",
  "sources": ["my.c"],
@@ -124,6 +125,7 @@ small square in the top-right corner of every screen.
 | field | |
 |---|---|
 | `id` | lowercase, unique; also the prefix of your global symbols |
+| `license` | an SPDX identifier. The example uses `GPL-2.0-or-later`, which can be combined with the loader's GPL-2.0. Put the same `SPDX-License-Identifier` line at the top of each source |
 | `sources` | `.c` and `.s` files, compiled/assembled with the device's flags |
 | `subscribe` | `{"event", "fn", "order"}`: `fn` is one of your global functions |
 | `sites` | patches to the stock image: `{"addr", "stock", "op", "target" or "new"}` (below) |
@@ -204,10 +206,16 @@ python -m elekloader.mkmod --stock Digitakt_OS1.53.syx --build my-cfw.syx \
 - The manifest lists your patches: `{"patches": [{"addr": "0x...", "old":
   "hex", "new": "hex"}]}`, each `old` the whole stock instruction(s) or data
   word. Every byte your build changes must be covered.
+- No manifest? `--diff` (in place of `--manifest` and `--elf`) works the
+  sites out by comparing your build with stock. A run of changed bytes is
+  a code site only when it covers whole instructions on both sides;
+  anything else is a data site. This is the path for the Octatrack, whose
+  mods are all whole builds (for example an octabam build):
+  `python -m elekloader.mkmod --stock OCTATRACK_OS1.40C.syx --build built.syx --diff --meta meta.json --out my.elemod`.
 - The build may append one blob at the stock main OS's end (0x4025CA40 on
   the Digitakt mk1 1.53); the ELF's `__run_start`, `__bss_end`,
   `__fast_start` and `__fast_len` describe where it runs.
-- `meta.json`: `id`, `title`, `category`, `description`, `names`,
+- `meta.json`: `id`, `title`, `category`, `description`, `license`, `names`,
   `regions`, `requires`, and `data_sites` for data patches that happen to
   decode as instructions.
 
@@ -248,7 +256,7 @@ with anything, so plan the move to Path B:
 - [ ] `python -m elekloader.lint <mod> --stock <stock.syx> --with <core> [--with <others>]`
       exits 0, with every mod users are likely to combine yours with.
 - [ ] `python -m elekloader.patch ... --out test.syx --version XXXX` prints `WROTE`.
-- [ ] `mod.json` has `description`, `category`, `requires`, and every named
+- [ ] `mod.json` has `description`, `category`, `license`, `requires`, and every named
       resource you use under `resources.names`.
 - [ ] Your sources hold no copied firmware code, and no firmware file is
       committed anywhere.
