@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Unit tests that need no firmware (pytest, or run with python)."""
 import os
 import random

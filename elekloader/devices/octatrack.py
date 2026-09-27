@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Octatrack (MKI and MKII): a ColdFire MCF5445x (V4e, EMAC) and a DSP56721.
 The main OS runs from SDRAM at 0x40000400. MKI and MKII get the same 1.40C
 file.

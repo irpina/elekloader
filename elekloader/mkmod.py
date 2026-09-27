@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """A built custom firmware (.syx or card .bin) -> a format-1 .elemod (one mod = one whole build).
 
     python -m elekloader.mkmod --stock Digitakt_OS1.53.syx --build CUSTOM.syx \

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """The .elemod file: shared validation, format 1 (whole-build bundles), the
 instruction-boundary check, and apply for bundles. Format 2 (separate,
 linkable mods) is in link.py. The format itself is docs/FORMAT.md.

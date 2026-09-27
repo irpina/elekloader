@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """The linker, format-2 mods (pytest, or run with python).
 
 Needs files that never go in the repo, named by environment variables; a

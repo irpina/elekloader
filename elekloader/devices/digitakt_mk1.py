@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Digitakt (mk1): a ColdFire MCF54418; the main OS runs from DDR at
 0x40000400. Measured on OS 1.53 (the digikit research notes):
 

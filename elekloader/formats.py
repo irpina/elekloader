@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """One interface over the OS file families a device profile names
 (`Device.container`):
 - 'ele3': the Digitakt mk1's ELE3 container and SysEx transport (syx.py);

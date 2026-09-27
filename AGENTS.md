@@ -32,7 +32,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 | `elekloader/patch.py` | the command line; `build()` is what the window calls too |
 | `elekloader/gui.py` | the window (Tkinter); `LoaderModel` is its logic without Tk |
 | `elekloader/lint.py`, `elekloader/mkmod.py`, `elekloader/sdk/` | tools for mod authors |
-| `elekloader/codec/`, `elekloader/isa/` | code from digikit (GPL-2.0): change it only with a round-trip test |
+| `elekloader/codec/`, `elekloader/isa/` | code from digikit (GPL-2.0-or-later): change it only with a round-trip test |
 | `mods/core/` | the core mod's sources (the hook bus every format-2 mod needs) |
 | `packaging/`, `.github/workflows/windows-build.yml` | the Windows app: `elekloader-<version>-windows.exe` with core built in (`elekloader/bundled`, never committed) |
 

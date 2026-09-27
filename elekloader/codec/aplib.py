@@ -1,5 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Vendored from digikit (https://github.com/m-dwyer/digikit), dt2/aplib.py,
-# under the GNU GPL version 2. By Em D; the match-finder and the compressed output by irpina. The module's __main__, which needs the emulator, is left out. See NOTICE.
+# under the GNU GPL version 2 or (at your option) any later version. By Em D; the match-finder and the compressed output by irpina. The module's __main__, which needs the emulator, is left out. See NOTICE.
 """An encoder for this firmware's aPLib-shaped container streams.
 
 Byte-exact compression was never the requirement: the device's own depacker

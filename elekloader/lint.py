@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Check .elemod files and say what is wrong (docs/ADAPTING.md).
 
     python -m elekloader.lint MY.elemod [MORE.elemod ...]

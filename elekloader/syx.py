@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Elektron OS .syx files: read, rebuild with a new main OS, verify.
 
 The writer changes one thing: the stored bytes of the device's main OS

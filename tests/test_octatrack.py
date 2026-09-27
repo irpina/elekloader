@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """The Octatrack: its file family (elek.py), its profile, whole builds (pytest,
 or run with python).
 

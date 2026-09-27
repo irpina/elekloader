@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Build elekloader's Windows app: one elekloader.exe with the core mod built in.
 
     python packaging/build_windows.py --core core-2.0a.elemod [--out dist]

@@ -1,5 +1,6 @@
 {
  "id": "core", "version": "2.0a",
+ "license": "GPL-2.0-or-later",
  "title": "core", "category": "Framework", "author": "irpina",
  "description": "The boot copier and the hook bus: every other mod needs it. On its own it changes nothing the unit does.",
  "device": "digitakt-mk1", "os": "1.53",

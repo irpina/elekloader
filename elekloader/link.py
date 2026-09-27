@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """The linker: format-2 mods -> one patched main OS (docs/FORMAT.md).
 
 A format-2 mod is a relocatable object in JSON:

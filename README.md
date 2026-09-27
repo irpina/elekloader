@@ -204,6 +204,6 @@ files never go in this repository.
 
 ## Licence
 
-GPL-2.0. See [LICENSE](LICENSE), and [NOTICE](NOTICE) for the code that
+GPL-2.0-or-later. See [LICENSE](LICENSE), and [NOTICE](NOTICE) for the code that
 comes from digikit and for the credits. elekloader is not affiliated with
 Elektron. Flashing custom firmware is at your own risk.
