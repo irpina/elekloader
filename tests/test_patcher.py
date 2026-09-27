@@ -68,7 +68,8 @@ def ctool_syx():
 def built():
     """The bundle through the whole patcher (once)."""
     if 'out' not in _cache:
-        out, man = patch.build(STOCK, [need(BUNDLE)], log=lambda *a: None)
+        outputs, man = patch.build(STOCK, [need(BUNDLE)], log=lambda *a: None)
+        out = outputs['syx']
         _cache['out'], _cache['man'] = out, man
     return _cache['out'], _cache['man']
 

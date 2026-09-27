@@ -19,7 +19,7 @@ import argparse
 import json
 import sys
 
-from . import devices, elemod, link, syx
+from . import devices, elemod, formats, link
 
 
 def describe(m):
@@ -28,6 +28,7 @@ def describe(m):
          'target': '%s %s' % (m.dev.name, m.rel.version),
          'sites': ['0x%08x +%d %s' % (s['addr'], s['len'], s['kind']) for s in m.sites],
          'requires': m.requires, 'conflicts': m.conflicts, 'names': m.names,
+         'license': m.doc.get('license', ''),
          'regions': ['%s 0x%08x-0x%08x' % (g['name'], g['lo'], g['hi']) for g in m.regions]}
     if isinstance(m, link.Mod2):
         d.update(sections={s: m.size(s) for s in ('.boot', '.run', '.fast', '.bss') if m.size(s)},
@@ -65,10 +66,9 @@ def main(argv=None):
             report['mods'].append(describe(m))
     if a.stock and loaded and report['ok']:
         try:
-            st = syx.Syx.load(a.stock)
-            dev, rel = devices.identify(st.sha256)
-            img = st.section(dev.main_section)
-        except (OSError, syx.SyxError, devices.UnknownFirmware) as e:
+            st, dev, rel = formats.load(a.stock)
+            img = formats.main_image(st, dev)
+        except (OSError, formats.FormatError, devices.UnknownFirmware) as e:
             problem('the stock file: %s' % e)
         else:
             for m in loaded:
@@ -101,10 +101,10 @@ def main(argv=None):
         print(json.dumps(report, indent=1))
     else:
         for d in report['mods']:
-            print('OK: %s %s (format %d) for %s: %d sites%s' % (
+            print('OK: %s %s (format %d) for %s: %d sites%s; licence %s' % (
                 d['id'], d['version'], d['format'], d['target'], len(d['sites']),
                 (', sections %s, imports %s' % (d['sections'], ', '.join(d['imports']) or 'none'))
-                if d['format'] == 2 else ''))
+                if d['format'] == 2 else '', d['license'] or 'not stated'))
         if 'link' in report:
             L = report['link']
             print('OK: links as %s; RAM %d of %d bytes, fast SRAM %d of %d'

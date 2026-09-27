@@ -28,6 +28,7 @@ class Release:
     syx_sha256: str              # the stock .syx file
     main_sha256: str             # its main OS section, depacked
     main_len: int                # ... and that section's length
+    bin_sha256: str = ''         # the stock card file (.bin), where the device has one
 
 
 @dataclass
@@ -38,11 +39,16 @@ class Device:
     releases: dict               # version -> Release
     main_section: int            # the container's main OS section id
     main_load: int               # where the main OS runs
-    stage: int                   # where the bootloader stages it before unpacking
+    stage: int                   # where the bootloader stages it before unpacking in place;
+                                 # None: unknown, so the in-place unpack is not simulated
     flash_at: int                # where the container starts in flash
     flash_limit: int             # where it must end
     trailer: str                 # None: no trailer (mk1); 'hmac': sealed (not yet)
     isa: str                     # 'coldfire'
+    container: str = 'ele3'      # the file family: 'ele3' (syx.py) or 'elek' (elek.py)
+    version_len: int = 4         # the characters of the version field the unit shows
+    protected: tuple = ()        # ((lo, hi, why), ...): main OS bytes no mod may change
+    blob_max: int = None         # the most a whole build may append (None: the flash budget)
     areas: dict = field(default_factory=dict)   # name -> (lo, hi): free at run time
     ddr: tuple = (0, 0)          # the linker's area for .run, tables and .bss
     sram_code: tuple = (0, 0)    # the linker's area for .fast code
@@ -53,11 +59,15 @@ class Device:
 
     def release_for(self, syx_sha256=None, main_sha256=None):
         for r in self.releases.values():
-            if syx_sha256 and r.syx_sha256 == syx_sha256:
+            if syx_sha256 and syx_sha256 in (r.syx_sha256, r.bin_sha256):
                 return r
             if main_sha256 and r.main_sha256 == main_sha256:
                 return r
         return None
+
+    def linkable(self):
+        """Whether format-2 mods (a core, the linker's areas) exist for it."""
+        return self.ddr[1] > self.ddr[0]
 
     def image_end(self, release):
         """Where an appended blob loads: the stock main OS's end."""
@@ -71,8 +81,8 @@ class Device:
 
 
 def _all():
-    from . import digitakt_mk1
-    return [digitakt_mk1.DEVICE]
+    from . import digitakt_mk1, octatrack
+    return [digitakt_mk1.DEVICE, octatrack.DEVICE]
 
 
 DEVICES = None

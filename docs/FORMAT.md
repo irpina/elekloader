@@ -19,6 +19,7 @@ made for different releases.
 | `elemod` | 1 or 2: the format (files from before 0.2 say `"dtmod"` and end in `.dtmod`; both still load) |
 | `id`, `version` | the mod's name and version; `requires`/`conflicts` name other ids |
 | `title`, `description`, `category`, `author` | for people |
+| `license` | an SPDX identifier for the mod's own bytes, e.g. `GPL-2.0-or-later`; shown in the loader and by `lint` |
 | `sites` | changes to the stock image (below) |
 | `resources` | `regions`: run-time memory it claims, each inside one of the device's free areas; `names`: named resources such as `sysex:0x7d`, `settings:FAST AUDIO`, `drive:/cfw/slices.a` |
 | `requires`, `conflicts` | lists of mod ids |
@@ -47,7 +48,9 @@ A format-1 mod is one monolithic custom build:
 - `sites`;
 - one `blob`, appended at the stock main OS's end:
   `{"load", "len", "sha256", "parts": [["hex", "..."], ["stock", addr, n]]}`;
-- `ele3_version`, optional: the version the unit shows.
+- `ele3_version`, optional: the version the unit shows. The name is
+  historical; it applies to every device: 4 characters on the Digitakt mk1,
+  1 to 10 on the Octatrack.
 
 At most one format-1 mod can be used, and never with format-2 mods.
 

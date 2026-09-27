@@ -204,7 +204,8 @@ def test_full_build_verifies():
     for i in IDS:
         doc(i)
     paths = [doc_path(i) for i in IDS]
-    out, man = patch.build(STOCK, paths, '2.0t', log=lambda *a: None)
+    outputs, man = patch.build(STOCK, paths, '2.0t', log=lambda *a: None)
+    out = outputs['syx']
     assert man['output']['main']['inplace_min_gap'] > 0
     o = syx.Syx(out)
     assert o.version == '2.0t'

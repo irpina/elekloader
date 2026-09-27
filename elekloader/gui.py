@@ -36,7 +36,7 @@ import sys
 import threading
 import time
 
-from . import devices, elemod, link, patch, syx
+from . import devices, elemod, formats, link, patch
 
 APP = 'elekloader'
 
@@ -99,10 +99,9 @@ class LoaderModel:
             info['error'] = 'no stock firmware chosen'
         else:
             try:
-                s = syx.Syx.load(path)
+                s, dev, rel = formats.load(path)
                 info['sha256'] = s.sha256
-                dev, rel = devices.identify(s.sha256)
-                img = s.section(dev.main_section)
+                img = formats.main_image(s, dev)
                 if elemod.sha(img) == rel.main_sha256:
                     self.img, self.dev, self.rel = img, dev, rel
                     info.update(ok=True, device=dev.name, os=rel.version)
@@ -162,7 +161,8 @@ class LoaderModel:
                  title=m.doc.get('title', m.id), description=m.doc.get('description', ''),
                  category=m.doc.get('category') or ('Whole build'
                                                     if not isinstance(m, link.Mod2) else ''),
-                 author=m.doc.get('author', ''), sha256=m.sha256,
+                 author=m.doc.get('author', ''), license=m.doc.get('license', ''),
+                 sha256=m.sha256,
                  requires=list(m.requires), conflicts=list(m.conflicts), names=list(m.names))
         sites = []
         for s in m.sites:
@@ -261,15 +261,16 @@ class LoaderModel:
     def build(self, paths, version, out_path):
         """Build, verify and write out_path (+ .json, + .map.json). -> facts."""
         with self.lock:
-            out, man = patch.build(self.stock['path'], paths, version or None,
-                                   log=lambda *a: None)
-        patch.save(out, man, out_path)
+            outputs, man = patch.build(self.stock['path'], paths, version or None,
+                                       log=lambda *a: None)
+        written = patch.save(outputs, man, out_path)
         f = man['output']
-        return {'path': out_path, 'sha256': f['sha256'], 'bytes': f['bytes'],
+        return {'path': out_path, 'written': written, 'sha256': f['sha256'], 'bytes': f['bytes'],
                 'version': man['version'], 'flash_end': f['flash_end'],
-                'headroom': f['flash_headroom'], 'gap': f['main']['inplace_min_gap'],
+                'headroom': f['flash_headroom'], 'gap': f['main'].get('inplace_min_gap'),
+                'inplace': f['main'].get('inplace', ''),
                 'mods': [m['id'] + ' ' + m['version'] for m in man['mods']],
-                'stock_sections': sorted(int(s) for s, v in f['sections'].items() if v['stock'])}
+                'untouched': f['untouched']}
 
     # settings: the stock file, and profiles (named sets of enabled mod files)
     def _load_settings(self):
@@ -353,6 +354,11 @@ class LoaderWindow:
                           ('Uninstall', self.uninstall), ('Enable all', self.enable_all),
                           ('Disable all', self.disable_all), ('Refresh', self.refresh)):
             ttk.Button(bar, text=text, style='Tool.TButton', command=cmd).pack(side='left', padx=(0, 6))
+        self.show_other = tk.BooleanVar(value=False)       # mods for other firmware: hidden
+        self.hidden = 0
+        ttk.Checkbutton(bar, text='Show mods for other devices', variable=self.show_other,
+                        style='Bar.TCheckbutton', command=self._toggle_other
+                        ).pack(side='left', padx=(10, 0))
         ttk.Button(bar, text='Save as...', style='Tool.TButton',
                    command=self.save_profile).pack(side='right')
         self.profile_var = tk.StringVar()
@@ -452,7 +458,7 @@ class LoaderWindow:
                                     command=self.build)
         self.build_btn.pack(side='right')
         self.version_var = tk.StringVar(value='2.0a')
-        ttk.Entry(foot, textvariable=self.version_var, width=6, style='Dark.TEntry',
+        ttk.Entry(foot, textvariable=self.version_var, width=11, style='Dark.TEntry',
                   font=(FONT, 11)).pack(side='right', padx=8)
         tk.Label(foot, text='OS version shown', font=(FONT, 9), fg=C['muted'],
                  bg=C['bg']).pack(side='right')
@@ -466,6 +472,9 @@ class LoaderWindow:
         self._init_profiles()
         self.refresh()
         parent.after(80, self._poll)
+        if not model.stock['ok']:
+            # the first run, or the remembered file moved: ask for it straight away
+            parent.after(300, lambda: self.choose_stock(first=True))
 
     # -- theme ------------------------------------------------------------------------------
     def _style(self):
@@ -479,6 +488,11 @@ class LoaderWindow:
         s.configure('Bar.TFrame', background=C['bg'])
         s.configure('Panel.TFrame', background=C['panel'])
         s.configure('Bar.TLabel', background=C['bg'], foreground=C['muted'])
+        s.configure('Bar.TCheckbutton', background=C['bg'], foreground=C['muted'],
+                    indicatorbackground=C['raised'], indicatorforeground=C['text'])
+        s.map('Bar.TCheckbutton', background=[('active', C['bg'])],
+              foreground=[('active', C['text'])],
+              indicatorbackground=[('selected', C['accent'])])
         s.configure('Tool.TButton', background=C['raised'], foreground=C['text'], padding=(10, 5),
                     borderwidth=0, focusthickness=0)
         s.map('Tool.TButton', background=[('active', C['line']), ('disabled', C['panel'])],
@@ -520,6 +534,15 @@ class LoaderWindow:
     def refresh_stock(self):
         st = self.model.stock
         dev = self.model.dev
+        if dev is not None:
+            cur = self.version_var.get().strip()
+            default = '2.0a' if dev.container == 'ele3' else '%s ELEK' % self.model.rel.version
+            try:
+                formats.check_version(dev, cur)
+                if cur in ('2.0a',) or cur.endswith(' ELEK'):
+                    self.version_var.set(default)         # another device's default
+            except formats.FormatError:
+                self.version_var.set(default)
         self.note.configure(text=(
             'Nothing here talks to your device: flash the built .syx yourself, as with any OS '
             'update. Only the main OS changes, so the stock .syx always recovers the unit'
@@ -545,8 +568,12 @@ class LoaderWindow:
         sel = self.tree.selection()
         self.tree.delete(*self.tree.get_children())
         rows = []
+        self.hidden = 0
         for p, d in self.descs.items():
             on = p in self.enabled
+            if self._other(d) and not on and not self.show_other.get():
+                self.hidden += 1                       # made for other firmware
+                continue
             if 'error' in d:
                 st, text = 'err', 'Invalid file'
             elif not d.get('fits') and self.model.dev is not None:
@@ -573,6 +600,38 @@ class LoaderWindow:
             self.tree.selection_set(sel[0])
         elif rows:
             self.tree.selection_set(rows[0][0])
+        else:
+            self._no_mods()
+        self._update_count()
+
+    def _other(self, d):
+        """A mod made for other firmware than the stock file loaded."""
+        return 'error' not in d and not d.get('fits') and self.model.dev is not None
+
+    def _toggle_other(self):
+        self._fill(*self._last_status())
+
+    def _update_count(self):
+        shown = [p for p in self.descs if self.tree.exists(p)]
+        n = len([p for p in self.enabled if p in shown])
+        text = '%d of %d mods enabled' % (n, len(shown))
+        if self.hidden:
+            text += '  ·  %d for other devices hidden' % self.hidden
+        self.count_var.set(text)
+
+    def _no_mods(self):
+        """The details pane when the list is empty."""
+        dev, rel = self.model.dev, self.model.rel
+        self.d_title.configure(text='No mods for this firmware yet' if dev else 'No mods')
+        self.d_sub.configure(text='%s OS %s' % (dev.name, rel.version) if dev else '')
+        self.d_badge.configure(text='')
+        hint = [('Install a mod made for this firmware with "Install from file...".', '')]
+        if self.hidden:
+            hint += [('\n\n%d mod%s for other devices %s hidden; "Show mods for other devices" '
+                      'lists them.' % (self.hidden, '' if self.hidden == 1 else 's',
+                                       'is' if self.hidden == 1 else 'are'), 'm')]
+        for tab in self.d_text:
+            self._write(tab, hint if tab == 'Description' else [])
 
     def sort_by(self, col):
         if col == 'on':
@@ -672,6 +731,8 @@ class LoaderWindow:
                                              'phase 1). It cannot be combined with separate '
                                              'mods.\n', 'm')]
         out += [('\nFor', 'h'), ('\n%s\n' % d.get('for_label', '?'), '' if d.get('fits') else 'warn')]
+        out += [('\nLicence', 'h'), ('\n%s\n' % (d.get('license') or 'not stated'),
+                                      '' if d.get('license') else 'm')]
         out += [('\nFile', 'h'), ('\n%s\nsha256 %s\n' % (d['path'], d.get('sha256', '')), 'm')]
         return out
 
@@ -740,8 +801,7 @@ class LoaderWindow:
         self.result = r
         self._fill(r.get('status'), r.get('load_order'))
         self.show_details()
-        n = len(self.enabled)
-        self.count_var.set('%d of %d mods enabled' % (n, len(self.descs)))
+        self._update_count()
         for k, (pb, v) in self.bars.items():
             pb['value'] = 0
             v.set('-')
@@ -782,14 +842,16 @@ class LoaderWindow:
         from tkinter import filedialog, messagebox
         paths = sorted(self.enabled)
         version = self.version_var.get().strip()
-        if len(version.encode('ascii', 'replace')) != 4:
-            messagebox.showerror('elekloader', 'The OS version is exactly 4 characters, '
-                                 'for example 2.0a.', parent=self.win)
+        try:
+            formats.check_version(self.model.dev, version)
+        except formats.FormatError as e:
+            messagebox.showerror('elekloader', 'The OS version: %s.' % e, parent=self.win)
             return
         out = filedialog.asksaveasfilename(
             parent=self.win, title='Save the custom firmware as', defaultextension='.syx',
             initialfile=suggested_name([self.descs[p] for p in paths], version),
             initialdir=os.path.expanduser('~'), filetypes=[('SysEx firmware', '*.syx')])
+        # a device with a card file gets the .bin beside the .syx (patch.save)
         if not out:
             return
         if os.path.exists(out) and os.path.samefile(out, self.model.stock['path']):
@@ -830,16 +892,16 @@ class LoaderWindow:
         w.transient(self.win)
         tk.Label(w, text='\u2713  Firmware built and verified', font=(FONT, 14, 'bold'),
                  fg=C['ok'], bg=C['panel']).pack(anchor='w', padx=18, pady=(16, 4))
-        tk.Label(w, text=os.path.basename(r['path']), font=(FONT, 10, 'bold'), fg=C['text'],
-                 bg=C['panel']).pack(anchor='w', padx=18)
+        tk.Label(w, text='  +  '.join(os.path.basename(p) for p in r['written']),
+                 font=(FONT, 10, 'bold'), fg=C['text'], bg=C['panel']).pack(anchor='w', padx=18)
         lines = [
             ('Mods', ', '.join(r['mods'])),
             ('OS version shown', r['version']),
             ('sha256', r['sha256']),
             ('Size', '%.2f MB' % (r['bytes'] / 1048576.0)),
-            ('Untouched', 'sections %s, byte for byte (bootloader included)'
-             % ', '.join(str(s) for s in r['stock_sections'])),
-            ('Main OS', 'unpacks in place with %.0f KB to spare' % (r['gap'] / 1024.0)),
+            ('Untouched', '; '.join(r['untouched'])),
+            ('Main OS', 'unpacks in place with %.0f KB to spare' % (r['gap'] / 1024.0)
+             if r['gap'] is not None else 'depacks to the patched image (%s)' % r['inplace']),
             ('Flash', 'ends %s, %.1f MB to spare' % (r['flash_end'], r['headroom'] / 1048576.0)),
         ]
         g = tk.Frame(w, background=C['panel'])
@@ -867,15 +929,34 @@ class LoaderWindow:
             subprocess.Popen(['explorer', '/select,', os.path.normpath(path)])
 
     # -- files, profiles ------------------------------------------------------------------------
-    def choose_stock(self):
-        from tkinter import filedialog
-        p = filedialog.askopenfilename(parent=self.win, title='Your stock OS .syx (as Elektron '
-                                       'publishes it)',
-                                       filetypes=[('SysEx firmware', '*.syx')])
-        if p:
-            self.model.set_stock(p)
+    def choose_stock(self, first=False):
+        """Ask for the stock OS file until one is known or the user cancels."""
+        from tkinter import filedialog, messagebox
+        last = self.model.stock.get('path')
+        start = os.path.dirname(last) if last else os.path.join(os.path.expanduser('~'),
+                                                                'Downloads')
+        title = ('elekloader: choose the stock OS file Elektron publishes for your device'
+                 if first else 'Your stock OS file (as Elektron publishes it)')
+        while True:
+            p = filedialog.askopenfilename(
+                parent=self.win, title=title,
+                initialdir=start if os.path.isdir(start) else None,
+                filetypes=[('Elektron OS files', '*.syx *.bin *.zip'), ('All files', '*.*')])
+            if not p:
+                return
+            info = self.model.set_stock(p)
             self.refresh_stock()
-            self.changed()
+            self.refresh()          # which mods fit depends on the stock: describe them again
+            if info['ok']:
+                return
+            start = os.path.dirname(p)
+            why = info.get('error', '')
+            if 'Supported:' not in why:
+                why += '\n\nSupported: %s.' % devices.supported()
+            if not messagebox.askretrycancel(
+                    'elekloader', '%s is not a stock OS file elekloader knows.\n\n%s\n\n'
+                    'Choose another file?' % (os.path.basename(p), why), parent=self.win):
+                return
 
     def install(self):
         from tkinter import filedialog, messagebox
@@ -913,13 +994,14 @@ class LoaderWindow:
     def _init_profiles(self):
         m = self.model
         files = {os.path.basename(p): p for p in m.files()}
-        if not m.profiles:                  # the first run: every separate mod on
+        if not m.profiles:                  # the first run: every separate mod for this stock on
             on = []
             for n, p in files.items():
                 try:
                     x = m.mod(p)
-                    if isinstance(x, link.Mod2) and (m.dev is None or (x.dev.key == m.dev.key
-                                                                       and x.rel == m.rel)):
+                    # no stock file yet: nothing is known to fit, so nothing is ticked
+                    if isinstance(x, link.Mod2) and m.dev is not None \
+                            and x.dev.key == m.dev.key and x.rel == m.rel:
                         on.append(n)
                 except (OSError, elemod.ModError):
                     pass
@@ -999,7 +1081,8 @@ def main(argv=None):
                                  os.path.join(tmp, 'settings.json')).files()
         with open(a.selftest, 'w') as fh:
             json.dump({'version': __version__, 'frozen': bool(getattr(sys, 'frozen', False)),
-                       'tk': str(tk.TkVersion), 'bundled': mods,
+                       'tk': str(tk.TkVersion), 'supported': devices.supported(),
+                       'bundled': mods,
                        'listed': [os.path.basename(p) for p in listed]}, fh, indent=1)
         return
     try:

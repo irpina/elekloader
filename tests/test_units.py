@@ -93,6 +93,43 @@ def test_transport_and_parser_round_trip():
     assert n == len(s.data)
 
 
+def test_elek_transport_and_card_file_round_trip():
+    from elekloader import elek
+    body = b'octatrack main os ' * 400
+    sec = aplib.pack_section(body)
+    for extra in (0, 1, 2, 62, 63, 64):                 # every short-final-message shape
+        cont = elek.MAGIC + b'0178' + b'     1.00X' + sec + bytes(extra)
+        raw = elek.encode_syx(cont, 0x05)
+        dev_id, back = elek.decode_syx(raw)
+        assert dev_id == 5 and back == cont
+        seed, padded = elek.decode_bin(elek.encode_bin(cont, 0x12345678))
+        assert seed == 0x12345678 and padded == cont + bytes(-len(cont) % 4)
+    f = elek.ElekFile(elek.encode_syx(elek.MAGIC + b'0178' + b'     1.00X' + sec, 5))
+    assert f.section(3) == body and f.version == '1.00X' and f.build == '0178'
+
+
+def test_a_zip_without_a_known_os_is_refused():
+    import io
+    import zipfile
+    from elekloader import formats
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w') as z:
+        z.writestr('dist/Some_OS.syx', b'\xf0\x00\x20\x3c\xf7')
+        z.writestr('dist/readme.txt', b'hello')
+    try:
+        formats.load(buf.getvalue())
+    except devices.UnknownFirmware as e:
+        assert 'holds no stock firmware' in str(e) and 'dist/Some_OS.syx' in str(e)
+    else:
+        raise AssertionError('accepted a zip with no known OS file')
+    try:
+        formats.load(b'PK\x03\x04' + bytes(100))
+    except formats.FormatError as e:
+        assert 'zip' in str(e)
+    else:
+        raise AssertionError('accepted a broken zip')
+
+
 def test_inplace_depack_gap():
     body = bytes(random.Random(3).getrandbits(8) for _ in range(20000))
     dev = devices.devices()[0]

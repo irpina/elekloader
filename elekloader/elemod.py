@@ -5,7 +5,7 @@ linkable mods) is in link.py. The format itself is docs/FORMAT.md.
 A .elemod is JSON. It carries only its author's bytes plus hashes of the
 stock bytes it expects. It can only describe changes to the device's main
 OS: there is no field for any other section, so the bootloader and the
-other sections stay stock by construction (syx.verify checks the output
+other sections stay stock by construction (formats.verify checks the output
 again).
 
 Every mod names its "target": a stock release, by hash. The device profile
@@ -165,7 +165,8 @@ def load_any(path):
     return Mod(doc, os.path.basename(path), raw)
 
 
-COMMON = {'elemod', 'dtmod', 'id', 'version', 'title', 'description', 'category', 'author', 'target',
+COMMON = {'elemod', 'dtmod', 'id', 'version', 'title', 'description', 'category', 'author', 'license',
+          'target',
           'sites', 'resources', 'requires', 'conflicts', 'build', 'signature', 'notes'}
 
 
@@ -185,9 +186,14 @@ class Mod:
             raise ModError('%s: unknown fields %s' % (name, sorted(extra)))
         self.id, self.version = str(doc['id']), str(doc['version'])
         self.dev, self.rel = resolve_target(doc, name)
-        ev = doc.get('ele3_version')
-        if ev is not None and (not isinstance(ev, str) or len(ev.encode('ascii', 'replace')) != 4):
-            raise ModError('%s: ele3_version is exactly 4 ASCII characters' % name)
+        ev = doc.get('ele3_version')        # the version the unit shows (any device)
+        if ev is not None:
+            n = len(ev.encode('ascii', 'replace')) if isinstance(ev, str) else -1
+            exact = self.dev.container == 'ele3'
+            if (exact and n != self.dev.version_len) or not 0 < n <= self.dev.version_len:
+                raise ModError('%s: ele3_version is %s %d ASCII characters on the %s'
+                               % (name, 'exactly' if exact else 'up to', self.dev.version_len,
+                                  self.dev.name))
         self.sites = parse_sites(doc, name, self.dev, self.rel)
         self.blob = None
         b = doc.get('blob')
@@ -197,10 +203,11 @@ class Mod:
             total = sum(len(p[1]) if p[0] == 'hex' else p[2] for p in parts)
             if total != n:
                 raise ModError('%s: blob parts make %d bytes, not %d' % (name, total, n))
-            room = self.dev.ddr[1] - self.dev.ddr[0]
-            if n > room:
-                raise ModError('%s: blob of %d bytes is over the %d the RAM area holds'
-                               % (name, n, room))
+            room = self.dev.blob_max if self.dev.blob_max is not None else (
+                self.dev.ddr[1] - self.dev.ddr[0] if self.dev.linkable() else None)
+            if room is not None and n > room:
+                raise ModError('%s: blob of %d bytes is over the %d the %s allows'
+                               % (name, n, room, self.dev.name))
             self.blob = {'load': load, 'len': n, 'sha256': str(b.get('sha256', '')).lower(),
                          'parts': parts}
         self.regions, self.names = parse_resources(doc, name, self.dev)
@@ -306,6 +313,12 @@ def common_checks(mods, image, spans):
     if bad and bad[0].startswith('the mods are for different firmware'):
         return bad
     dev = mods[0].dev
+    for m in mods:
+        for s in m.sites:
+            for lo, hi, why in dev.protected:
+                if s['addr'] < hi and lo < s['addr'] + s['len']:
+                    bad.append('%s site 0x%08x is inside 0x%08x-0x%08x, %s: protected on the %s'
+                               % (m.label(), s['addr'], lo, hi, why, dev.name))
     for m in mods:
         for s in m.sites:
             o = s['addr'] - dev.main_load

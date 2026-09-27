@@ -1,4 +1,4 @@
-"""A built custom firmware .syx -> a format-1 .elemod (one mod = one whole build).
+"""A built custom firmware (.syx or card .bin) -> a format-1 .elemod (one mod = one whole build).
 
     python -m elekloader.mkmod --stock Digitakt_OS1.53.syx --build CUSTOM.syx \
         [--manifest CUSTOM.syx.json] [--elf CUSTOM.syx.elf] --meta META.json --out CUSTOM.elemod
@@ -29,7 +29,7 @@ import os
 import struct
 import sys
 
-from . import devices, elemod, syx
+from . import devices, elemod, formats
 from .elemod import sha
 
 
@@ -87,11 +87,36 @@ def stock_parts(blob, stock, minimum, load):
     return parts
 
 
+def diff_patches(stock, built, load, gap=4):
+    """-> [{"addr", "old", "new"}]: the runs where `built` differs from
+    `stock` (images of one length, loaded at `load`), merged when fewer than
+    `gap` equal bytes separate them."""
+    runs, i, n = [], 0, len(stock)
+    while i < n:
+        if stock[i] == built[i]:
+            i += 1
+            continue
+        j = i
+        while j < n and stock[j] != built[j]:
+            j += 1
+        if runs and i - runs[-1][1] < gap:
+            runs[-1][1] = j
+        else:
+            runs.append([i, j])
+        i = j
+    return [{'addr': '0x%08x' % (load + a), 'old': stock[a:b].hex(), 'new': built[a:b].hex()}
+            for a, b in runs]
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='elekloader.mkmod', description=__doc__.split('\n')[0])
     ap.add_argument('--stock', required=True, help='the stock OS .syx')
     ap.add_argument('--build', required=True, help='the built custom firmware .syx')
     ap.add_argument('--manifest', help='its build manifest (default BUILD.json)')
+    ap.add_argument('--diff', action='store_true',
+                    help='no manifest: the sites are every run of bytes the build changes '
+                         '(runs closer than 4 bytes are merged); code where both sides are '
+                         'whole instructions, data otherwise')
     ap.add_argument('--elf', help='its ELF, for the regions (default BUILD.elf if present)')
     ap.add_argument('--meta', required=True, help='the mod\'s id, title, resources (JSON)')
     ap.add_argument('--out', required=True, help='the .elemod to write')
@@ -102,36 +127,33 @@ def main(argv=None):
     if a.stock_min < 4 or a.stock_min % 2:
         die('--stock-min is an even number >= 4')
 
-    stock = syx.Syx.load(a.stock)
     try:
-        dev, rel = devices.identify(stock.sha256)
-    except devices.UnknownFirmware as e:
+        stock, dev, rel = formats.load(a.stock)
+        built = formats.parse(a.build, dev)
+    except (OSError, devices.UnknownFirmware, formats.FormatError) as e:
         die(str(e))
     load, end = dev.main_load, dev.image_end(rel)
-    img0 = stock.section(dev.main_section)
+    img0 = formats.main_image(stock, dev)
     if sha(img0) != rel.main_sha256:
         die('the stock main OS sha256 is not the known one')
-    built = syx.Syx.load(a.build)
-    img1 = built.section(dev.main_section)
-    if [(s, d) for s, _o, _l, d in built.table] != [(s, d) for s, _o, _l, d in stock.table]:
-        die('the build\'s section table differs from stock')
-    for sid in stock.stored:
-        if sid != dev.main_section and built.section(sid) != stock.section(sid):
-            die('the build changes section %d; a .elemod can only carry the main OS' % sid)
-    hd = [i for i in range(0x1C) if built.header[i] != stock.header[i]]
-    if any(not 0x14 <= i < 0x18 for i in hd):
-        die('the build\'s ELE3 header differs outside the version field')
+    img1 = formats.main_image(built, dev)
+    for p in formats.header_problems(stock, built, dev):
+        die('the build: %s' % p)
     if len(img1) < len(img0):
         die('the build\'s main OS is shorter than stock')
 
     with open(a.meta) as fh:
         meta = json.load(fh)
     data_sites = {int(str(x), 0) for x in meta.get('data_sites', [])}
-    with open(a.manifest or a.build + '.json') as fh:
-        manifest = json.load(fh)
+    if a.diff:
+        patches = diff_patches(img0, img1[:len(img0)], load)
+        print('--diff: %d changed runs in the stock image' % len(patches))
+    else:
+        with open(a.manifest or a.build + '.json') as fh:
+            patches = json.load(fh)['patches']
 
     sites, cover = [], bytearray(img0)
-    for p in sorted(manifest['patches'], key=lambda p: int(p['addr'], 16)):
+    for p in sorted(patches, key=lambda p: int(p['addr'], 16)):
         addr, old, new = int(p['addr'], 16), bytes.fromhex(p['old']), bytes.fromhex(p['new'])
         o = addr - load
         if len(old) != len(new) or not 0 <= o <= len(img0) - len(old):
@@ -142,6 +164,11 @@ def main(argv=None):
             die('manifest patch %s: not what the build has there' % p['addr'])
         ok_end = elemod.insn_check(img0, addr, len(old), dev, sweeps=0)[0]
         kind = 'data' if addr in data_sites or not ok_end else 'code'
+        if kind == 'code' and a.diff:
+            # a diffed run is code only if both sides are whole instructions
+            new_img = bytes(cover[:o] + new + cover[o + len(new):])
+            if not all(elemod.insn_check(im, addr, len(old), dev)[0] for im in (img0, new_img)):
+                kind = 'data'
         if kind == 'code':
             for which, im in (('stock', img0),
                               ('new', bytes(cover[:o] + new + cover[o + len(new):]))):
@@ -163,6 +190,7 @@ def main(argv=None):
         'version': meta.get('version') or built.version,
         'title': meta.get('title', meta['id']),
         'category': meta.get('category', 'Whole build'),
+        'license': meta.get('license', ''),
         'description': meta.get('description', ''),
         'target': devices.target_of(dev, rel),
         'ele3_version': built.version,

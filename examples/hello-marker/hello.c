@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 irpina and contributors */
 /* hello-marker: the smallest mod that runs code on a Digitakt mk1 (OS 1.53).
  *
  * It subscribes to core's ev_draw event (mod.json "subscribe"): after the

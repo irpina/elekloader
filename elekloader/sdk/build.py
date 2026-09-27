@@ -41,7 +41,7 @@ import os
 import subprocess
 import sys
 
-from .. import devices, elemod, link, syx
+from .. import devices, elemod, formats, link
 from ..mkmod import stock_parts
 from . import elf
 
@@ -86,15 +86,14 @@ def build(mdir, stock_path, out_dir=None, extra=None):
     with open(os.path.join(mdir, 'mod.json')) as fh:
         mod = json.load(fh)
     extra = extra or {}
-    stock = syx.Syx.load(stock_path)
     try:
-        dev, rel = devices.identify(stock.sha256)
-    except devices.UnknownFirmware as e:
+        stock, dev, rel = formats.load(stock_path)
+    except (devices.UnknownFirmware, formats.FormatError) as e:
         raise BuildError(str(e))
     if mod.get('device', dev.key) != dev.key or mod.get('os', rel.version) != rel.version:
         raise BuildError('mod.json is for %s %s; the stock file is %s %s'
                          % (mod.get('device'), mod.get('os'), dev.key, rel.version))
-    image = stock.section(dev.main_section)
+    image = formats.main_image(stock, dev)
     if sha(image) != rel.main_sha256:
         raise BuildError('the stock main OS is not the known image')
     tc = dev.toolchain
@@ -255,6 +254,7 @@ def build(mdir, stock_path, out_dir=None, extra=None):
         'elemod': 2, 'id': mid, 'version': version,
         'title': mod.get('title', mid), 'description': mod.get('description', ''),
         'category': mod.get('category', ''), 'author': mod.get('author', ''),
+        'license': mod.get('license', ''),
         'target': devices.target_of(dev, rel),
         'sections': secs, 'symbols': symbols, 'exports': sorted(exports),
         'imports': sorted(imports - set(symbols)), 'weak': sorted(weak),
