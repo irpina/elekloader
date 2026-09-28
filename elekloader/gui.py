@@ -12,8 +12,8 @@ a game's (Vortex, Nexus Mod Manager). Tkinter, no other dependency.
   needs.
 - Install from file copies a .elemod into your library; Uninstall removes it
   from there. Mods built into the app (the bundled/ folder next to this
-  file: the Windows build carries core there) are listed too, and can't be
-  uninstalled.
+  file: the Windows and macOS builds carry core there) are listed too, and
+  can't be uninstalled.
 - Ticking a mod also ticks the mods it requires, when they are listed.
 - Profiles are named sets of enabled mods.
 - Build firmware links the enabled mods onto your stock .syx, verifies the
@@ -50,8 +50,8 @@ def settings_dir():
 
 LIBRARY = os.path.join(settings_dir(), 'mods')
 SETTINGS = os.path.join(settings_dir(), 'settings.json')
-# Mods built into the app: the Windows build puts core here. A source checkout
-# has none (built .elemod files are never committed).
+# Mods built into the app: the Windows and macOS builds put core here. A source
+# checkout has none (built .elemod files are never committed).
 BUNDLED = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bundled')
 
 
@@ -928,9 +928,11 @@ class LoaderWindow:
                    command=lambda: self._reveal(r['path'])).pack(side='right', padx=6)
 
     def _reveal(self, path):
+        import subprocess
         if sys.platform == 'win32':
-            import subprocess
             subprocess.Popen(['explorer', '/select,', os.path.normpath(path)])
+        elif sys.platform == 'darwin':
+            subprocess.Popen(['open', '-R', path])
 
     # -- files, profiles ------------------------------------------------------------------------
     def choose_stock(self, first=False):

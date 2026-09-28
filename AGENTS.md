@@ -34,7 +34,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 | `elekloader/lint.py`, `elekloader/mkmod.py`, `elekloader/sdk/` | tools for mod authors |
 | `elekloader/codec/`, `elekloader/isa/` | code from digikit (GPL-2.0-or-later): change it only with a round-trip test |
 | `mods/core/`, `mods/core-dn1/` | the core mod (the hook bus every format-2 mod needs): one `core.s`, each device's addresses and sites in its `mod.json` |
-| `packaging/`, `.github/workflows/windows-build.yml` | the Windows app: `elekloader-<version>-windows.exe` with core built in (`elekloader/bundled`, never committed) |
+| `packaging/`, `.github/workflows/windows-build.yml`, `macos-build.yml` | the apps: `elekloader-<version>-windows.exe`, and `elekloader-<version>-macos.dmg` (signed and notarized), with core built in (`elekloader/bundled`, never committed) |
 
 Tests:
 
