@@ -21,8 +21,15 @@ MCF5441x CPUs; the main OS runs from DDR at 0x40000400. Measured on OS 1.43:
   0x380000). The stock container ends at 0x1C2400.
 - Recovery: the bootstrap's startup menu (section 2's strings) has
   "4 ... OS UPGRADE", as on the Digitakt mk1.
-- Not known yet: the free run-time areas and the hook sites a core would
-  use, so there are no linkable mods for it yet: whole builds (format 1) only.
+- Linkable mods run with the Digitone's core (mods/core-dn1), from
+  0x47BE0000-0x47C00000, the Digitakt mk1's area. The OS clears
+  0x4028E000-0x43229E60 at start and runs its stack down from 0x48000000.
+  No instruction operand in its code points between 0x43EB0000 and the
+  stack; the highest is 0x4BEA72C8, the uncached view of 0x43EA72C8. And in
+  a settled emulator run, no DDR page from 0x43400000 to 0x47C00000 is ever
+  mapped.
+- No .fast area: the free SRAM (0x800058F0-0x80008000, zero in the same
+  run) is not claimed yet.
 """
 from . import Device, Release
 
@@ -44,6 +51,10 @@ DEVICE = Device(
     flash_limit=0x380000,
     trailer=None,
     isa='coldfire',
+    areas={
+        'ddr': (0x47BE0000, 0x47C00000),          # below the stack's page, above anything the OS uses
+    },
+    ddr=(0x47BE0000, 0x47C00000),
     recovery=('hold FUNC while powering on for the startup menu, press TRIG 4 (OS UPGRADE), '
               'then send the stock .syx'),
     toolchain={

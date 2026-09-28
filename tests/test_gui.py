@@ -110,6 +110,51 @@ def test_the_first_run_on_a_digitakt_lists_core_unticked():
             w.win.destroy()
 
 
+DN_SYX = os.environ.get('ELEKLOADER_DN_SYX', '')
+DN_MODS = os.environ.get('ELEKLOADER_DN_MODS', '')
+
+
+def test_a_digitone_set_checks_with_its_core():
+    """The Digitone links mods but has no .fast area: the check must show
+    its budgets without dividing by that zero (a Tk callback error, which
+    the window would only print)."""
+    need(DN_SYX, 'ELEKLOADER_DN_SYX')
+    cores = sorted(glob.glob(os.path.join(need(DN_MODS, 'ELEKLOADER_DN_MODS'), 'core*.elemod')))
+    if not cores:
+        raise Skip('no core*.elemod in ELEKLOADER_DN_MODS')
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+    except Exception as e:
+        raise Skip('no Tk: %s' % e)
+    errors = []
+    root.report_callback_exception = lambda *exc: errors.append(exc[1])
+    with tempfile.TemporaryDirectory() as tmp:
+        bundled = os.path.join(tmp, 'bundled')
+        os.makedirs(bundled)
+        for c in cores:
+            shutil.copy(c, bundled)
+        root.withdraw()
+        w = gui.LoaderWindow(root, gui.LoaderModel(DN_SYX, os.path.join(tmp, 'lib'), [bundled],
+                                                   os.path.join(tmp, 'settings.json')))
+        try:
+            core = [p for p, d in w.descs.items() if d.get('id') == 'core' and d.get('fits')]
+            assert len(core) == 1, w.descs
+            if core[0] not in w.enabled:            # a first run with the stock given ticks it
+                w.toggle(core[0])
+            w.changed()
+            w.result = None
+            t = time.time()
+            while time.time() - t < 60 and not (w.result is not None and w.pending is None):
+                root.update()
+                time.sleep(0.02)
+            assert w.result and w.result['ok'], w.result
+            assert w.bars['fast'][1].get() == 'none on this device'
+            assert not errors, errors
+        finally:
+            root.destroy()
+
+
 if __name__ == '__main__':
     import traceback
     ok = skipped = failed = 0
