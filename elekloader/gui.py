@@ -325,8 +325,6 @@ class LoaderWindow:
         self.result = None
         self.pending = None
         parent.title('elekloader')
-        parent.geometry('1180x720')
-        parent.minsize(980, 600)
         parent.configure(background=C['bg'])
         self._style()
 
@@ -370,8 +368,7 @@ class LoaderWindow:
         ttk.Label(bar, text='Profile', style='Bar.TLabel').pack(side='right')
 
         # the list and the details
-        panes = ttk.Panedwindow(parent, orient='horizontal')
-        panes.pack(fill='both', expand=True, padx=12, pady=(8, 0))
+        panes = ttk.Panedwindow(parent, orient='horizontal')     # packed last: see below
         left = ttk.Frame(panes, style='Panel.TFrame')
         panes.add(left, weight=3)
         cols = ('on', 'name', 'category', 'version', 'status', 'size', 'order')
@@ -428,7 +425,6 @@ class LoaderWindow:
 
         # the check
         chk = tk.Frame(parent, background=C['panel'])
-        chk.pack(fill='x', padx=12, pady=(8, 0))
         self.c_head = tk.Label(chk, font=(FONT, 10, 'bold'), bg=C['panel'], anchor='w')
         self.c_head.pack(fill='x', padx=12, pady=(8, 0))
         self.c_body = tk.Text(chk, height=3, wrap='word', relief='flat', bg=C['panel'],
@@ -440,8 +436,18 @@ class LoaderWindow:
         self.c_body.configure(state='disabled')
 
         # the footer: budgets, version, build
+        # (the build button first, so a narrow window squeezes the budgets, not it)
         foot = tk.Frame(parent, background=C['bg'])
-        foot.pack(fill='x', padx=12, pady=10)
+        self.build_btn = ttk.Button(foot, text='BUILD FIRMWARE', style='Accent.TButton',
+                                    command=self.build)
+        self.build_btn.pack(side='right')
+        self.version_var = tk.StringVar(value='2.0a')
+        ttk.Entry(foot, textvariable=self.version_var, width=11, style='Dark.TEntry',
+                  font=(FONT, 11)).pack(side='right', padx=8)
+        tk.Label(foot, text='OS version shown', font=(FONT, 9), fg=C['muted'],
+                 bg=C['bg']).pack(side='right')
+        self.progress = ttk.Progressbar(foot, mode='indeterminate', length=120,
+                                        style='Budget.Horizontal.TProgressbar')
         self.bars = {}
         for k, label in (('ram', 'RAM'), ('fast', 'Fast SRAM')):
             f = tk.Frame(foot, background=C['bg'])
@@ -455,27 +461,40 @@ class LoaderWindow:
         self.count_var = tk.StringVar()
         tk.Label(foot, textvariable=self.count_var, font=(FONT, 9), fg=C['muted'],
                  bg=C['bg']).pack(side='left')
-        self.build_btn = ttk.Button(foot, text='BUILD FIRMWARE', style='Accent.TButton',
-                                    command=self.build)
-        self.build_btn.pack(side='right')
-        self.version_var = tk.StringVar(value='2.0a')
-        ttk.Entry(foot, textvariable=self.version_var, width=11, style='Dark.TEntry',
-                  font=(FONT, 11)).pack(side='right', padx=8)
-        tk.Label(foot, text='OS version shown', font=(FONT, 9), fg=C['muted'],
-                 bg=C['bg']).pack(side='right')
-        self.progress = ttk.Progressbar(foot, mode='indeterminate', length=120,
-                                        style='Budget.Horizontal.TProgressbar')
         self.note = tk.Label(parent, font=(FONT, 8), fg=C['muted'], bg=C['bg'], anchor='w',
                              justify='left')
-        self.note.pack(fill='x', padx=14, pady=(0, 8))
+
+        # The rows below the list are packed before it, from the bottom up: they keep
+        # their height and the list takes what is left, so none of them is ever cut off.
+        self.note.pack(side='bottom', fill='x', padx=14, pady=(0, 8))
+        foot.pack(side='bottom', fill='x', padx=12, pady=10)
+        chk.pack(side='bottom', fill='x', padx=12, pady=(8, 0))
+        panes.pack(fill='both', expand=True, padx=12, pady=(8, 0))
 
         self.refresh_stock()
         self._init_profiles()
         self.refresh()
+        self._fit(panes, (head, bar, foot))
         parent.after(80, self._poll)
         if not model.stock['ok']:
             # the first run, or the remembered file moved: ask for it straight away
             parent.after(300, lambda: self.choose_stock(first=True))
+
+    def _fit(self, panes, rows):
+        """Open showing everything: 1180x720 at 100% (larger with larger text), wide
+        enough for `rows`, tall enough for all but the list plus a few mods, centred
+        within the screen. The window can't be made smaller than that least size."""
+        win = self.win
+        win.update_idletasks()
+        scale = max(1.0, win.winfo_fpixels('1i') / 96.0)     # 1.5 at 150% on Windows
+        need_w = max(r.winfo_reqwidth() for r in rows) + 24    # the footer's padding
+        need_h = win.winfo_reqheight() - panes.winfo_reqheight() + int(200 * scale)
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+        # leave room for the title bar and the taskbar, or the menu bar and the Dock
+        w = min(max(int(1180 * scale), need_w), sw - int(40 * scale))
+        h = min(max(int(720 * scale), need_h), sh - int(140 * scale))
+        win.minsize(min(need_w, w), min(need_h, h))
+        win.geometry('%dx%d+%d+%d' % (w, h, (sw - w) // 2, max(0, (sh - h) // 2 - int(20 * scale))))
 
     # -- theme ------------------------------------------------------------------------------
     def _style(self):
