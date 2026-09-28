@@ -15,6 +15,12 @@ final 101-byte chunk is padded with zeros. Given that tool's section-3
 stream, write() reproduces its .syx byte for byte (tests/test_patcher.py);
 given a stock file's own stream, it reproduces that file.
 
+The Analog Rytm mk1's container is ELE2, the same transport with a simpler
+container: a 0x14-byte header ('ELE2', a 4-character build, eight spaces, the
+4-character version at 0x10), the main OS's load address, and its packed
+section at 0x18, with no table; the stock file pads it to 4 bytes. Given
+that stock file's own stream, write() reproduces it byte for byte.
+
 verify() re-reads an output file with the decoder, not the writer. It
 refuses the file unless every other section is stock and the main OS
 depacks, in place as the bootloader does it, to the expected image.
@@ -25,6 +31,8 @@ import struct
 from .codec import aplib, elz, transport
 
 COUNT_OFF, TABLE_OFF, ENTRY_SZ = 0x1C, 0x20, 16
+# ELE2 (Analog Rytm mk1): header, the load address, then the one section
+ELE2_VERSION, ELE2_DEST, ELE2_SECT, ELE2_ALIGN, ELE2_MAIN = 0x10, 0x14, 0x18, 4, 3
 CHUNK = transport.CHUNK_SIZE      # decoded bytes per data message (101)
 FIRST_COUNTER = transport.FIRST_COUNTER
 
@@ -105,10 +113,14 @@ class Syx:
         self.k = msgs[0][8]                     # the transfer constant
         dec = _decode(self.data)
         self.total, self.checksum = struct.unpack_from('>II', dec, 0)
-        if dec[8:12] != b'ELE3' or 8 + self.total > len(dec):
-            raise SyxError('no ELE3 container')
+        self.family = dec[8:12].decode('ascii', 'replace')
+        if self.family not in ('ELE3', 'ELE2') or 8 + self.total > len(dec):
+            raise SyxError('no ELE3 or ELE2 container')
         self.container = dec[8:8 + self.total]
         self.tail = dec[8 + self.total:]        # the final chunk's padding
+        if self.family == 'ELE2':
+            self._ele2()
+            return
         self.header = self.container[:COUNT_OFF]
         n = struct.unpack_from('>I', self.container, COUNT_OFF)[0]
         if not 0 < n <= 16 or TABLE_OFF + n * ENTRY_SZ > self.total:
@@ -125,14 +137,30 @@ class Syx:
                 raise SyxError('section %d: duplicate or outside the container' % sid)
             self.stored[sid] = self.container[off:off + clen]
 
+    def _ele2(self):
+        """ELE2: no table; the one section is the main OS, at 0x18."""
+        if self.total < ELE2_SECT + 8:
+            raise SyxError('ELE2 container too short')
+        self.header = self.container[:ELE2_DEST]
+        dest, ln = struct.unpack_from('>II', self.container, ELE2_DEST)
+        if ELE2_SECT + 8 + ln > self.total:
+            raise SyxError('the ELE2 section runs past the container')
+        self.table = [(ELE2_MAIN, ELE2_SECT, 8 + ln, dest)]
+        self.data_start = ELE2_SECT
+        self.stored = {ELE2_MAIN: self.container[ELE2_SECT:ELE2_SECT + 8 + ln]}
+
     @classmethod
     def load(cls, path):
         with open(path, 'rb') as fh:
             return cls(fh.read())
 
     @property
+    def version_at(self):
+        return ELE2_VERSION if self.family == 'ELE2' else 0x14
+
+    @property
     def version(self):
-        return self.header[0x14:0x18].decode('ascii', 'replace')
+        return self.header[self.version_at:self.version_at + 4].decode('ascii', 'replace')
 
     def section(self, sid):
         """-> the section's decoded bytes."""
@@ -155,7 +183,14 @@ def write(stock, stored_main, dev, version=None):
         v = version.encode('ascii')
         if len(v) != 4:
             raise SyxError('the version field is exactly 4 characters')
-        header[0x14:0x18] = v
+        header[stock.version_at:stock.version_at + 4] = v
+    if stock.family == 'ELE2':
+        if dev.main_section != ELE2_MAIN:
+            raise SyxError('an ELE2 container holds section %d only' % ELE2_MAIN)
+        cont = bytearray(header) + stock.container[ELE2_DEST:ELE2_SECT] + stored_main
+        cont += bytes(-len(cont) % ELE2_ALIGN)
+        stream = struct.pack('>II', len(cont), transport.content_checksum(bytes(cont))) + bytes(cont)
+        return transport.encode_syx(stream, stock.device_id, stock.framing[0], stock.framing[1])
     cont = bytearray(stock.container[:stock.data_start])   # the table area as stock has it
     cont[:COUNT_OFF] = header
     for i, (sid, _o, _l, dest) in enumerate(stock.table):
@@ -237,24 +272,32 @@ def verify(out, stock, want_main, dev, version=None):
         raise SyxError('content checksum 0x%08x != preamble 0x%08x' % (got, o.checksum))
     if len(o.tail) >= CHUNK or any(o.tail):
         raise SyxError('%d bytes after the container, or not zero' % len(o.tail))
+    if o.family != stock.family:
+        raise SyxError('an %s container, not %s as stock' % (o.family, stock.family))
     if [(s, d) for s, _o, _l, d in o.table] != [(s, d) for s, _o, _l, d in stock.table]:
         raise SyxError('section order or destinations differ from stock')
+    align = ELE2_ALIGN if o.family == 'ELE2' else 16
     at = stock.data_start
     for sid, off, clen, _d in o.table:
         if off != at:
             raise SyxError('section %d at 0x%x, not 0x%x' % (sid, off, at))
-        at = off + clen + (-(off + clen) % 16)
+        at = off + clen + (-(off + clen) % align)
     if o.total != at:
-        raise SyxError('container length %d is not the 16-aligned end %d' % (o.total, at))
+        raise SyxError('container length %d is not the %d-aligned end %d' % (o.total, align, at))
     if dev.flash_at + o.total > dev.flash_limit:
         raise SyxError('the container ends at flash 0x%x > 0x%x'
                        % (dev.flash_at + o.total, dev.flash_limit))
-    hd = [i for i in range(COUNT_OFF) if o.header[i] != stock.header[i]]
-    if any(not 0x14 <= i < 0x18 for i in hd):
-        raise SyxError('ELE3 header differs outside the version field: %s' % hd)
+    va = stock.version_at
+    hd = [i for i in range(len(stock.header)) if o.header[i] != stock.header[i]]
+    if any(not va <= i < va + 4 for i in hd):
+        raise SyxError('%s header differs outside the version field: %s' % (o.family, hd))
     if version is not None and o.version != version:
         raise SyxError('version field %r, not %r' % (o.version, version))
-    if o.container[TABLE_OFF + ENTRY_SZ * len(o.table):stock.data_start] != \
+    if o.family == 'ELE2' and o.container[ELE2_DEST:ELE2_SECT] != \
+            stock.container[ELE2_DEST:ELE2_SECT]:
+        raise SyxError('the ELE2 load address differs from stock')
+    if o.family == 'ELE3' and \
+            o.container[TABLE_OFF + ENTRY_SZ * len(o.table):stock.data_start] != \
             stock.container[TABLE_OFF + ENTRY_SZ * len(stock.table):stock.data_start]:
         raise SyxError('the table area after the entries differs from stock')
     for sid in stock.stored:

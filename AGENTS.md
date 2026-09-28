@@ -45,6 +45,7 @@ ELEKLOADER_STOCK=... ELEKLOADER_MODS=... python tests/test_sdk.py    # the examp
 ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=... ELEKLOADER_CTOOL_SYX=... python tests/test_patcher.py
 ELEKLOADER_OT_SYX=... ELEKLOADER_OT_BIN=... python tests/test_octatrack.py
 ELEKLOADER_DN_SYX=... python tests/test_digitone.py
+ELEKLOADER_RYTM_SYX=... python tests/test_rytm.py
 ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
 ```
 

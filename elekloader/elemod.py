@@ -190,7 +190,7 @@ class Mod:
         ev = doc.get('ele3_version')        # the version the unit shows (any device)
         if ev is not None:
             n = len(ev.encode('ascii', 'replace')) if isinstance(ev, str) else -1
-            exact = self.dev.container == 'ele3'
+            exact = self.dev.container in ('ele3', 'ele2')
             if (exact and n != self.dev.version_len) or not 0 < n <= self.dev.version_len:
                 raise ModError('%s: ele3_version is %s %d ASCII characters on the %s'
                                % (name, 'exactly' if exact else 'up to', self.dev.version_len,

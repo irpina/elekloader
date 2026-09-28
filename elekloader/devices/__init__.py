@@ -46,10 +46,11 @@ class Device:
     flash_limit: int             # where it must end
     trailer: str                 # None: no trailer (mk1); 'hmac': sealed (not yet)
     isa: str                     # 'coldfire'
-    container: str = 'ele3'      # the file family: 'ele3' (syx.py) or 'elek' (elek.py)
+    container: str = 'ele3'      # the file family: 'ele3', 'ele2' (syx.py) or 'elek' (elek.py)
     version_len: int = 4         # the characters of the version field the unit shows
     protected: tuple = ()        # ((lo, hi, why), ...): main OS bytes no mod may change
     blob_max: int = None         # the most a whole build may append (None: the flash budget)
+    default_version: str = ''    # the version field a build keeps unless given one ('': 2.0a)
     areas: dict = field(default_factory=dict)   # name -> (lo, hi): free at run time
     ddr: tuple = (0, 0)          # the linker's area for .run, tables and .bss
     sram_code: tuple = (0, 0)    # the linker's area for .fast code
@@ -82,8 +83,8 @@ class Device:
 
 
 def _all():
-    from . import digitakt_mk1, digitone_mk1, octatrack
-    return [digitakt_mk1.DEVICE, digitone_mk1.DEVICE, octatrack.DEVICE]
+    from . import digitakt_mk1, digitone_mk1, octatrack, rytm_mk1
+    return [digitakt_mk1.DEVICE, digitone_mk1.DEVICE, octatrack.DEVICE, rytm_mk1.DEVICE]
 
 
 DEVICES = None
