@@ -1,28 +1,34 @@
 | SPDX-License-Identifier: GPL-2.0-or-later
 | core: the boot copier and the hook bus every other mod builds on.
-| ColdFire V4 (MCF54418), Digitakt mk1 OS 1.53; assemble with -mcpu=54455.
+| ColdFire V4 (MCF5441x); assemble with -mcpu=54455. One source for every
+| device with this hook bus: the Digitakt mk1 (OS 1.53, mods/core) and the
+| Digitone mk1 (OS 1.43, mods/core-dn1). The addresses below are not here:
+| each device's mod.json gives them as "defsym", so a missing one fails the
+| build instead of using another device's.
 |
-| .boot runs where the bootstrap unpacks it (appended to MAIN OS at
-| 0x4025CA40), once, from the OS entry's call at 0x40000538: before the OS
-| zeroes 0x40252000-0x439D0000 and turns the caches on. It copies the DDR
-| image the patcher's linker built to 0x47BE0000, zeroes .bss, starts DTIM0
-| if nothing has, and goes on to the call it replaced. The linker defines
-| the __run_*/__bss_* symbols.
+|   DRAWALL      ViewController::drawAll(ctrl, Bitmap&)
+|   KEYDISP      Brain::key(brain, KeyEvent*)
+|   ENCDISP      Brain::enc(brain, EncoderEvent*)
+|   OP_NEW       operator new(size) -> d0
+|   ITEM_CTOR    MenuItem(this, label, select, draw, change, id, step)
+|   MENU_ADD     Menu::addItem(menu, item)
+|   FN_MGR       a std::function manager for a 4-byte function pointer
+|   DTMR0        DMA timer 0 mode;  PPMSR0: the peripheral clock set register
+|   VBR_FN       what the OS entry's call at 0x40000538 called
+|   SETTINGS_RET where the SETTINGS item builder goes on after its site
+|   RENDER_FRAME the render handler's frame: its registers are saved at
+|                -RENDER_FRAME(a6)
+|
+| .boot runs where the bootstrap unpacks it (appended to MAIN OS), once,
+| from the OS entry's call at 0x40000538: before the OS zeroes its .bss and
+| turns the caches on. It copies the DDR image the linker built to its run
+| address, zeroes .bss, starts DTIM0 if nothing has, and goes on to the
+| call it replaced. The linker defines the __run_*/__bss_* symbols.
 |
 | Each shared site calls the handlers mods subscribe to its event, from a
-| table the linker builds (docs/ADAPTING.md, "The Digitakt mk1 hook bus"):
-| a list of pointers ending in 0. Handlers use the C convention.
-
-        .equ DRAWALL,     0x400ca382    | ViewController::drawAll(ctrl, Bitmap&)
-        .equ KEYDISP,     0x400084fe    | Brain::key(brain, KeyEvent*)
-        .equ ENCDISP,     0x40008550    | Brain::enc(brain, EncoderEvent*)
-        .equ OP_NEW,      0x400d4180    | operator new(size) -> d0
-        .equ ITEM_CTOR,   0x400c423c    | MenuItem(this, label, select, draw, change, id, step)
-        .equ MENU_ADD,    0x400c3a72    | Menu::addItem(menu, item)
-        .equ FN_MGR,      0x40137478    | std::function manager, 4-byte payload
-        .equ DTMR0,       0xFC070000    | DMA timer 0 mode
-        .equ PPMSR0,      0xFC04002D    | peripheral clock set register
-        .equ VBR_FN,      0x40001c94    | the call 0x40000538 made
+| table the linker builds (docs/ADAPTING.md, "The hook bus"): a list of
+| pointers ending in 0. Handlers use the C convention. The sites are in
+| mod.json; the comments below give the Digitakt mk1's.
 
 | ============================ .boot =======================================
         .section .boot, "ax"
@@ -159,7 +165,7 @@ core_settings:
 2:      movea.l (%sp)+, %a3
         movea.l (%a2), %a0              | the instructions this replaced
         pea     2.w
-        jmp     0x40058806
+        jmp     SETTINGS_RET
 
 | core_additem(Menu*, row*): a 0x54-byte MenuItem with four std::function
 | objects, the callbacks from row: label, select, draw, change.
@@ -247,7 +253,7 @@ core_render_out:
         movea.l %d0, %a0
         jsr     (%a0)
         bra.s   1b
-2:      movem.l -0xa8(%a6), %d0-%d7/%a0-%a5
+2:      movem.l -RENDER_FRAME(%a6), %d0-%d7/%a0-%a5
         rts
 
 | ============================ .bss ========================================

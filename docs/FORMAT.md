@@ -113,9 +113,12 @@ Nothing is built unless all of these pass:
   - decode as whole instructions with no PC-relative operand and no relative
     branch, because it will run from the copy.
 
-## The Digitakt mk1 hook bus
+## The hook bus (Digitakt mk1, Digitone mk1)
 
-This is a convention between Digitakt mk1 mods, not a rule of the loader.
+This is a convention between mods for these devices, not a rule of the
+loader. The table gives the Digitakt mk1 1.53's sites; the Digitone mk1
+1.43's are 0x4001900c, 0x40019072, 0x40019d9c, 0x40019de4, 0x40072a34,
+0x4009d108 and 0x4009e51c, in the same order (`mods/core-dn1/mod.json`).
 
 The core mod patches each shared site once. It calls the handlers
 subscribed to that event, from a table built by the linker, in order.

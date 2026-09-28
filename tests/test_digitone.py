@@ -145,11 +145,19 @@ def test_version_is_four_characters():
         expect(lambda: patch.build(SYX, [p], version='DN1', log=lambda *a: None), '4')
 
 
-def test_no_linkable_mods_yet():
-    doc = {'elemod': 2, 'id': 'x', 'version': '1', 'target': devices.target_of(DEV, REL),
-           'sections': {}}
+def test_linkable_mods_need_the_digitone_core():
+    """The Digitone links format-2 mods in its own DDR area, with its own core
+    (mods/core-dn1; tests/test_sdk.py builds and links it)."""
+    assert DEV.linkable() and DEV.ddr == (0x47BE0000, 0x47C00000)
+    addr, new = a_string_site()
     st, img = stock()
-    expect(lambda: link.link([link.Mod2(doc, 'x')], img), 'no linkable')
+    o = addr - DEV.main_load
+    doc = {'elemod': 2, 'id': 'x', 'version': '1', 'target': devices.target_of(DEV, REL),
+           'sections': {}, 'requires': ['core'],
+           'sites': [{'addr': '0x%08x' % addr, 'len': len(new), 'kind': 'data',
+                      'stock_sha256': sha(img[o:o + len(new)]), 'new': new.hex()}]}
+    problems = link.check([link.Mod2(doc, 'x')], img)
+    assert any('requires core' in p for p in problems), problems
 
 
 def test_a_digitakt_mod_is_refused():

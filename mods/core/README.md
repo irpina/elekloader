@@ -4,6 +4,10 @@ The boot copier and the hook bus for Digitakt mk1 OS 1.53. Every set of
 linkable (format 2) mods needs exactly one core. On its own it changes
 nothing the unit does.
 
+`core.s` has no addresses: `mod.json` gives them (`defsym`), with the
+sites. [../core-dn1](../core-dn1) builds the same `core.s` for the Digitone
+mk1.
+
 - **At boot** (the OS entry's call at 0x40000538), `boot` copies the RAM
   image the linker built to 0x47BE0000, zeroes `.bss`, starts the DTIM0
   counter if nothing has, and goes on to the call it replaced.

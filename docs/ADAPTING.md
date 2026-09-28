@@ -27,12 +27,13 @@ monolithic build; section 4 says how to go from A to B.
   gcc: on Debian or Ubuntu, `apt install binutils-m68k-linux-gnu
   gcc-m68k-linux-gnu`; on Windows, inside WSL. Set `ELEKLOADER_CROSS` if
   your tools have another prefix.
-- For linkable mods on the Digitakt mk1: the **core** mod (`core-*.elemod`).
+- For linkable mods: the **core** mod for your device (`core-*.elemod`).
   It owns the shared hook sites, copies every mod's code into RAM at boot,
   and turns the shared sites into events your mod subscribes to. Every
-  format-2 mod set needs exactly one core. Its sources are in `mods/core`:
-  `python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx`
-  writes `mods/core/out/core-2.0a.elemod`.
+  format-2 mod set needs exactly one core. `mods/core/core.s` is its one
+  source; `mods/core` builds it for the Digitakt mk1
+  (`python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx`)
+  and `mods/core-dn1` for the Digitone mk1.
 
 ## 2. The rules
 
@@ -81,7 +82,7 @@ what you see when it is broken (section 5 has the fixes).
 12. **One file, one release.** A mod targets one stock release by hash.
     Porting to another OS version means finding every address again.
 
-### The Digitakt mk1 hook bus (core's events)
+### The hook bus (core's events): the Digitakt mk1 and the Digitone mk1
 
 Handlers are C functions (arguments on the stack; d0-d1/a0-a1 free,
 everything else kept; the result in d0). `order` sorts handlers of one
@@ -97,8 +98,16 @@ event (lower first; the shipped mods use 10-90).
 | `ev_render_in` | audio render entry, 1500 times a second | `void f(void)` | interrupt level: keep it short |
 | `ev_render_out` | audio render exit | `void f(void)` | the same |
 
-The sites core owns (do not patch them): 0x40000538, 0x4000a770,
-0x4000a7d6, 0x4000b770, 0x4000b7ba, 0x40058800, 0x40077428, 0x400784c8.
+The events, their prototypes and their conventions are the same on both
+devices; only the sites differ. The sites core owns (do not patch them):
+- Digitakt mk1 1.53: 0x40000538, 0x4000a770, 0x4000a7d6, 0x4000b770,
+  0x4000b7ba, 0x40058800, 0x40077428, 0x400784c8;
+- Digitone mk1 1.43: 0x40000538, 0x4001900c, 0x40019072, 0x40019d9c,
+  0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c.
+
+A firmware routine your mod calls has its own address on each device: look
+it up for the release you target, and build one `.elemod` per device (a
+mod's `device` and `os` pick the stock file).
 
 ## 3. Path B: a linkable mod
 

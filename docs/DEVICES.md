@@ -3,9 +3,9 @@
 Everything elekloader knows about a product is in one profile,
 `elekloader/devices/<device>.py`, registered in `devices/__init__.py`
 (`_all()`). The Digitakt mk1 profile is the example. The Digitone mk1's
-(`digitone_mk1.py`) is a second device of the same file family, and the
-Octatrack's (`octatrack.py`) a second file family; neither has linkable mods
-yet.
+(`digitone_mk1.py`) is a second device of the same file family, with its own
+core. The Octatrack's (`octatrack.py`) is a second file family, which has no
+linkable mods yet.
 
 | field | what it is | how it was found for the Digitakt mk1 |
 |---|---|---|
@@ -42,8 +42,24 @@ yet.
   bootstrap and updater, then a cold boot and a scripted session. Stock 1.43,
   repacked by elekloader, passes it against stock: the updater accepts the
   stream, and the screens and the audio are identical.
-- **Not known yet.** The free run-time areas and the hook sites a core would
-  use, so only format-1 mods load.
+- **Linkable mods.** Its core is `mods/core-dn1`: `core.s` with the
+  Digitone's addresses. Its eight sites and every routine it calls are the
+  Digitakt mk1's found again in 1.43. They are the same code instruction
+  for instruction, bar the addresses in it. The render handler's frame is
+  0xB8 bytes (0xA8 on the Digitakt), hence `RENDER_FRAME`.
+- **The DDR area** is the Digitakt's, `0x47BE0000-0x47C00000`:
+  - The OS clears `0x4028E000-0x43229E60` at start, and its stack runs down
+    from `0x48000000`.
+  - No instruction operand in its code points between `0x43EB0000` and the
+    stack.
+  - In a settled emulator run, no DDR page from `0x43400000` to
+    `0x47C00000` is ever mapped.
+- **Checked in the emulator:** with core alone, the build passes every
+  stage, with every screen identical to stock.
+  - The audio is identical to stock up to PLAY.
+  - After PLAY it is the same sound, sample-shifted, because core's few
+    cycles move when the scripted key presses land. Stock against itself
+    with PLAY 0.3 ms later diverges in the same way.
 
 ## The Octatrack (1.40C)
 

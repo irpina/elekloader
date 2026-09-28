@@ -18,7 +18,7 @@ file on your own machine, and you flash it the way you flash any OS update.
 | Device | OS | Status |
 |---|---|---|
 | Digitakt (mk1) | 1.53 | supported |
-| Digitone (mk1) and Digitone Keys | 1.43 | supported: whole builds (format-1 mods); no linkable mods yet |
+| Digitone (mk1) and Digitone Keys | 1.43 | supported |
 | Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); no linkable mods yet |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
 
@@ -150,12 +150,15 @@ Users install mods from their `.elemod` files.
   tables. The loader's linker places them, resolves their symbols and
   checks them.
 
-Every set of format-2 mods needs the **core** mod. The Windows app has it
-built in, and each release carries `core-2.0a.elemod`. Its sources are in
-[mods/core](mods/core); to build it yourself, use the SDK (below):
+Every set of format-2 mods needs the **core** mod for its device. The
+Windows app has them built in, and each release carries them: one source,
+[mods/core/core.s](mods/core/core.s), built with each device's addresses
+([mods/core](mods/core) for the Digitakt mk1, [mods/core-dn1](mods/core-dn1)
+for the Digitone mk1). To build one yourself, use the SDK (below):
 
 ```bash
-python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx   # -> mods/core/out/core-2.0a.elemod
+python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx                          # the Digitakt mk1's
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # the Digitone mk1's
 ```
 
 Files from before version 0.2 used the `.dtmod` extension; they still load.
@@ -182,15 +185,15 @@ Digitakt mk1 that is m68k binutils and gcc.
 
 ## The Windows app
 
-`packaging/build_windows.py --core core-2.0a.elemod` builds
+`packaging/build_windows.py --core core-2.0a.elemod [--core ...]` builds
 `elekloader.exe` with PyInstaller (`packaging/requirements-build.txt`). The
-exe carries core in `elekloader/bundled`. The script checks the exe with
-its `--selftest` (the version, Tk, the built-in core and its hash, the
+exe carries the cores in `elekloader/bundled`. The script checks the exe with
+its `--selftest` (the version, Tk, the built-in cores and their hashes, the
 devices it supports), then writes `elekloader-<version>-windows.exe` and
 `SHA256SUMS.txt`.
 
 The **windows-build** workflow (Actions, run by hand with a release's tag)
-does the same on GitHub's Windows runner. It takes `core-*.elemod` from that
+does the same on GitHub's Windows runner. It takes every `core*.elemod` from that
 release and attaches the exe and `SHA256SUMS.txt` to it. core is built where
 the stock OS file is and attached to the release first. No firmware
 reaches the workflow.

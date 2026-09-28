@@ -816,9 +816,12 @@ class LoaderWindow:
                 for k in ('ram', 'fast'):
                     used, size = r[k]
                     pb, v = self.bars[k]
-                    pb['value'] = 100.0 * used / size
-                    v.set('%.1f / %.0f KB' % (used / 1024.0, size / 1024.0) if k == 'ram'
-                          else '%d / %d bytes' % (used, size))
+                    pb['value'] = 100.0 * used / size if size else 0
+                    if not size:
+                        v.set('none on this device')        # e.g. no .fast area (Digitone)
+                    else:
+                        v.set('%.1f / %.0f KB' % (used / 1024.0, size / 1024.0) if k == 'ram'
+                              else '%d / %d bytes' % (used, size))
             else:
                 body.append(('A whole build: %s.' % ', '.join(r['order']), 'm'))
             self.build_btn.state(['!disabled'])

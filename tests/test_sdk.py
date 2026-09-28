@@ -128,6 +128,55 @@ def test_core_builds_and_lints():
     assert rc == 0 and r['link']['order'][0].startswith('core')
 
 
+DN_STOCK = os.environ.get('ELEKLOADER_DN_SYX', '')
+
+
+def dn_core(tmp, drop=None):
+    """mods/core-dn1 built with the SDK (one defsym left out if `drop`)."""
+    if not DN_STOCK or not os.path.exists(DN_STOCK):
+        raise Skip('missing ELEKLOADER_DN_SYX')
+    tc = devices.devices()[0].toolchain
+    if not shutil.which(os.environ.get('ELEKLOADER_CROSS', tc['prefix']) + 'as'):
+        raise Skip('no m68k cross assembler to build mods/core-dn1')
+    src = os.path.join(ROOT, 'mods', 'core-dn1')
+    if drop:
+        with open(os.path.join(src, 'mod.json')) as fh:
+            j = json.load(fh)
+        del j['defsym'][drop]
+        j['sources'] = [os.path.join(ROOT, 'mods', 'core', 'core.s')]
+        src = os.path.join(tmp, 'core-dn1')
+        os.makedirs(src)
+        with open(os.path.join(src, 'mod.json'), 'w') as fh:
+            json.dump(j, fh)
+    path, _m = build.build(src, DN_STOCK, tmp)
+    return path
+
+
+def test_digitone_core_builds_and_links():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = dn_core(tmp)
+        with open(path) as fh:
+            dn = json.load(fh)
+        with open(built_core()) as fh:
+            dt = json.load(fh)
+        assert dn['target']['device'] == 'digitone-mk1' and len(dn['sites']) == 8
+        assert sorted(dn['collections']) == sorted(dt['collections'])
+        def sizes(d):
+            return {s: v.get('len', v.get('size')) for s, v in d['sections'].items()}
+        assert sizes(dn) == sizes(dt)       # the same code, with the Digitone's addresses
+        rc, r = lint_json(path, '--stock', DN_STOCK)
+        assert rc == 0 and r['link']['order'] == ['core 2.0a']
+
+
+def test_digitone_core_needs_every_constant():
+    """A device constant left out of mod.json is an import nothing provides,
+    so the link refuses it, rather than falling back to another device's."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = dn_core(tmp, drop='FN_MGR')
+        rc, r = lint_json(path, '--stock', DN_STOCK)
+        assert rc == 1 and any('FN_MGR' in x for x in r['problems']), r['problems']
+
+
 def test_example_builds_and_links():
     tc = devices.devices()[0].toolchain
     if not shutil.which(os.environ.get('ELEKLOADER_CROSS', tc['prefix']) + 'gcc'):

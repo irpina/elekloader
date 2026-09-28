@@ -1,12 +1,13 @@
-# The Windows app, built for a release: elekloader.exe with the core mod
+# The Windows app, built for a release: elekloader.exe with the core mods
 # built in, attached to that release as elekloader-<version>-windows.exe with
 # its checksums.
 #
 # Run it by hand (Actions > windows-build > Run workflow) with the release's
-# tag, once the release exists and carries core-*.elemod. That file is built
-# from mods/core with the SDK, which needs the stock OS file, so it is made
-# where that file is and attached to the release first; no firmware ever
-# reaches this workflow.
+# tag, once the release exists and carries its core-*.elemod files, one per
+# device with linkable mods (mods/core, mods/core-dn1). They are built with
+# the SDK, which needs each stock OS file, so they are made where those files
+# are and attached to the release first; no firmware ever reaches this
+# workflow.
 name: windows-build
 
 on:
@@ -43,7 +44,7 @@ jobs:
         run: python tests/test_units.py
       - name: Build tools
         run: python -m pip install -r packaging/requirements-build.txt
-      - name: The core mod, from the release
+      - name: The core mods, from the release
         run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "core-*.elemod" --dir build/core
       - name: Build and self-test
         run: python packaging/build_windows.py --core build/core/core-*.elemod --out dist
