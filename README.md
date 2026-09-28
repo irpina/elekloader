@@ -31,6 +31,13 @@ for your stock OS file (below). The **core** mod is built in: it is listed in th
 with any mod that needs it. The exe is not signed, so Windows may say it
 protected your PC: choose **More info**, then **Run anyway**.
 
+**macOS:** download `elekloader-<version>-macos.dmg` from
+[Releases](https://github.com/irpina/elekloader/releases/latest), open it,
+and drag **elekloader** to **Applications**. It runs on Apple silicon and
+Intel Macs, with no Python needed, and it is signed and notarized by Apple.
+As on Windows, the first time it asks for your stock OS file, and core is
+built in.
+
 **Any system, from source:** Python 3.9 or newer, nothing else to install
 (on Linux, Tkinter may be a separate package, such as `python3-tk`).
 Download or clone this repository, then:
@@ -151,8 +158,8 @@ Users install mods from their `.elemod` files.
   checks them.
 
 Every set of format-2 mods needs the **core** mod for its device. The
-Windows app has them built in, and each release carries them: one source,
-[mods/core/core.s](mods/core/core.s), built with each device's addresses
+Windows and macOS apps have them built in, and each release carries them:
+one source, [mods/core/core.s](mods/core/core.s), built with each device's addresses
 ([mods/core](mods/core) for the Digitakt mk1, [mods/core-dn1](mods/core-dn1)
 for the Digitone mk1). To build one yourself, use the SDK (below):
 
@@ -197,6 +204,32 @@ does the same on GitHub's Windows runner. It takes every `core*.elemod` from tha
 release and attaches the exe and `SHA256SUMS.txt` to it. core is built where
 the stock OS file is and attached to the release first. No firmware
 reaches the workflow.
+
+## The macOS app
+
+`packaging/build_macos.py --core core-2.0a.elemod [...]` builds
+`elekloader.app` the same way, universal2 (Apple silicon and Intel; it needs
+a universal2 Python, such as python.org's). With `--identity` (a Developer
+ID Application certificate in your keychain) every binary in it is signed
+with the hardened runtime; without, it is signed ad hoc, for trying on
+your own Mac. It runs the app's `--selftest` as it will ship, signed, then
+writes `elekloader-<version>-macos.dmg` and `SHA256SUMS.txt`. `--notarize`
+has Apple notarize the app and the `.dmg` and staples both, with an App Store
+Connect API key in `NOTARY_KEY` (the `.p8` file), `NOTARY_KEY_ID` and
+`NOTARY_ISSUER`.
+
+The **macos-build** workflow (Actions, run by hand with a release's tag, like
+windows-build) does all of that on GitHub's macOS runner and attaches the
+`.dmg` to the release, adding its line to `SHA256SUMS.txt`. It needs these
+repository secrets:
+
+| secret | what |
+|---|---|
+| `MACOS_CERTIFICATE` | the Developer ID Application certificate with its private key, exported from Keychain Access as a `.p12`, base64-encoded |
+| `MACOS_CERTIFICATE_PASSWORD` | the password the `.p12` was exported with |
+| `NOTARY_KEY` | an App Store Connect API key's `AuthKey_<id>.p8`, its text as it is |
+| `NOTARY_KEY_ID` | that key's ID |
+| `NOTARY_ISSUER` | the Issuer ID shown above the keys in App Store Connect |
 
 ## Tests
 

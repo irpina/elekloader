@@ -1,6 +1,6 @@
 # The Windows app, built for a release: elekloader.exe with the core mods
 # built in, attached to that release as elekloader-<version>-windows.exe with
-# its checksums.
+# its checksum in SHA256SUMS.txt (macos-build adds the macOS app's).
 #
 # Run it by hand (Actions > windows-build > Run workflow) with the release's
 # tag, once the release exists and carries its core-*.elemod files, one per
@@ -19,6 +19,10 @@ on:
 
 permissions:
   contents: write
+
+# macos-build is in the same group: both rewrite the release's SHA256SUMS.txt
+concurrency:
+  group: release-${{ inputs.tag }}
 
 jobs:
   windows-build:
@@ -49,4 +53,14 @@ jobs:
       - name: Build and self-test
         run: python packaging/build_windows.py --core build/core/core-*.elemod --out dist
       - name: Attach to the release
-        run: gh release upload "$TAG" dist/elekloader-*-windows.exe dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+        run: |
+          # SHA256SUMS.txt lists every app on the release: keep the other builds' lines
+          old=/dev/null
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx SHA256SUMS.txt; then
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt --dir build/release
+            old=build/release/SHA256SUMS.txt
+          fi
+          awk 'NR == FNR { ours[$2]; print; next } !($2 in ours)' dist/SHA256SUMS.txt "$old" | sort -k 2 > build/SHA256SUMS.txt
+          mv build/SHA256SUMS.txt dist/SHA256SUMS.txt
+          cat dist/SHA256SUMS.txt
+          gh release upload "$TAG" dist/elekloader-*-windows.exe dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
