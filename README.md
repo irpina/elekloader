@@ -220,8 +220,11 @@ Connect API key in `NOTARY_KEY` (the `.p8` file), `NOTARY_KEY_ID` and
 
 The **macos-build** workflow (Actions, run by hand with a release's tag, like
 windows-build) does all of that on GitHub's macOS runner and attaches the
-`.dmg` to the release, adding its line to `SHA256SUMS.txt`. It needs these
-repository secrets:
+`.dmg` to the release, adding its line to `SHA256SUMS.txt`. With **test**
+ticked, it builds the branch it is run on with the given release's cores,
+signs, notarizes and self-tests it the same way, and keeps the `.dmg` as the
+run's artifact instead of attaching it: a check of the signing before a
+release. It needs these repository secrets:
 
 | secret | what |
 |---|---|

@@ -7,6 +7,11 @@
 # tag, like windows-build: once the release exists and carries its
 # core-*.elemod files. No firmware ever reaches this workflow.
 #
+# With test ticked, it builds the branch it is run on instead, with the cores
+# of the release given (any release: v0.3.0 will do), and signs, notarizes and
+# self-tests it the same way. The .dmg is kept as the run's artifact and nothing
+# is attached to a release: for checking the signing before a release.
+#
 # Secrets (Settings > Secrets and variables > Actions):
 #   MACOS_CERTIFICATE           the Developer ID Application certificate and its
 #                               private key, exported as a .p12, base64-encoded
@@ -23,13 +28,17 @@ on:
       tag:
         description: "The release's tag (vX.Y.Z); the tag must exist and equal v + elekloader's version"
         required: true
+      test:
+        description: "Test: build this branch with that release's cores; attach nothing, keep the .dmg as an artifact"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 # windows-build is in the same group: both rewrite the release's SHA256SUMS.txt
 concurrency:
-  group: release-${{ inputs.tag }}
+  group: ${{ inputs.test && 'test' || 'release' }}-${{ inputs.tag }}
 
 jobs:
   macos-build:
@@ -40,11 +49,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ !inputs.test && inputs.tag || '' }}   # a test builds the branch it runs on
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"   # python.org's build: universal2, with its own Tk
       - name: The tag is the version
+        if: ${{ !inputs.test }}
         run: |
           v=$(python -c "import elekloader; print(elekloader.__version__)")
           test "$TAG" = "v$v" || { echo "tag $TAG is not v$v"; exit 1; }
@@ -88,7 +98,15 @@ jobs:
           printf '%s\n' "$NOTARY_KEY_TEXT" > "$NOTARY_KEY"
           python packaging/build_macos.py --core build/core/core-*.elemod \
             --identity "$SIGN_IDENTITY" --notarize --out dist
+      - name: Keep the test build
+        if: ${{ inputs.test }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: elekloader-macos-test
+          path: dist/
+          retention-days: 14
       - name: Attach to the release
+        if: ${{ !inputs.test }}
         run: |
           # SHA256SUMS.txt lists every app on the release: keep the other builds' lines
           old=/dev/null
