@@ -109,6 +109,45 @@ A firmware routine your mod calls has its own address on each device: look
 it up for the release you target, and build one `.elemod` per device (a
 mod's `device` and `os` pick the stock file).
 
+### SRC machines (core 2.1, Digitakt mk1)
+
+The Digitakt mk1 has four SRC machines: 0 ONESHOT, 1 WERP, 2 REPITCH and
+3 SLICE, kept in a sound's byte +0x7E. From core 2.1 a mod can add one: it
+contributes to the table `core_machines` a pointer to a descriptor of six
+longs:
+
+| offset | field | |
+|---|---|---|
+| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>` (NEIGHBOR is 4, DIGISLICER 5) |
+| +4 | name | its name in the machine menu and the SRC page's title (10 characters fit) |
+| +8 | short | its 4-character name (the SRC page's `NAME: sample` title) |
+| +12 | icon | an 11 x 7 Bitmap for the menu, in the stock icons' format, or 0 |
+| +16 | params | the stock machine (0-3) whose 8 parameters it takes: their defaults on a switch, MIDI CC 16-23 and NRPN 0x80-0x87, the Randomize and Reload pages, the SAMP lookup of the sample browser |
+| +20 | render | the machine it plays as: a stock one (0-3) in the audio render and in that machine's features elsewhere (SLICE's slice locks, its keyboard slice pages, its SRC page state); or its own id, for an empty voice window a mod fills |
+
+```json
+"contribute": [{"to": "core_machines", "order": 50, "data": "00000000",
+                "relocs": [[0, "abs32", "sym:my_machine", 0]]}],
+"resources": {"names": ["machine:6"]}
+```
+
+With it, the menu lists the machine after the stock four (added ones by
+id), with its name and icon; the setter takes it, and a loaded kit keeps
+it (stock loads any machine past 3 as ONESHOT, and so does core for an id
+no installed mod adds). The firmware gives any machine past 3 SLICE's SRC
+page; to change it, hook the page layout `0x400657cc` as digineighbor
+does. `core_track_machine[t]` (8 bytes) is each track's own machine as the
+render last took it, for a mod whose machine renders as a stock one:
+`core_machine(id)` returns an added machine's descriptor, or 0.
+
+Core 2.1 owns these sites too (`mods/core/mod.json` says what each is):
+0x40011322, 0x400225f0, 0x40022fe6, 0x40028f7e, 0x40029e9c, 0x4002a4e0,
+0x4002a76e, 0x4002a9e8, 0x4002aee0, 0x4002ba7e, 0x40039dac, 0x40039dcc,
+0x40039e80, 0x40039e86, 0x4003a43e, 0x4003afe4, 0x4003afee, 0x4003b448,
+0x4003b452, 0x4003b49e, 0x4003b4ac, 0x4003b6d4, 0x4003b6de, 0x40077272,
+0x40078f72, 0x40079124, 0x40079144, 0x400791d6, 0x40079240, 0x4007a2ea,
+0x400a1706.
+
 ## 3. Path B: a linkable mod
 
 **3.1 Start from the template.** Copy `examples/hello-marker/` to a folder
