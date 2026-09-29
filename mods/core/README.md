@@ -15,15 +15,24 @@ mk1.
   `ev_tick`, `ev_draw`, `ev_key`, `ev_enc`, `ev_settings`, `ev_render_in`
   and `ev_render_out`. `core_additem(menu, row)` adds a SETTINGS row. The
   table of events, their C prototypes and the sites core owns is in
-  [docs/ADAPTING.md](../../docs/ADAPTING.md), "The Digitakt mk1 hook bus".
+  [docs/ADAPTING.md](../../docs/ADAPTING.md), "The hook bus".
+- **SRC machine slots** (2.1, `machines.s`, Digitakt mk1 only): mods add
+  SRC machines past the stock four through the table `core_machines`, and
+  core makes the firmware list, name, set, load and render them, and treat
+  them as the stock machine they stand for where the firmware tests for
+  one. Several mods can add machines at once (NEIGHBOR is 4, DIGISLICER
+  5). [docs/ADAPTING.md](../../docs/ADAPTING.md), "SRC machines".
 
 Build it with the SDK (it needs m68k binutils):
 
 ```bash
 python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx
-python -m elekloader.lint mods/core/out/core-2.0a.elemod --stock Digitakt_OS1.53.syx
+python -m elekloader.lint mods/core/out/core-2.1.elemod --stock Digitakt_OS1.53.syx
 ```
 
 Checked by cold-booting it in digikit's emulator: alone, every screen and
 the audio are identical to stock; with other mods, as those mods' own
-checks describe.
+checks describe. 2.1 alone: the check's nine screens are identical to
+stock's, and the audio too, apart from the recording's silent end being
+1 ms longer (2.0a does the same). The machine slots were checked with
+digislicer 2.0 and digineighbor 0.6, as their READMEs describe.
