@@ -5,7 +5,8 @@ Everything elekloader knows about a product is in one profile,
 (`_all()`). The Digitakt mk1 profile is the example. The Digitone mk1's
 (`digitone_mk1.py`) is a second device of the same file family, with its own
 core. The Octatrack's (`octatrack.py`) is a second file family, which has no
-linkable mods yet.
+linkable mods yet. The Analog Rytm mk1's (`rytm_mk1.py`) is a third, ELE2,
+read and written by `syx.py`; its mods are patch sets.
 
 | field | what it is | how it was found for the Digitakt mk1 |
 |---|---|---|
@@ -19,9 +20,10 @@ linkable mods yet.
 | `areas` | memory that is free at run time: where a mod's regions may lie | the research on what the OS never touches |
 | `ddr`, `sram_code`, `fast_table` | where the linker puts mods' code and data, fast code, and the table that copies it | the areas above |
 | `recovery` | how to get back to stock, shown to the user | FUNC at power-on |
-| `container`, `version_len` | the file family (`'ele3'`, `'elek'`) and the version field's length | the container header |
+| `container`, `version_len` | the file family (`'ele3'`, `'ele2'`, `'elek'`) and the version field's length | the container header |
 | `protected` | main OS ranges no mod may change, with the reason | none on the mk1 |
 | `blob_max` | a cap on the appended blob, if the DDR areas do not give one | none on the mk1 |
+| `default_version` | the version a build keeps unless given one | none on the mk1 (the window offers 2.0a) |
 | `toolchain` | the compiler, assembler and flags the SDK uses | the CFW's build |
 
 ## The Digitone mk1 and Digitone Keys (1.43)
@@ -99,3 +101,46 @@ linkable mods yet.
 Mods are made per release: a mod's target names one stock file by hash, so
 supporting a new OS version means adding its release to the profile and
 rebuilding the mods for it.
+
+## The Analog Rytm mk1 (1.73)
+
+- **Files.** `Analog-Rytm_OS1.73.syx`: the Digitakt mk1's SysEx transport
+  (device id `0x07`; the same counters, checksums and framing) around an
+  **ELE2** container. That is a `0x14`-byte header (`ELE2`, build `0173`,
+  eight spaces, version `1.73` at `0x10`), the load address `0x40000400`,
+  and the one packed section (the main OS) at `0x18`, with no table. The
+  container is padded to 4 bytes. From its own section stream, the writer
+  reproduces the stock file byte for byte.
+- **Unpacking.** The bootstrap lives in flash below `0x20000` and the
+  container starts at `0x20000`. At boot the bootstrap depacks from flash
+  (`0x20018` to the address at `0x20014`). After an upgrade it depacks the
+  section staged at `0x40200000` to `0x40000400` in place. Both use one
+  routine, at flash `0x2a` (356 bytes). It is **byte-identical** to the
+  Digitakt mk1 bootstrap's depacker (`0x8000009e`), so this packer's streams
+  are valid on the Rytm too. Stock's in-place gap is 558,719 bytes.
+- **Flash budget.** The bootstrap's MIDI upgrade stages the received file in
+  RAM below the part of itself it runs from `0x40400000`, then erases only
+  the 64 KB sectors the length needs, from `0x20000`. The pad calibration
+  goes to the pad controller, not to this flash. A flash that holds the
+  stock container (ending at `0x15a2c4`) is at least 2 MB, hence
+  `flash_limit` `0x200000`. This packer's stream is about 9% larger than
+  stock's (1.41 MB against 1.29 MB). Whether the in-OS (USB) upgrade takes a
+  file of that size has not been tried; the bootstrap's does.
+- **Protected.** The main OS carries a copy of the bootstrap
+  (`0x4028c708-0x402a1b24`). At boot it writes that copy into the
+  bootstrap's flash when the copy's version word is newer than flash's
+  (`0x1fff8`; `0x400005aa`, then `0x4011a738`, BOOTSTRAP UPGRADE). No mod may
+  change a byte of it, so the startup menu stays stock.
+- **Mods are patch sets**: format 1 without a blob. Their code sits in three
+  runs of zeros the OS never uses: `cave2` below the SRAM load images,
+  `cave` right after the bootstrap copy, and `cave3` in the read-only data.
+  Their `regions` claim those runs, and the checks keep two mods apart by
+  bytes, regions and names. A working set (euclid accents, velocity
+  humanise, LFO random modifiers, a sample low/high cut) is
+  [rytm1_mods](https://github.com/gdeo607/rytm1_mods). For every
+  combination of its mods, elekloader builds the same main OS as that
+  project's own pipeline (its `tools/elemod_check.py`).
+- **The version field** keeps `1.73` (`default_version`): how the bootstrap
+  treats another value has not been tried on a unit.
+- **Not yet:** a core and a DDR area for linkable mods, and a run on a unit
+  of an elekloader-built file.

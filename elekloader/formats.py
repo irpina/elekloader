@@ -2,6 +2,8 @@
 """One interface over the OS file families a device profile names
 (`Device.container`):
 - 'ele3': the Digitakt mk1's ELE3 container and SysEx transport (syx.py);
+- 'ele2': the Analog Rytm mk1's ELE2 container, one section and no table,
+  in the same transport (syx.py);
 - 'elek': the Octatrack's ELEK container, legacy SysEx and ELUP card file
   (elek.py).
 
@@ -32,8 +34,11 @@ def parse(path_or_bytes, dev):
     """A file of `dev`'s family -> its parsed form (syx.Syx or elek.ElekFile)."""
     raw = _read(path_or_bytes)
     try:
-        if dev.container == 'ele3':
-            return syx.Syx(raw)
+        if dev.container in ('ele3', 'ele2'):
+            s = syx.Syx(raw)
+            if s.family.lower() != dev.container:
+                raise FormatError('an %s file, not %s' % (s.family, dev.container.upper()))
+            return s
         if dev.container == 'elek':
             return elek.ElekFile(raw)
     except (syx.SyxError, elek.ElekError) as e:
@@ -84,7 +89,7 @@ def check_version(dev, version):
     v = version.encode('ascii', 'replace') if version is not None else None
     if v is None:
         return
-    if dev.container == 'ele3' and len(v) != dev.version_len:
+    if dev.container in ('ele3', 'ele2') and len(v) != dev.version_len:
         raise FormatError('the version is exactly %d ASCII characters' % dev.version_len)
     if not 0 < len(v) <= dev.version_len:
         raise FormatError('the version is 1 to %d ASCII characters' % dev.version_len)
@@ -98,7 +103,7 @@ def write(stock, stored_main, dev, version=None):
     """-> {'syx': bytes} or, for a family with a card file too, {'syx', 'bin'}."""
     check_version(dev, version)
     try:
-        if dev.container == 'ele3':
+        if dev.container in ('ele3', 'ele2'):
             return {'syx': syx.write(stock, stored_main, dev, version)}
         return elek.write(stock, stored_main, dev, version)
     except (syx.SyxError, elek.ElekError) as e:
@@ -111,10 +116,14 @@ def verify(outputs, stock, want_main, dev, version=None):
     stock's. -> facts."""
     stock_main = main_image(stock, dev)
     try:
-        if dev.container == 'ele3':
+        if dev.container in ('ele3', 'ele2'):
             facts = syx.verify(outputs['syx'], stock, want_main, dev, version)
-            facts['untouched'] = ['sections %s, byte for byte' % ', '.join(
-                s for s, v in sorted(facts['sections'].items()) if v['stock'])]
+            if dev.container == 'ele2':
+                facts['untouched'] = ['the container header but its version field, and the '
+                                      'load address']
+            else:
+                facts['untouched'] = ['sections %s, byte for byte' % ', '.join(
+                    s for s, v in sorted(facts['sections'].items()) if v['stock'])]
         else:
             facts = elek.verify(outputs, stock, want_main, dev, stock_main, version)
     except (syx.SyxError, elek.ElekError) as e:
@@ -130,7 +139,12 @@ def header_problems(stock, built, dev):
     """What differs between two files of one device besides the main OS and
     the version field. -> problems (empty: only those differ)."""
     bad = []
-    if dev.container == 'ele3':
+    if dev.container == 'ele2':
+        if built.container[syx.ELE2_DEST:syx.ELE2_SECT] != stock.container[syx.ELE2_DEST:syx.ELE2_SECT]:
+            bad.append('the load address differs from stock')
+        n = syx.ELE2_DEST
+        lo, hi = syx.ELE2_VERSION, syx.ELE2_VERSION + 4
+    elif dev.container == 'ele3':
         if [(s, d) for s, _o, _l, d in built.table] != [(s, d) for s, _o, _l, d in stock.table]:
             bad.append('the section table differs from stock')
         for sid in stock.stored:

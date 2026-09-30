@@ -20,6 +20,7 @@ file on your own machine, and you flash it the way you flash any OS update.
 | Digitakt (mk1) | 1.53 | supported |
 | Digitone (mk1) and Digitone Keys | 1.43 | supported |
 | Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); no linkable mods yet |
+| Analog Rytm (mk1) | 1.73 | supported: patch sets (format-1 mods without a blob); no linkable mods yet |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
 
 ## Install
@@ -61,7 +62,9 @@ publishes it:
 - Digitone mk1 or Digitone Keys: `Digitone_and_Digitone_Keys_OS1.43.syx`
   (one file serves both), from Elektron's Digitone downloads;
 - Octatrack MKI or MKII: `OCTATRACK_OS1.40C.syx` or `OCTATRACK_OS1.40C.bin`
-  (one file serves both), from Elektron's Octatrack downloads.
+  (one file serves both), from Elektron's Octatrack downloads;
+- Analog Rytm mk1: `Analog-Rytm_OS1.73.syx`, from Elektron's Analog Rytm
+  downloads (the mk1 OS, not the MKII's).
 
 The `.zip` Elektron's site gives you works as it is. elekloader recognises
 the file by its hash.
@@ -80,7 +83,8 @@ the file by its hash.
    The check below the list says when the set combines: "No conflicts ...
    Ready to build".
 4. **OS version shown**: what the unit will show as its OS version: 4
-   characters on the Digitakt mk1 and the Digitone mk1, 1 to 10 on the
+   characters on the Digitakt mk1, the Digitone mk1 and the Analog Rytm mk1
+   (which keeps its stock `1.73` unless you change it), 1 to 10 on the
    Octatrack.
 5. **BUILD FIRMWARE**: choose where to save the `.syx`. elekloader builds it,
    verifies it (see below), and shows its sha256. For the Octatrack it also
@@ -118,7 +122,11 @@ press **TRIG 4** for OS UPGRADE.
 Then send the stock `.syx` with Transfer's legacy OS upgrade mode. On the
 Octatrack: hold **FUNC** while powering on, press **TRIG 3** for MIDI
 UPGRADE, and send the stock `.syx` over 5-pin DIN MIDI (USB MIDI does not
-work for this).
+work for this). On the Analog Rytm mk1: hold **FUNC** while powering on,
+press **TRIG 4** for OS UPGRADE, and send the stock `.syx` over 5-pin DIN
+MIDI with Transfer's legacy OS upgrade mode. The Rytm's main OS carries a
+copy of that bootstrap and re-flashes it at boot; elekloader keeps every mod
+out of that copy, so the startup menu stays stock too.
 
 ## What a build guarantees
 
@@ -244,6 +252,7 @@ ELEKLOADER_STOCK=... ELEKLOADER_MODS=... python tests/test_sdk.py   # the exampl
 ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=bundle.elemod ELEKLOADER_CTOOL_SYX=its-build.syx python tests/test_patcher.py
 ELEKLOADER_OT_SYX=OCTATRACK_OS1.40C.syx ELEKLOADER_OT_BIN=OCTATRACK_OS1.40C.bin python tests/test_octatrack.py
 ELEKLOADER_DN_SYX=Digitone_and_Digitone_Keys_OS1.43.syx python tests/test_digitone.py
+ELEKLOADER_RYTM_SYX=Analog-Rytm_OS1.73.syx python tests/test_rytm.py
 ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
 ```
 

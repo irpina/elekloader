@@ -556,10 +556,12 @@ class LoaderWindow:
         dev = self.model.dev
         if dev is not None:
             cur = self.version_var.get().strip()
-            default = '2.0a' if dev.container == 'ele3' else '%s ELEK' % self.model.rel.version
+            default = dev.default_version or ('2.0a' if dev.container == 'ele3'
+                                              else '%s ELEK' % self.model.rel.version)
+            others = {d.default_version for d in devices.devices() if d.default_version}
             try:
                 formats.check_version(dev, cur)
-                if cur in ('2.0a',) or cur.endswith(' ELEK'):
+                if cur in ({'2.0a'} | others) or cur.endswith(' ELEK'):
                     self.version_var.set(default)         # another device's default
             except formats.FormatError:
                 self.version_var.set(default)
