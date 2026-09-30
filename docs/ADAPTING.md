@@ -197,10 +197,10 @@ entry. `stock` is the hex of the whole stock instruction(s) at `addr`;
 | `jsr` / `jmp` | `jsr`/`jmp` to `target`, nop-padded to the stock length (6 bytes or more) |
 | `keep2` | the stock opcode word, then `target`'s address (a `jsr.l`/`lea.l` you redirect) |
 | `ptr` | `target`'s address (4 bytes of data, e.g. a vtable entry) |
+| `bytes` | `new`, in hex; add `"kind": "code"` if they are instructions |
 
 A site with a `target` may also give `"addend": N`: the address used is the
 target's plus N bytes.
-| `bytes` | `new`, in hex; add `"kind": "code"` if they are instructions |
 
 The routine a `jsr` site calls must do the displaced instruction's work
 and keep every register the surrounding code relies on.
