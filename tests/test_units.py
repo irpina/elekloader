@@ -8,7 +8,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-from elekloader import devices, elemod, syx               # noqa: E402
+from elekloader import devices, elemod, link, syx         # noqa: E402
 from elekloader.codec import aplib, elz, transport       # noqa: E402
 
 FRAMING0 = bytes.fromhex('f000203c0a007f010500017200000000f7')[:15] + b'\xf7'
@@ -189,6 +189,24 @@ def test_devices():
         pass
     else:
         raise AssertionError('accepted an unknown target')
+
+
+def test_section_alignment():
+    """A section's alignment is a power of two up to 4,096 (USB descriptors want 32)."""
+    d, r = devices.identify(devices.devices()[0].releases['1.53'].syx_sha256)
+
+    def mod(align):
+        return {'elemod': 2, 'id': 'a', 'version': '1', 'target': devices.target_of(d, r),
+                'sections': {'.run': {'align': align, 'len': 4, 'parts': [['hex', '4e714e71']]}}}
+    for ok in (1, 2, 4, 8, 16, 32, 4096):
+        assert link.Mod2(mod(ok), 'a').sections['.run']['align'] == ok
+    for bad in (0, 3, 24, 8192):
+        try:
+            link.Mod2(mod(bad), 'a')
+        except elemod.ModError as e:
+            assert 'alignment' in str(e)
+            continue
+        raise AssertionError('accepted alignment %d' % bad)
 
 
 def test_parts_stay_in_the_image():

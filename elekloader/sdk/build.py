@@ -15,6 +15,7 @@ mod.json:
      "category": "...", "author": "...",
      "device": "digitakt-mk1", "os": "1.53",          must match the stock file
      "sources": ["my.c", "glue.s"],                  assembled or compiled, then ld -r
+     "fixed": [{"source", "addr", "symbol"}],         optional: code at a fixed address
      "defsym": {"NAME": 1},                           assembler --defsym, optional
      "cflags": [...],                                 extra compiler flags, optional
      "name_string": "my-mod",                         optional: str_name = "<it> <version>"
@@ -36,6 +37,12 @@ A site's "op" says how its new bytes are made:
 | `bytes` | `new`, given in hex; `"kind": "code"` if they are instructions |
 
 With a target, `"addend": N` (optional) adds N bytes to its address.
+
+A `fixed` source is placed at `addr` inside the stock image. It must be
+inside one of the device's free image areas (`image_free`, zero in stock).
+It may only have `.text`. `symbol` (optional) names its first byte. It
+becomes an ordinary site over those zeros, and its labels become absolute
+symbols, so nothing new is needed to load it.
 """
 import argparse
 import hashlib
@@ -115,7 +122,7 @@ def build(mdir, stock_path, out_dir=None, extra=None):
             fh.write('        .section .run, "ax"\n        .globl  str_name\n'
                      'str_name: .asciz "%s %s"\n        .balign 2\n' % (mod['name_string'], version))
         srcs.append(p)
-    if not srcs and not mod.get('sites') and not extra.get('sites'):
+    if not srcs and not mod.get('sites') and not extra.get('sites') and not mod.get('fixed'):
         raise BuildError('mod.json names no sources and no sites: nothing to build')
     defs = []
     for k, v in mod.get('defsym', {}).items():
@@ -129,11 +136,28 @@ def build(mdir, stock_path, out_dir=None, extra=None):
         else:
             run([prefix + 'as'] + tc['asflags'] + ['-I', mdir] + defs + ['-o', o, s])
         objs.append(o)
-    secs, sec_of = {}, {}
+    fixed = {}                              # section name -> (address, source)
+    for k, fx in enumerate(mod.get('fixed', [])):
+        src = os.path.join(mdir, fx['source'])
+        at = int(fx['addr'], 16) if isinstance(fx['addr'], str) else fx['addr']
+        o = os.path.join(work, 'fixed%d.o' % k)
+        run([prefix + 'as'] + tc['asflags'] + ['-I', mdir] + defs + ['-o', o, src])
+        for sec in elf.Elf.load(o).sections:
+            if sec.size and sec.flags & 2 and sec.name != '.text':
+                raise BuildError('%s: fixed code may only have .text, not %s'
+                                 % (fx['source'], sec.name))
+        name = '.fixed.%d' % k
+        run([prefix + 'objcopy', '--rename-section', '.text=' + name, o])
+        if fx.get('symbol'):
+            run([prefix + 'objcopy', '--add-symbol', '%s=%s:0,global' % (fx['symbol'], name), o])
+        fixed[name] = (at, fx['source'])
+        objs.append(o)
+    secs, sec_of, fsec = {}, {}, {}
     if objs:
         ld = os.path.join(work, 'mod.ld')
         with open(ld, 'w') as fh:
-            fh.write(LD_SCRIPT)
+            fh.write(LD_SCRIPT.replace('    /DISCARD/', ''.join(
+                '    %s 0 : { *(%s) }\n' % (n, n) for n in fixed) + '    /DISCARD/'))
         obj = os.path.join(work, mid + '.o')
         run([prefix + 'ld', '-r', '-d', '-T', ld, '-o', obj] + objs)
         e = elf.Elf.load(obj)
@@ -141,6 +165,9 @@ def build(mdir, stock_path, out_dir=None, extra=None):
         e = elf.Elf.__new__(elf.Elf)
         e.sections, e.symbols, e.relocs = [], [], {}
     for s in e.sections:
+        if s.name in fixed:
+            fsec[s.idx] = s
+            continue
         if s.name in KEEP and s.size:
             sec_of[s.idx] = s.name
             if s.name == '.bss':
@@ -163,6 +190,8 @@ def build(mdir, stock_path, out_dir=None, extra=None):
             continue
         if y.shndx == elf.SHN_ABS:
             where = ['abs', y.value]
+        elif y.shndx in fsec:
+            where = ['abs', fixed[fsec[y.shndx].name][0] + y.value]
         elif y.shndx in sec_of:
             where = [sec_of[y.shndx], y.value]
         else:
@@ -172,13 +201,26 @@ def build(mdir, stock_path, out_dir=None, extra=None):
         symbols[y.name] = where
         if y.bind in (elf.STB_GLOBAL, elf.STB_WEAK):
             exports.append(y.name)
-    relocs = []
+    def target(y, add):
+        v = 0 if y.type == elf.STT_SECTION else y.value
+        if y.shndx == elf.SHN_UNDEF:
+            imports.add(y.name)
+            return 'sym:' + y.name, add
+        if y.shndx == elf.SHN_ABS:
+            return 'abs', y.value + add
+        if y.shndx in fsec:                 # fixed code: its address is known
+            return 'abs', fixed[fsec[y.shndx].name][0] + v + add
+        if y.shndx in sec_of:
+            return 'sec:' + sec_of[y.shndx], v + add
+        raise BuildError('a relocation against %s in section %d' % (y.name, y.shndx))
+
+    relocs, frel = [], {}
     for tidx, rl in sorted(e.relocs.items()):
-        if tidx not in sec_of:
+        if tidx not in sec_of and tidx not in fsec:
             if e.sections[tidx].flags & 2:
                 raise BuildError('relocations in %s' % e.sections[tidx].name)
             continue
-        sec = sec_of[tidx]
+        sec = sec_of.get(tidx) or e.sections[tidx].name
         for off, typ, y, add in rl:
             if typ == elf.R_68K_NONE:
                 continue
@@ -186,19 +228,27 @@ def build(mdir, stock_path, out_dir=None, extra=None):
                 raise BuildError('relocation type %d at %s+0x%x (%s): only 32-bit absolute and '
                                  '32/16-bit PC-relative references can be relocated'
                                  % (typ, sec, off, y.name))
-            t = elf.RNAMES[typ]
-            if y.shndx == elf.SHN_UNDEF:
-                relocs.append([sec, off, t, 'sym:' + y.name, add])
-                imports.add(y.name)
-            elif y.shndx == elf.SHN_ABS:
-                relocs.append([sec, off, t, 'abs', y.value + add])
-            elif y.shndx in sec_of:
-                relocs.append([sec, off, t, 'sec:' + sec_of[y.shndx],
-                               (0 if y.type == elf.STT_SECTION else y.value) + add])
+            tgt, a = target(y, add)
+            if tidx in fsec:
+                frel.setdefault(tidx, []).append([off, elf.RNAMES[typ], tgt, a])
             else:
-                raise BuildError('a relocation against %s in section %d' % (y.name, y.shndx))
+                relocs.append([sec, off, elf.RNAMES[typ], tgt, a])
 
     sites = []
+    for idx, s in sorted(fsec.items()):
+        at, src = fixed[s.name]
+        if not s.size:
+            raise BuildError('%s: no code to place' % src)
+        if not any(a <= at and at + s.size <= b for a, b in dev.image_free):
+            raise BuildError('%s: 0x%08x-0x%08x is not inside a free area of the %s image (%s)'
+                             % (src, at, at + s.size, dev.name,
+                                ', '.join('0x%08x-0x%08x' % ab for ab in dev.image_free)
+                                or 'it declares none'))
+        stockb = image[at - dev.main_load:at - dev.main_load + s.size]
+        if any(stockb):
+            raise BuildError('%s: the stock bytes at 0x%08x are not all zero' % (src, at))
+        sites.append({'addr': '0x%08x' % at, 'len': s.size, 'stock_sha256': sha(stockb),
+                      'new': s.data.hex(), 'kind': 'data', 'relocs': frel.get(idx, [])})
     for s in mod.get('sites', []) + list(extra.get('sites', [])):
         addr = int(s['addr'], 16) if isinstance(s['addr'], str) else s['addr']
         stockb = bytes.fromhex(s['stock'])
