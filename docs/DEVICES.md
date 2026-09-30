@@ -4,8 +4,8 @@ Everything elekloader knows about a product is in one profile,
 `elekloader/devices/<device>.py`, registered in `devices/__init__.py`
 (`_all()`). The Digitakt mk1 profile is the example. The Digitone mk1's
 (`digitone_mk1.py`) is a second device of the same file family, with its own
-core. The Octatrack's (`octatrack.py`) is a second file family, which has no
-linkable mods yet.
+core. The Octatrack's (`octatrack.py`) is a second file family, with a core
+of its own that is only a boot copier.
 
 | field | what it is | how it was found for the Digitakt mk1 |
 |---|---|---|
@@ -72,8 +72,26 @@ linkable mods yet.
   that the OS can re-flash. No site, blob or verified output may change it.
 - **Flash.** The container sits at `0x4000` and must end below `0x200000`.
 - **Not known yet.** Where the bootloader stages the image (`stage` is
-  `None`), so the in-place unpack is not simulated; and the free run-time
-  areas, so there is no linker layout and only format-1 mods load.
+  `None`), so the in-place unpack is not simulated.
+- **Linkable mods.** There is no free RAM in stock: the OS gives the whole
+  audio page arena (`0x40a955e0-0x46025de0`, 14,602 pages of 6,144 B) to
+  samples and the recorders. The core, `mods/core-ot`, takes the arena's
+  bottom 1,707 pages (10 MB), as sambanks/octabam's platform does, and
+  that is the device's `ddr`: `0x40a955e0-0x41495de0`.
+  - It moves the arena's base past them with octabam's 28 arena writes
+    (the base, base + one page, the page count, the fill limit and the
+    clear length). tests/test_octatrack.py derives each from the page count.
+  - Its `.boot` is appended at the image's end (`0x4010fdf0`) and called
+    from the boot site `0x4000050c`, in place of `0x40001e50`, which it
+    calls first. It copies the run image to the reserve through the
+    uncached alias (`+0x08000000`) and zeroes `.bss`.
+  - There is no hook bus: each mod patches its own sites.
+  - `elekloader.sdk.octabam` converts octabam's ColdFire-only modules to
+    such mods (docs/ADAPTING.md, 4b).
+- **Checked in an emulator** (octabam's `ot_emu`): with core and a mod that
+  puts a marker in `.run`, the boot reaches the RTOS handoff as stock does,
+  `.boot` runs once, and the marker is in the reserve after boot. Not yet
+  run on a unit.
 
 ## What a new device needs besides its profile
 

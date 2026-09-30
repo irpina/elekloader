@@ -18,7 +18,7 @@ mod.json:
      "defsym": {"NAME": 1},                           assembler --defsym, optional
      "cflags": [...],                                 extra compiler flags, optional
      "name_string": "my-mod",                         optional: str_name = "<it> <version>"
-     "sites": [{"addr", "stock", "op", "target" | "new"}],
+     "sites": [{"addr", "stock", "op", "target" | "new", "addend"}],
      "subscribe": [{"event": "ev_draw", "fn": "my_draw", "order": 60}],
      "collections": {"my_table": 8},                  tables you declare (entry size)
      "contribute": [{"to", "order", "data", "relocs", "claims"}],
@@ -34,6 +34,8 @@ A site's "op" says how its new bytes are made:
 | `keep2` | the stock opcode word + target's address (a `jsr.l` or `lea.l` whose operand you redirect) |
 | `ptr` | target's address (4 bytes of data, e.g. a vtable entry) |
 | `bytes` | `new`, given in hex; `"kind": "code"` if they are instructions |
+
+With a target, `"addend": N` (optional) adds N bytes to its address.
 """
 import argparse
 import hashlib
@@ -205,19 +207,22 @@ def build(mdir, stock_path, out_dir=None, extra=None):
             raise BuildError('site 0x%08x: the stock bytes are %s, not %s'
                              % (addr, image[o:o + len(stockb)].hex(), s['stock']))
         op, rel_ = s['op'], []
+        add = int(s.get('addend', 0))
+        if add and op not in OPS and op not in ('keep2', 'ptr'):
+            raise BuildError('site 0x%08x: an addend needs a target (jsr, jmp, keep2 or ptr)' % addr)
         if op in OPS:
             if len(stockb) < 6 or len(stockb) % 2:
                 raise BuildError('site 0x%08x: a jsr/jmp needs 6 or more (even) bytes' % addr)
             new = OPS[op] + bytes(4) + b'\x4e\x71' * ((len(stockb) - 6) // 2)
-            rel_ = [[2, 'abs32', 'sym:' + s['target'], 0]]
+            rel_ = [[2, 'abs32', 'sym:' + s['target'], add]]
             kind = 'code'
         elif op == 'keep2':
             new = stockb[:2] + bytes(4)
-            rel_ = [[2, 'abs32', 'sym:' + s['target'], 0]]
+            rel_ = [[2, 'abs32', 'sym:' + s['target'], add]]
             kind = 'code'
         elif op == 'ptr':
             new = bytes(4)
-            rel_ = [[0, 'abs32', 'sym:' + s['target'], 0]]
+            rel_ = [[0, 'abs32', 'sym:' + s['target'], add]]
             kind = 'data'
         elif op == 'bytes':
             new = bytes.fromhex(s['new'])

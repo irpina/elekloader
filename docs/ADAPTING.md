@@ -12,6 +12,7 @@ its fix and give a definition of done. The format itself is
 | code that should run next to other mods | **Path B**: a linkable mod (format 2), built with the SDK | combines with any other mod that does not conflict |
 | a byte or two to change (a constant, a limit) | **Path B** with `bytes` sites and no sources | the same; no compiler needed |
 | a custom firmware you already build as one piece (one `.syx`) | **Path A**: a whole-build mod (format 1), made with `mkmod` | quick, but it cannot be combined with anything |
+| an octabam module (Octatrack) | `elekloader.sdk.octabam` converts it to Path B (section 4b) | a linkable mod, checked against octabam's own account of its bytes |
 
 Path B is the one to aim for. Path A is a stopgap for an existing
 monolithic build; section 4 says how to go from A to B.
@@ -33,7 +34,9 @@ monolithic build; section 4 says how to go from A to B.
   format-2 mod set needs exactly one core. `mods/core/core.s` is its one
   source; `mods/core` builds it for the Digitakt mk1
   (`python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx`)
-  and `mods/core-dn1` for the Digitone mk1.
+  and `mods/core-dn1` for the Digitone mk1. The Octatrack's core,
+  `mods/core-ot`, is only the boot copier: its mods patch their own sites,
+  since it has no events yet.
 
 ## 2. The rules
 
@@ -194,6 +197,9 @@ entry. `stock` is the hex of the whole stock instruction(s) at `addr`;
 | `jsr` / `jmp` | `jsr`/`jmp` to `target`, nop-padded to the stock length (6 bytes or more) |
 | `keep2` | the stock opcode word, then `target`'s address (a `jsr.l`/`lea.l` you redirect) |
 | `ptr` | `target`'s address (4 bytes of data, e.g. a vtable entry) |
+
+A site with a `target` may also give `"addend": N`: the address used is the
+target's plus N bytes.
 | `bytes` | `new`, in hex; add `"kind": "code"` if they are instructions |
 
 The routine a `jsr` site calls must do the displaced instruction's work
@@ -257,9 +263,8 @@ python -m elekloader.mkmod --stock Digitakt_OS1.53.syx --build my-cfw.syx \
 - No manifest? `--diff` (in place of `--manifest` and `--elf`) works the
   sites out by comparing your build with stock. A run of changed bytes is
   a code site only when it covers whole instructions on both sides;
-  anything else is a data site. This is the path for the Digitone mk1 and
-  the Octatrack, whose
-  mods are all whole builds (for example an octabam build):
+  anything else is a data site. This is the path for whole builds, for
+  example an octabam build for the Octatrack:
   `python -m elekloader.mkmod --stock OCTATRACK_OS1.40C.syx --build built.syx --diff --meta meta.json --out my.elemod`.
 - The build may append one blob at the stock main OS's end (0x4025CA40 on
   the Digitakt mk1 1.53); the ELF's `__run_start`, `__bss_end`,
@@ -278,6 +283,65 @@ with anything, so plan the move to Path B:
 3. Make each feature a mod folder with a `mod.json`, build and lint them,
    and check that the combined build behaves like your old one (the same
    audio and screens in an emulator is a good bar).
+
+## 4b. Octabam modules (Octatrack)
+
+sambanks/octabam declares each Octatrack module in
+`modules/<name>/manifest.py`. `elekloader.sdk.octabam` reads those
+manifests from a checkout, and turns each ColdFire-only module into a
+linkable mod for the Octatrack's core (`mods/core-ot`):
+
+```bash
+git clone --recurse-submodules https://github.com/sambanks/octabam
+python -m elekloader.sdk.octabam --octabam octabam --stock OCTATRACK_OS1.40C.syx \
+    [--module recorder-hold ...] --out octabam-mods
+```
+
+Each converted module gets:
+- a mod folder: `mod.json`, octabam's sources, generated glue, and octabam's
+  licence;
+- a built `octabam-<name>-<commit>.elemod`.
+
+Every line of output is one of these:
+- `CONVERTED`, with what was checked;
+- `REFUSED`, with the reason;
+- `FAILED`, when a build or a check failed.
+
+It needs the m68k cross binutils.
+
+Placement is not octabam's. All code goes in the core's RAM reserve,
+including the caves octabam places in zero runs inside the OS image.
+The converter's docstring has the table from each octabam construct to what
+it becomes. Before it writes `CONVERTED`, it links each mod with the core
+and checks:
+- **Caves.** Each cave's bytes equal its source, linked by GNU ld at the
+  same address, as octabam's build links it. They also equal the bytes the
+  manifest ratifies (`pinned`, or `reference(addr)`).
+- **Sites.** Every site holds what octabam would write there, for the final
+  addresses: hooks, `emit()` pokes, detours, symbol refs, pokes, tables.
+- **The whole mod.** Its RAM equals GNU ld's link of the same object.
+- **Units.** A unit that octabam assembles for another CPU encodes the same
+  for the chip. A unit with a `reference` still links to its author's bytes.
+
+What does not convert, and why:
+- **DSP code.** Modules with DSP code or an FX menu entry are out of scope.
+- **Code pinned inside the OS image** (`cave_addr` set). The linker has no
+  fixed-address sections yet.
+- **Formatter registrations.** They draw a DSP module's knob.
+- **Octakit's runtime, arena reservations and bridges** (`Override`).
+- **Modules that require one of the above.**
+
+Some differences from an octabam build, by design:
+- **`include` units** get the text octabam would generate for a remix of
+  that module alone. MODE DEFAULTS and RIG HOSTS act on DSP modules, so
+  alone they do little.
+- **`defsyms`** keep the manifest's own value, even where octabam would
+  link another module's symbol (CC MAP's `CC_MODEDEF1`).
+- **Claims** (Part window, SRAM) become one named resource per 16-byte
+  block. Overlapping claims share a name, so the linker refuses the pair,
+  as octabam's ledger does for MIDI SCENES and SCENES P2.
+- **A `jmp` detour** whose six bytes end inside an instruction is
+  nop-padded to that instruction's end.
 
 ## 5. When the loader refuses: message → fix
 

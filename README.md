@@ -19,7 +19,7 @@ file on your own machine, and you flash it the way you flash any OS update.
 |---|---|---|
 | Digitakt (mk1) | 1.53 | supported |
 | Digitone (mk1) and Digitone Keys | 1.43 | supported |
-| Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); no linkable mods yet |
+| Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); linkable mods with its own core, checked in an emulator, not yet on a unit |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
 
 ## Install
@@ -162,11 +162,14 @@ Every set of format-2 mods needs the **core** mod for its device. The
 Windows and macOS apps have them built in, and each release carries them:
 one source, [mods/core/core.s](mods/core/core.s), built with each device's addresses
 ([mods/core](mods/core) for the Digitakt mk1, [mods/core-dn1](mods/core-dn1)
-for the Digitone mk1). To build one yourself, use the SDK (below):
+for the Digitone mk1). The Octatrack's, [mods/core-ot](mods/core-ot), is
+only the boot copier, with no hook bus: it reserves RAM for mods and copies
+their code there. To build one yourself, use the SDK (below):
 
 ```bash
 python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx                          # the Digitakt mk1's
 python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # the Digitone mk1's
+python -m elekloader.sdk.build mods/core-ot --stock OCTATRACK_OS1.40C.syx                    # the Octatrack's
 ```
 
 Files from before version 0.2 used the `.dtmod` extension; they still load.
@@ -184,7 +187,13 @@ The tools, in brief:
 python -m elekloader.sdk.build examples/hello-marker --stock Digitakt_OS1.53.syx   # sources -> .elemod
 python -m elekloader.lint my-mod-1.0.elemod --stock Digitakt_OS1.53.syx --with core-2.1.elemod
 python -m elekloader.mkmod ...                                                      # a whole build -> .elemod
+python -m elekloader.sdk.octabam --octabam octabam --stock OCTATRACK_OS1.40C.syx    # octabam modules -> .elemod
 ```
+
+For the Octatrack, `elekloader.sdk.octabam` converts
+[sambanks/octabam](https://github.com/sambanks/octabam)'s ColdFire modules
+into linkable mods. It checks each one against octabam's own account of
+its bytes. See [docs/ADAPTING.md](docs/ADAPTING.md), section 4b.
 
 `examples/hello-marker/` is a complete mod to start from. It is one C
 function on the draw event, and it puts a small square in the corner of
@@ -243,6 +252,7 @@ ELEKLOADER_STOCK=Digitakt_OS1.53.syx ELEKLOADER_MODS=path/to/mods python tests/t
 ELEKLOADER_STOCK=... ELEKLOADER_MODS=... python tests/test_sdk.py   # the example needs the cross compiler
 ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=bundle.elemod ELEKLOADER_CTOOL_SYX=its-build.syx python tests/test_patcher.py
 ELEKLOADER_OT_SYX=OCTATRACK_OS1.40C.syx ELEKLOADER_OT_BIN=OCTATRACK_OS1.40C.bin python tests/test_octatrack.py
+ELEKLOADER_OT_SYX=... ELEKLOADER_OCTABAM=path/to/octabam python tests/test_octabam.py   # octabam optional
 ELEKLOADER_DN_SYX=Digitone_and_Digitone_Keys_OS1.43.syx python tests/test_digitone.py
 ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
 ```

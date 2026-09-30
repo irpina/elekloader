@@ -31,6 +31,17 @@ documented by elektron-firmware-tool
 Bierling). No code from that tool is included; it served as a
 cross-check.
 
+octabam
+-------
+Facts about the Octatrack come from sambanks/octabam
+(https://github.com/sambanks/octabam, MIT, (c) 2026 Sam Banks), and are
+marked "octabam" where they are used (elekloader/devices/octatrack.py).
+mods/core-ot makes the same 28 arena writes as octabam's platform, for the
+same reservation. elekloader/sdk/octabam.py reads octabam's module manifests
+from a checkout the user supplies, and copies their sources into the mod
+folders it writes, with octabam's licence beside them. No octabam code is
+included here.
+
 Elektron
 --------
 Elektron, Digitakt, Digitone, Syntakt and Analog are trademarks of Elektron

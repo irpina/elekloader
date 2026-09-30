@@ -32,10 +32,19 @@ Facts taken from sambanks/octabam (MIT) and not re-derived here are marked
   is not in the file), so the in-place unpack is not simulated. A container
   that depacks from flash into SDRAM needs no such check. If that turns out
   wrong, set `stage`.
-- **No free RAM by default.** A whole build (e.g. an octabam remix) brings
-  its own loader, which runs at boot from right after the OS image
-  (0x4010fdf0) and carves memory for itself. elekloader has no linkable mods
-  for the Octatrack yet.
+- **No free RAM by default.** The OS gives the whole audio page arena
+  (0x40a955e0-0x46025de0, 14,602 pages of 6,144 B) to samples and the
+  recorders.
+  - Linkable mods run with the Octatrack's core (mods/core-ot), which takes
+    the arena's bottom 1,707 pages (10 MB), as octabam's platform does.
+    That is 0x40a955e0-0x41495de0, the `ddr` below. The core moves the
+    arena's base past them: 23 instructions carry the base and one carries
+    base + 6,144, then four literals give the geometry. Those are octabam's
+    arena.py writes (octabam), for the same reservation.
+  - The arena clear then starts at the new base, so the OS never touches
+    the reserve again (octabam, measured there).
+  - A whole build (e.g. an octabam remix) brings its own loader instead, from
+    right after the OS image (0x4010fdf0), as the core's `.boot` does.
 """
 from . import Device, Release
 
@@ -63,6 +72,10 @@ DEVICE = Device(
     protected=((0x400de1e0, 0x400e21e0,
                 'the copy of the bootloader the OS can re-flash it from'),),
     blob_max=None,
+    areas={
+        'ddr': (0x40A955E0, 0x41495DE0),          # the arena's bottom 1,707 pages (core-ot)
+    },
+    ddr=(0x40A955E0, 0x41495DE0),
     recovery=('hold FUNC while powering on for the startup menu, press TRIG 3 (MIDI '
               'UPGRADE) and send the stock .syx over 5-pin MIDI (not USB)'),
     toolchain={
