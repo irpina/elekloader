@@ -44,14 +44,15 @@ Download or clone this repository, then:
 
 ```bash
 python -m elekloader                        # the window
-python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.0a.elemod --mod a.elemod --out custom.syx --version 2.0a
-python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.0a.elemod --mod a.elemod --check
+python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.1.elemod --mod a.elemod --out custom.syx --version 2.0a
+python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.1.elemod --mod a.elemod --check
 ```
 
 With `pip install .` the same commands are `elekloader` and `elekpatch`.
-From source, core is not built in. Take `core-2.0a.elemod` from
+From source, core is not built in. Take your device's from
 [Releases](https://github.com/irpina/elekloader/releases/latest) (or build
-it, below), and install it like any mod.
+it, below), and install it like any mod: `core-2.1.elemod` for the Digitakt
+mk1, `core-dn1-2.0a.elemod` for the Digitone mk1 and Digitone Keys.
 
 You also need the **stock OS file** for your device, exactly as Elektron
 publishes it:
@@ -181,7 +182,7 @@ The tools, in brief:
 
 ```bash
 python -m elekloader.sdk.build examples/hello-marker --stock Digitakt_OS1.53.syx   # sources -> .elemod
-python -m elekloader.lint my-mod-1.0.elemod --stock Digitakt_OS1.53.syx --with core-2.0a.elemod
+python -m elekloader.lint my-mod-1.0.elemod --stock Digitakt_OS1.53.syx --with core-2.1.elemod
 python -m elekloader.mkmod ...                                                      # a whole build -> .elemod
 ```
 
@@ -192,7 +193,7 @@ Digitakt mk1 that is m68k binutils and gcc.
 
 ## The Windows app
 
-`packaging/build_windows.py --core core-2.0a.elemod [--core ...]` builds
+`packaging/build_windows.py --core core-2.1.elemod [core-dn1-2.0a.elemod ...]` builds
 `elekloader.exe` with PyInstaller (`packaging/requirements-build.txt`). The
 exe carries the cores in `elekloader/bundled`. The script checks the exe with
 its `--selftest` (the version, Tk, the built-in cores and their hashes, the
@@ -207,7 +208,7 @@ reaches the workflow.
 
 ## The macOS app
 
-`packaging/build_macos.py --core core-2.0a.elemod [...]` builds
+`packaging/build_macos.py --core core-2.1.elemod [...]` builds
 `elekloader.app` the same way, universal2 (Apple silicon and Intel; it needs
 a universal2 Python, such as python.org's). With `--identity` (a Developer
 ID Application certificate in your keychain) every binary in it is signed

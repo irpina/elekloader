@@ -212,7 +212,7 @@ section sizes and imports. `BUILD FAILED: ...` names the problem.
 
 ```bash
 python -m elekloader.lint my-mod-1.0.elemod
-python -m elekloader.lint my-mod-1.0.elemod --stock Digitakt_OS1.53.syx --with core-2.0a.elemod
+python -m elekloader.lint my-mod-1.0.elemod --stock Digitakt_OS1.53.syx --with core-2.1.elemod
 ```
 
 Expect `OK: ... links as core ... > my-mod ...` and exit status 0.
@@ -222,7 +222,7 @@ Add `--with` for every mod users are likely to combine yours with, and
 **3.7 Build a firmware with it.**
 
 ```bash
-python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.0a.elemod \
+python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.1.elemod \
     --mod my-mod-1.0.elemod --out test.syx --version 2.0t
 ```
 

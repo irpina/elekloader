@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Build elekloader's macOS app: elekloader.app with the core mods built in, in a .dmg.
 
-    python packaging/build_macos.py --core core-2.0a.elemod [core-dn1-2.0a.elemod ...]
+    python packaging/build_macos.py --core core-2.1.elemod [core-dn1-2.0a.elemod ...]
         [--identity "Developer ID Application: ..."] [--notarize] [--out dist]
 
 Needs macOS, Xcode's command line tools and PyInstaller

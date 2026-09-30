@@ -2,7 +2,7 @@
 """Your stock OS file + .elemod files -> a custom firmware (the command line).
 
     python -m elekloader.patch --stock Digitakt_OS1.53.syx \
-        --mod core-2.0a.elemod --mod sysinfo-2.0a.elemod ... --out CUSTOM.syx \
+        --mod core-2.1.elemod --mod sysinfo-2.0a.elemod ... --out CUSTOM.syx \
         [--version 2.0a] [--check]
 
 In this order, stopping at the first failure:
