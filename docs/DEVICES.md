@@ -22,6 +22,7 @@ of its own that is only a boot copier.
 | `container`, `version_len` | the file family (`'ele3'`, `'elek'`) and the version field's length | the container header |
 | `protected` | main OS ranges no mod may change, with the reason | none on the mk1 |
 | `blob_max` | a cap on the appended blob, if the DDR areas do not give one | none on the mk1 |
+| `image_free` | zero runs inside the main OS that `fixed` code may take (sdk.build) | none on the mk1 |
 | `toolchain` | the compiler, assembler and flags the SDK uses | the CFW's build |
 
 ## The Digitone mk1 and Digitone Keys (1.43)
@@ -88,6 +89,14 @@ of its own that is only a boot copier.
   - There is no hook bus: each mod patches its own sites.
   - `elekloader.sdk.octabam` converts octabam's ColdFire-only modules to
     such mods (docs/ADAPTING.md, 4b).
+- **Free space inside the image** (`image_free`, octabam's measured zero
+  runs): `0x400c45b0-0x400c4702`, `0x400d24d0-0x400d2ce0` and
+  `0x400d64e0-0x400d7c3c`. octabam pins code in these runs, and `fixed`
+  code may use them.
+  - The third run starts at `0x400d64da` in stock. Its first six bytes are
+    left out: they follow the table at `0x400d64a0`.
+  - Left out entirely: `0x400d2ee6-0x400d3020` (a live descriptor), and
+    everything above `0x400d8000` (the PROJECT subsystem's RAM).
 - **Checked in an emulator** (octabam's `ot_emu`): with core and a mod that
   puts a marker in `.run`, the boot reaches the RTOS handoff as stock does,
   `.boot` runs once, and the marker is in the reserve after boot. Not yet

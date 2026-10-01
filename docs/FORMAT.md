@@ -60,7 +60,7 @@ A format-2 mod is a relocatable object:
 
 | field | |
 |---|---|
-| `sections` | `.run` (RAM), `.fast` (fast SRAM, copied in at run time), `.bss` (`{"size"}`), and `.boot` (the core mod only: it runs where the bootloader unpacks it) |
+| `sections` | `.run` (RAM), `.fast` (fast SRAM, copied in at run time), `.bss` (`{"size"}`), and `.boot` (the core mod only: it runs where the bootloader unpacks it); each with an `align`, a power of two up to 4,096 (default 4) |
 | `symbols` | `{"name": [".run", offset]}` or `["abs", value]` |
 | `exports` | the symbols other mods may use |
 | `imports`, `weak` | the names it uses from others; a weak one resolves to `core_zero` (zeros) if no mod provides it |

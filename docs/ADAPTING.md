@@ -205,6 +205,22 @@ target's plus N bytes.
 The routine a `jsr` site calls must do the displaced instruction's work
 and keep every register the surrounding code relies on.
 
+**Code at a fixed address.** This is only possible where the device lists
+free space inside its image (`image_free`: on the Octatrack, the zero runs
+octabam measured):
+
+```json
+"fixed": [{"source": "page.s", "addr": "0x400d24d0", "symbol": "page"}]
+```
+
+This assembles `page.s` for that address.
+- It must fit inside one of those runs, and it may only have `.text`.
+- It becomes a site over the zeros there, and its labels become absolute
+  symbols, so other code and sites can name them. A mod built this way
+  loads in any elekloader that loads format 2.
+- Use it when other code must find the code at a known address. Otherwise
+  put code in `.run`.
+
 **3.5 Build it.**
 
 ```bash
@@ -294,10 +310,12 @@ linkable mod for the Octatrack's core (`mods/core-ot`):
 ```bash
 git clone --recurse-submodules https://github.com/sambanks/octabam
 python -m elekloader.sdk.octabam --octabam octabam --stock OCTATRACK_OS1.40C.syx \
-    [--module recorder-hold ...] --out octabam-mods
+    [--module recorder-hold ...] --out ~/octabam-mods
 ```
 
-Each converted module gets:
+`--out` must be outside the elekloader checkout: the converted mods carry
+octabam's sources, and they stay out of this repository. Each converted
+module gets:
 - a mod folder: `mod.json`, octabam's sources, generated glue, and octabam's
   licence;
 - a built `octabam-<name>-<commit>.elemod`.
@@ -309,8 +327,13 @@ Every line of output is one of these:
 
 It needs the m68k cross binutils.
 
-Placement is not octabam's. All code goes in the core's RAM reserve,
-including the caves octabam places in zero runs inside the OS image.
+Where code goes:
+- **Floating code** goes in the core's RAM reserve. That includes the caves
+  octabam floats in zero runs inside the OS image, so such a cave is the
+  same code at another address.
+- **Pinned code** (`cave_addr` set) stays where octabam pins it, as
+  `fixed` code (section 3).
+
 The converter's docstring has the table from each octabam construct to what
 it becomes. Before it writes `CONVERTED`, it links each mod with the core
 and checks:
@@ -319,22 +342,40 @@ and checks:
   manifest ratifies (`pinned`, or `reference(addr)`).
 - **Sites.** Every site holds what octabam would write there, for the final
   addresses: hooks, `emit()` pokes, detours, symbol refs, pokes, tables.
-- **The whole mod.** Its RAM equals GNU ld's link of the same object.
+- **The whole mod.** Its RAM and fixed code equal GNU ld's link of the same
+  object.
 - **Units.** A unit that octabam assembles for another CPU encodes the same
   for the chip. A unit with a `reference` still links to its author's bytes.
 
+**Bridges** (`Override`): a module that stands in for another module's hook
+converts as one mod that carries both.
+- The other module's detour at that site is left out.
+- The includes are generated for the pair.
+- The bridge conflicts with the other module alone.
+
 What does not convert, and why:
 - **DSP code.** Modules with DSP code or an FX menu entry are out of scope.
-- **Code pinned inside the OS image** (`cave_addr` set). The linker has no
-  fixed-address sections yet.
+- **Code pinned outside the device's free image areas.**
 - **Formatter registrations.** They draw a DSP module's knob.
-- **Octakit's runtime, arena reservations and bridges** (`Override`).
-- **Modules that require one of the above.**
+- **Runtimes.** This covers Octakit's runtime, arena reservations, and
+  bridges over a runtime's writes (KITS RELOAD, SCENES KITS, SCENES P2 KITS).
+- **Writes into the protected bootloader copy.** The USB AUDIO OUT modules
+  set the device class in the USB descriptor at `0x400e2004`. That lies
+  inside the 16 KB elekloader keeps stock below `0x400e21e0`, which octabam
+  also places the bootstrap copy in (`~0x400de7dc`).
+- **Modules that serve DSP modules only.** These are MODE DEFAULTS, RIG
+  HOSTS and TEMPO BUS (`SERVES_DSP` in the converter, with the reasons).
+  Converted alone, they would be inert, or they would point parts at
+  engines the image does not have.
+- **Modules that need one of the above.**
 
 Some differences from an octabam build, by design:
-- **`include` units** get the text octabam would generate for a remix of
-  that module alone. MODE DEFAULTS and RIG HOSTS act on DSP modules, so
-  alone they do little.
+- **`include` units** get the text octabam would generate for the modules
+  the mod carries.
+  - If that text would change with another module that converts, the mod
+    conflicts with that module.
+  - If it would change only with modules that do not convert, the notes say
+    so.
 - **`defsyms`** keep the manifest's own value, even where octabam would
   link another module's symbol (CC MAP's `CC_MODEDEF1`).
 - **Claims** (Part window, SRAM) become one named resource per 16-byte
@@ -342,6 +383,17 @@ Some differences from an octabam build, by design:
   as octabam's ledger does for MIDI SCENES and SCENES P2.
 - **A `jmp` detour** whose six bytes end inside an instruction is
   nop-padded to that instruction's end.
+- **The assembler.** octabam builds with the bare-metal `m68k-elf` binutils.
+  Ubuntu's `m68k-linux-gnu-as` is for a Linux target: it leaves every
+  reference to a global label to the linker (a shared library may preempt a
+  global), where `m68k-elf-as` resolves it in a shorter PC-relative form.
+  - With `m68k-linux-gnu`, such code assembles longer: the same code, but
+    not the same bytes. A unit whose author pinned its bytes (USB MIDI)
+    fails its check.
+  - The converter uses `m68k-elf-` when it is on the PATH (or
+    `ELEKLOADER_CROSS`), and says at the start which kind it has.
+  - To build it: GNU binutils, `configure --target=m68k-elf`, then
+    `make all-gas all-ld all-binutils`.
 
 ## 5. When the loader refuses: message → fix
 

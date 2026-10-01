@@ -54,6 +54,8 @@ class Device:
     ddr: tuple = (0, 0)          # the linker's area for .run, tables and .bss
     sram_code: tuple = (0, 0)    # the linker's area for .fast code
     fast_table: str = ''         # the table .fast sections are copied through
+    image_free: tuple = ()       # ((lo, hi), ...): zero runs inside the main OS that
+                                 # fixed code may take (sdk.build's "fixed")
     recovery: str = ''           # how to get back to stock, said to the user
     toolchain: dict = field(default_factory=dict)   # for the SDK: prefix, asflags, cflags
     notes: str = ''

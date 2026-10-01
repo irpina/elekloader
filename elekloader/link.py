@@ -30,6 +30,7 @@ FORMAT2 = 2
 SECTIONS = ('.boot', '.run', '.fast', '.bss')
 RTYPES = ('abs32', 'pc32', 'pc16')
 FAST_ENTRY = 16                   # a .fast copy entry: src, dst, len, 0
+MAX_ALIGN = 4096                  # a section's alignment: a power of two up to this
 LINKER_SYMS = {'__run_load', '__run_start', '__run_words', '__bss_start', '__bss_end',
                '__bss_words'}
 
@@ -60,8 +61,9 @@ class Mod2:
             if sec not in SECTIONS:
                 raise ModError('%s: unknown section %s' % (name, sec))
             align = _int(d.get('align', 4), name)
-            if align not in (1, 2, 4, 8, 16):
-                raise ModError('%s %s: alignment %d' % (name, sec, align))
+            if align < 1 or align & (align - 1) or align > MAX_ALIGN:
+                raise ModError('%s %s: alignment %d (a power of two up to %d)'
+                               % (name, sec, align, MAX_ALIGN))
             if sec == '.bss':
                 self.sections[sec] = {'align': align, 'size': _int(d['size'], name)}
                 continue

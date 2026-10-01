@@ -261,6 +261,59 @@ def test_a_site_can_add_to_its_target():
             raise AssertionError('an addend without a target was built')
 
 
+def test_fixed_code_is_a_site_with_absolute_symbols():
+    """sdk.build's `fixed`: code at an address in a free image area becomes a site
+    over the zeros there, its labels absolute symbols; the linker needs nothing new.
+    Refused outside a free area, over bytes that are not zero, or with anything but
+    .text."""
+    import shutil
+    from elekloader.sdk import build
+    need(SYX)
+    if not shutil.which(os.environ.get('ELEKLOADER_CROSS', DEV.toolchain['prefix']) + 'objcopy'):
+        raise Skip('no m68k cross binutils')
+    st, img = stock()
+
+    def attempt(tmp, addr, text, sym='fx_start'):
+        d = os.path.join(tmp, 'fx')
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, 'fx.s'), 'w') as fh:
+            fh.write(text)
+        with open(os.path.join(d, 'mod.json'), 'w') as fh:
+            json.dump({'id': 'fx', 'version': '1', 'device': 'octatrack', 'os': '1.40C',
+                       'fixed': [{'source': 'fx.s', 'addr': addr, 'symbol': sym}],
+                       'requires': ['core']}, fh)
+        return build.build(d, SYX, tmp)
+
+    # A destination operand stays absolute with every assembler (a bare-metal one turns
+    # a source operand naming its own label into a PC-relative one), so the relocations
+    # are the same whichever builds it.
+    code = ('        .text\n        .globl  fx_loop, fx_word\nfx_loop: move.l  %d0,fx_word\n'
+            '        jsr     arena_base\n        rts\nfx_word: .long   0\n')
+    with tempfile.TemporaryDirectory() as tmp:
+        path, m = attempt(tmp, '0x400d64e0', code)
+        s = m.sites[0]
+        assert (s['addr'], s['len'], s['kind']) == (0x400d64e0, 18, 'data')
+        assert s['stock_sha256'] == sha(bytes(18))
+        assert m.symbols['fx_start'] == ('abs', 0x400d64e0) == m.symbols['fx_loop']
+        assert m.symbols['fx_word'] == ('abs', 0x400d64ee)
+        assert (2, 'abs32', 'abs', 0x400d64ee) in s['relocs'], s['relocs']   # move.l d0,fx_word
+        assert (8, 'abs32', 'sym:arena_base', 0) in s['relocs']            # jsr arena_base
+        assert not m.size('.run') and m.imports == ['arena_base']
+        for addr, text, words in (('0x400d2000', code, 'not inside a free area'),
+                                  ('0x400d7c30', code, 'not inside a free area'),
+                                  ('0x40000400', code, 'not inside a free area'),
+                                  ('0x400d64e0', code + '        .data\n        .long 1\n',
+                                   'only have .text')):
+            try:
+                attempt(tmp, addr, text)
+            except build.BuildError as e:
+                assert words in str(e), (words, str(e))
+            else:
+                raise AssertionError('built: %s' % words)
+    dev0 = [d for d in devices.devices() if d.key == 'digitakt-mk1'][0]
+    assert dev0.image_free == ()                    # other devices declare none: unchanged
+
+
 def test_core_builds_and_links():
     """mods/core-ot with a mod that puts a marker in .run: the boot site calls
     .boot at the end of the image, and the run image the linker placed after

@@ -45,6 +45,16 @@ Facts taken from sambanks/octabam (MIT) and not re-derived here are marked
     the reserve again (octabam, measured there).
   - A whole build (e.g. an octabam remix) brings its own loader instead, from
     right after the OS image (0x4010fdf0), as the core's `.boot` does.
+- **Free space inside the image** (`image_free`): the zero runs octabam
+  measured as unused and places code in (octabam, docs/contributing/
+  PLACEMENT.md).
+  - The 5,986-byte run is taken from 0x400d64e0, not 0x400d64da, where it
+    starts. Its first six bytes follow the data at 0x400d64a0 (the MIDI
+    handler vectors, then a table), and may be part of it. octabam's own
+    placements there start at 0x400d64e0.
+  - Two ranges that read zero are left out: 0x400d2ee6-0x400d3020 is a live
+    descriptor, and everything above 0x400d8000 is the PROJECT subsystem's
+    RAM (octabam).
 """
 from . import Device, Release
 
@@ -76,6 +86,7 @@ DEVICE = Device(
         'ddr': (0x40A955E0, 0x41495DE0),          # the arena's bottom 1,707 pages (core-ot)
     },
     ddr=(0x40A955E0, 0x41495DE0),
+    image_free=((0x400C45B0, 0x400C4702), (0x400D24D0, 0x400D2CE0), (0x400D64E0, 0x400D7C3C)),
     recovery=('hold FUNC while powering on for the startup menu, press TRIG 3 (MIDI '
               'UPGRADE) and send the stock .syx over 5-pin MIDI (not USB)'),
     toolchain={
