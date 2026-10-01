@@ -33,11 +33,29 @@
 </section>
 
 <main>
+  <section class="step" id="step-shop" hidden>
+    <h2><span class="n">1</span> The mod shop</h2>
+    <div class="shop-bar">
+      <div class="device-pick" role="group" aria-labelledby="pick-label">
+        <span class="pick-label" id="pick-label">Select your device</span>
+        <span class="pick-buttons" id="device-buttons"></span>
+      </div>
+      <input type="search" id="shop-search" placeholder="Search the shop" aria-label="Search the shop" autocomplete="off">
+      <a href="#step-mods" class="cart" id="cart"></a>
+    </div>
+    <p class="device-note" id="device-note"></p>
+    <div class="cards" id="shop-cards"></div>
+    <p class="muted small" id="shop-foot">Every mod here comes from its author's release, checked
+      against the shop's list by its sha256. Add one and it joins your mods below, ticked with the
+      core it needs.</p>
+  </section>
+
   <section class="step" id="step-stock">
-    <h2><span class="n">1</span> Your stock OS file</h2>
+    <h2><span class="n">2</span> Your stock OS file</h2>
     <div class="drop" id="stock-drop" tabindex="0" role="button" aria-describedby="stock-hint">
       <p class="big">Drop the stock OS file Elektron publishes for your device here, or
         <span class="like-link">choose it</span>.</p>
+      <p class="need" id="stock-need" hidden></p>
       <p class="muted" id="stock-hint">A <code>.syx</code>, a <code>.bin</code> (Octatrack), or
         Elektron's <code>.zip</code> as you downloaded it. It is recognised by its hash.</p>
       <input type="file" id="stock-file" accept=".syx,.bin,.zip" hidden>
@@ -50,7 +68,7 @@
   </section>
 
   <section class="step" id="step-mods">
-    <h2><span class="n">2</span> Mods</h2>
+    <h2><span class="n">3</span> Your mods</h2>
     <div class="bar">
       <button type="button" class="tool" id="add-mods">+ Add mods&hellip;</button>
       <input type="file" id="mod-files" accept=".elemod,.dtmod" multiple hidden>
@@ -77,12 +95,12 @@
   </section>
 
   <section class="step" id="step-check">
-    <h2><span class="n">3</span> Check</h2>
+    <h2><span class="n">4</span> Check</h2>
     <div id="check" class="check" aria-live="polite"><p class="muted">Choose your stock OS file first.</p></div>
   </section>
 
   <section class="step" id="step-build">
-    <h2><span class="n">4</span> Build</h2>
+    <h2><span class="n">5</span> Build</h2>
     <div class="buildrow">
       <label>OS version shown <input id="version" size="11" autocomplete="off" spellcheck="false"></label>
       <span class="muted" id="version-rule"></span>
@@ -98,7 +116,7 @@
   </section>
 
   <section class="step" id="step-result" hidden>
-    <h2><span class="n">5</span> Your firmware</h2>
+    <h2><span class="n">6</span> Your firmware</h2>
     <div id="result"></div>
   </section>
 </main>

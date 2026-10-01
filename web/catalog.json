@@ -1,0 +1,28 @@
+{
+  "about": "The mod shop's curated list. The pages workflow takes each file from its author's GitHub release, checks it against the sha256 here, and puts it on the site; nothing here is committed but this list. Only mods whose licence allows passing them on. kind 'core': a core the listed mods need, added to the site's cores. needs_core: the oldest core version the mod links with. license: only for a file that names none (then the repository's licence).",
+  "items": [
+    {
+      "repo": "irpina/digislicer", "tag": "v2.0", "file": "core-2.1.elemod", "kind": "core",
+      "device": "digitakt-mk1",
+      "sha256": "d97ac09eacccb91e3f5f4999077956be09008bb508807003757b01c71ee23c28"
+    },
+    {
+      "repo": "irpina/digislicer", "tag": "v2.0", "file": "digislicer-2.0.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "79f697787ed2c1a5d3be1966707d5f0613ee81d1a240dafeee5cebf33c266d12",
+      "summary": "A slicing machine with a slice editor: cut a sample where you want and play the slices from the trig keys."
+    },
+    {
+      "repo": "irpina/digihealth", "tag": "v1.0", "file": "digihealth-1.0.elemod",
+      "device": "digitakt-mk1", "license": "GPL-2.0",
+      "sha256": "e854c16f8851e4b26aac2aabffcc43f04856ad0b0faf68e48efdab797b7226bb",
+      "summary": "FAST AUDIO lowers the DSP load; SYSTEM INFO shows CPU, DSP and memory in the top bar."
+    },
+    {
+      "repo": "irpina/digineighbor", "tag": "v0.6", "file": "digineighbor-0.6.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "title": "digineighbor", "version": "0.6",
+      "sha256": "1ce7fe099bc754859e4d9e81d8bdb22b51fd199538402911d699ed430b1df106",
+      "summary": "A NEIGHBOR machine like the Octatrack's: a track plays another track's audio through its own chain. A prototype."
+    }
+  ]
+}

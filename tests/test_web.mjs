@@ -78,5 +78,22 @@ check('the check asks for the stock file first', !chk.ok && /stock firmware firs
 const b = JSON.parse(bridge.call('build', JSON.stringify({ enabled: [], version: '2.0a', name: 'x.syx' }), undefined, null));
 check('the build asks for the stock file first', !b.ok && /stock firmware first/.test(b.error), b.error);
 
+// 3. the mod shop: every listed file is there, is the one listed, and loads
+let items = [];
+try { items = JSON.parse(readFileSync(join(SITE, 'shop', 'index.json'), 'utf8')); } catch { /* no shop */ }
+for (const e of items) {
+  if (!e.available) { console.log(`   (shop: ${e.file} listed as not available)`); continue; }
+  const r = call('add_mod', { name: e.file, sha256: e.sha256 }, read(join(SITE, 'shop', e.file)));
+  check(`shop ${e.file}`, r.ok && r.mod.sha256 === e.sha256 && r.mod.id === e.id && r.mod.version === e.version
+    && r.mod.for_device === e.device, r.ok ? `${r.mod.for_label}, ${e.license}` : r.error);
+  call('remove_mod', { path: r.ok ? r.mod.path : '/work/mods/' + e.file });
+}
+const first = items.find(e => e.available);
+if (first) {
+  const raw = read(join(SITE, 'shop', first.file));
+  const r = call('add_mod', { name: first.file, sha256: '0'.repeat(64) }, raw);
+  check('a shop file that is not the listed one is refused', !r.ok && /not the file the shop lists/.test(r.error), r.error);
+}
+
 console.log(failed ? `${failed} failed` : 'all passed');
 process.exit(failed ? 1 : 0);
