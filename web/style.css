@@ -151,7 +151,39 @@ input[type=checkbox] { accent-color: var(--arc); width: 16px; height: 16px; vert
 .group { display: inline-flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
 .bar .group .inline { margin-left: 0; }
 
-/* ---- the mod shop: pick a device, then cards ---- */
+/* ---- the mod shop: a dialog, opened from "or browse the mod shop" ---- */
+button.shop-open {
+  display: inline-flex; align-items: center; gap: 6px; background: none; cursor: pointer;
+  border: 1px dashed var(--arc-dim); border-radius: 6px; padding: 6px 12px; color: var(--arc);
+  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
+}
+button.shop-open::before {
+  content: ""; width: 13px; height: 13px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13.5 2 5 13.5h6L10 22l9-12h-6.2z' fill='%23ffe14a'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+button.shop-open:hover { border-style: solid; border-color: var(--arc); color: #fff; box-shadow: var(--glow-arc); }
+dialog.shop {
+  width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0;
+  color: var(--text); background-color: var(--bg);
+  background-image: radial-gradient(ellipse 60% 40% at 15% -5%, rgba(63, 216, 255, 0.12), transparent 70%),
+    linear-gradient(rgba(63, 216, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(63, 216, 255, 0.035) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+  border: 1px solid var(--arc-dim); border-radius: 14px;
+  box-shadow: 0 0 40px rgba(63, 216, 255, 0.25), 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+dialog.shop[open] { display: flex; flex-direction: column; }
+dialog.shop::backdrop { background: rgba(2, 4, 10, 0.78); backdrop-filter: blur(3px); }
+.shop-head { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 18px;
+  border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #0c1833, #070d1b); }
+.shop-head::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: linear-gradient(90deg, transparent 0, var(--arc) 20%, #fff 25%, var(--volt) 30%, transparent 50%);
+  background-size: 200% 100%; animation: current 3.2s linear infinite; }
+.shop-head h2 { margin: 0; flex: 1; font-size: 20px; color: var(--volt); text-shadow: var(--glow-volt); }
+button.close { background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--muted);
+  font-size: 22px; line-height: 1; width: 36px; height: 34px; cursor: pointer; }
+button.close:hover { color: #fff; border-color: var(--arc); box-shadow: var(--glow-arc); }
+.shop-body { padding: 16px 18px 18px; overflow: auto; }
 .shop-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 8px; }
 .device-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pick-label { color: var(--volt); font-weight: 800; font-size: 13px; text-transform: uppercase;
@@ -173,7 +205,7 @@ button.pick.on .yours { color: #06101f; text-shadow: none; }
 #shop-search { flex: 1 1 200px; min-width: 160px; max-width: 320px; background: #070d1b;
   border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; }
 #shop-search:focus { border-color: var(--arc); box-shadow: var(--glow-arc); outline: none; }
-.cart { margin-left: auto; font-weight: 700; font-size: 14px; text-decoration: none; color: var(--volt);
+.cart { font-weight: 700; font-size: 14px; color: var(--volt); background: none; cursor: pointer;
   padding: 6px 12px; border: 1px solid rgba(255, 225, 74, 0.35); border-radius: 999px; white-space: nowrap; }
 .cart:hover { border-color: var(--volt); box-shadow: var(--glow-volt); }
 .device-note { margin: 2px 0 12px; color: var(--muted); font-size: 14px; }
@@ -354,7 +386,10 @@ footer p { margin: 4px 0; }
   .engine { margin-left: 0; }
   main { padding: 4px 16px 20px; }
   .top, .notice { padding-left: 16px; padding-right: 16px; }
-  .cart { margin-left: 0; }
   #shop-search { max-width: none; }
+  dialog.shop { width: 100vw; max-width: 100vw; height: 100%; max-height: 100%; margin: 0; border-radius: 0; }
+  .shop-head { padding: 12px 16px; }
+  .shop-head h2 { font-size: 17px; }
+  .shop-body { padding: 14px 16px; }
   th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6) { display: none; }
 }

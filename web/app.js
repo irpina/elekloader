@@ -144,7 +144,7 @@ async function loadShop() {
   } catch {
     shop.items = [];
   }
-  $('step-shop').hidden = !shop.items.length;
+  $('open-shop').hidden = !shop.items.length;
   renderShop();
   renderMods();
 }
@@ -166,8 +166,14 @@ function pickDevice(key) {
   renderShop();
 }
 
+function openShop() {
+  if (dev() && !$('shop').open) shop.device = dev().key;
+  renderShop();
+  $('shop').showModal();
+}
+
 function renderShop() {
-  if ($('step-shop').hidden) return;
+  if (!shop.items.length) return;
   const devs = pickable();
   const sd = dev();
   $('device-buttons').replaceChildren(...[{ key: null, name: 'All' }, ...devs].map(d => {
@@ -184,17 +190,17 @@ function renderShop() {
       : 'Every device\'s mods. Select your device to see the ones that fit it.')
     : sd && sd.key === chosen.key ? `For your ${sd.name}, OS ${st.stock.os}: what you add is ticked for your build.`
       : sd ? `Your stock file is for the ${sd.name}, so mods for the ${chosen.name} can't go into this build.`
-        : `Mods for the ${chosen.name}. To build, you need its stock OS ${chosen.os} file (step 2).`;
+        : `Mods for the ${chosen.name}. To build, you need its stock OS ${chosen.os} file (step 1).`;
   $('device-note').className = 'device-note' + (chosen && sd && sd.key !== chosen.key ? ' warn' : '');
   const n = st.enabled.size;
-  $('cart').textContent = n ? `⚡ ${n} in your build ↓` : 'Your mods ↓';
+  $('cart').textContent = n ? `⚡ ${n} in your build: done` : 'Done';
   const q = shop.query.trim().toLowerCase();
   const list = shop.items.filter(e => (!shop.device || e.device === shop.device)
     && (!q || [e.title, e.id, e.summary, e.description, e.category, e.author].join(' ').toLowerCase().includes(q)));
   $('shop-cards').replaceChildren(...list.map(card));
   if (!list.length) {
     $('shop-cards').append(el('p', { class: 'empty muted' }, q ? 'Nothing in the shop matches that.'
-      : `Nothing in the shop for the ${chosen ? chosen.name : 'device'} yet. You can still add your own .elemod files in step 3.`));
+      : `Nothing in the shop for the ${chosen ? chosen.name : 'device'} yet. You can still add your own .elemod files with + Add mods.`));
   }
   renderNeed();
 }
@@ -259,7 +265,7 @@ function renderNeed() {
 
 function toast(text) {
   const t = el('div', { class: 'toast', role: 'status' }, text);
-  document.body.append(t);
+  ($('shop').open ? $('shop') : document.body).append(t);   // above the shop when it is open
   setTimeout(() => t.classList.add('gone'), 4000);
   setTimeout(() => t.remove(), 4600);
 }
@@ -636,8 +642,8 @@ function renderMods() {
   }));
   if (!shown.length) {
     rows.append(el('tr', {}, el('td', { colspan: 7, class: 'empty' },
-      dev() ? 'No mods for this firmware yet. Add a mod made for it with "+ Add mods".'
-        : 'Add mods with "+ Add mods", or drop .elemod files anywhere on this page.')));
+      dev() ? 'No mods for this firmware yet. Add a mod made for it with "+ Add mods", or browse the mod shop.'
+        : 'Add mods with "+ Add mods", browse the mod shop, or drop .elemod files anywhere on this page.')));
   }
   const n = shown.filter(d => st.enabled.has(d.path)).length;
   $('mod-count').textContent = `${n} of ${shown.length} mods enabled`
@@ -918,6 +924,11 @@ function wire() {
     try { await Files.clear(); } catch { /* nothing kept */ }
   });
   $('shop-search').addEventListener('input', e => { shop.query = e.target.value; renderShop(); });
+  $('open-shop').addEventListener('click', openShop);
+  $('close-shop').addEventListener('click', () => $('shop').close());
+  $('cart').addEventListener('click', () => { $('shop').close(); $('step-mods').scrollIntoView({ behavior: 'smooth' }); });
+  // a click on the backdrop (the dialog itself, outside its content) closes it
+  $('shop').addEventListener('click', e => { if (e.target === $('shop')) $('shop').close(); });
 }
 
 wire();

@@ -42,13 +42,13 @@ The page never talks to a device: it has no Web MIDI and no USB access.
 
 ## The mod shop
 
-Step 1 of the page is a shop of curated mods. **Select your device** shows
-the mods made for it (or every device's, with "All"); once you drop in a
-stock file, the shop switches to its device by itself. A device you pick
-before that says which stock OS file it needs. Each card shows the mod's
+**or browse the mod shop**, next to **+ Add mods**, opens a shop of curated
+mods. **Select your device** shows the mods made for it (or every device's,
+with "All"); once you have dropped in a stock file, the shop opens on its
+device. A device you pick before that says which stock OS file it needs. Each card shows the mod's
 title, version, author, licence and what it changes (from the mod file
 itself), with a one-line summary from the catalog. **Add to build** puts
-the mod in your mods (step 3) and ticks it with what it requires.
+the mod in your mods and ticks it with what it requires.
 
 - **The list** is `web/catalog.json`, committed and edited by hand. Each
   item names a file of a GitHub release (`repo`, `tag`, `file`), its
