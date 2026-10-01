@@ -125,4 +125,33 @@ of its own that is only a boot copier.
 
 Mods are made per release: a mod's target names one stock file by hash, so
 supporting a new OS version means adding its release to the profile and
-rebuilding the mods for it.
+rebuilding the mods for it (below).
+
+## A new OS version of a supported device
+
+How Digitakt mk1 1.54 and Digitone mk1 1.44 were added (2026-10-01):
+
+1. **Compare the file with the last release's.** Every section but the main
+   OS (and section 5, the version string) must be the same bytes: the same
+   bootstrap and updater, so the same staging and flash layout. For both
+   releases that held. If the bootstrap changes, check `stage`,
+   `flash_limit` and the recovery path again.
+2. **Add the release** to the profile: the file's sha256, and the main OS's
+   sha256 and length, depacked. The writer must reproduce the file from its
+   own main OS stream, and its main OS must depack in place from `stage`
+   (`tests/test_releases.py` checks both for every release given).
+3. **Check the memory facts** the profile states: here, the same SRAM
+   operands in the code, and no operand near the DDR area mods run from.
+   Both releases moved their RAM past the image by 0x1000 and changed
+   nothing else there.
+4. **Port the cores**, under `ports` in their `mod.json` (ADAPTING.md 3.10):
+   every `defsym` and site found again in the new image, and each site's
+   stock bytes read from it. `tests/test_releases.py` builds and lints every
+   core for every release it names.
+5. **Run a build with the core in the emulator** against the new stock
+   file. Digitakt mk1 1.54: core 2.1 passes, with every screen identical
+   and the audio identical apart from the recording's silent end, 1 ms
+   off, exactly as core 2.1 does on 1.53. Digitone mk1 1.44: not yet,
+   since the emulator does not boot stock 1.44 to a settled screen.
+6. **Tell mod authors** to build their mods for the new OS. A mod for the
+   old one is refused with the new stock file.

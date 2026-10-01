@@ -18,8 +18,8 @@ file on your own machine, and you flash it the way you flash any OS update.
 
 | Device | OS | Status |
 |---|---|---|
-| Digitakt (mk1) | 1.53 | supported |
-| Digitone (mk1) and Digitone Keys | 1.43 | supported |
+| Digitakt (mk1) | 1.53, 1.54 | supported |
+| Digitone (mk1) and Digitone Keys | 1.43, 1.44 | supported |
 | Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); linkable mods with its own core, checked in an emulator, not yet on a unit |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
 
@@ -62,15 +62,25 @@ python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.1.elemod --m
 With `pip install .` the same commands are `elekloader` and `elekpatch`.
 From source, core is not built in. Take your device's from
 [Releases](https://github.com/irpina/elekloader/releases/latest) (or build
-it, below), and install it like any mod: `core-2.1.elemod` for the Digitakt
-mk1, `core-dn1-2.0a.elemod` for the Digitone mk1 and Digitone Keys.
+it, below), and install it like any mod. There is one per device and OS:
+
+| device | OS | core |
+|---|---|---|
+| Digitakt mk1 | 1.53 | `core-2.1.elemod` |
+| Digitakt mk1 | 1.54 | `core-2.1-os1.54.elemod` |
+| Digitone mk1, Digitone Keys | 1.43 | `core-dn1-2.0a.elemod` |
+| Digitone mk1, Digitone Keys | 1.44 | `core-dn1-2.0a-os1.44.elemod` |
+
+A mod is made for one OS version: one built for 1.53 is refused with a 1.54
+stock file, and its author has to build it for 1.54 (docs/ADAPTING.md,
+"Another OS version").
 
 You also need the **stock OS file** for your device, exactly as Elektron
 publishes it:
-- Digitakt mk1: `Digitakt_OS1.53.syx`, from
+- Digitakt mk1: `Digitakt_OS1.54.syx` or `Digitakt_OS1.53.syx`, from
   [Elektron's Digitakt downloads](https://www.elektron.se/support-downloads/digitakt);
-- Digitone mk1 or Digitone Keys: `Digitone_and_Digitone_Keys_OS1.43.syx`
-  (one file serves both), from Elektron's Digitone downloads;
+- Digitone mk1 or Digitone Keys: `Digitone_and_Digitone_Keys_OS1.44.syx` or
+  `..._OS1.43.syx` (one file serves both), from Elektron's Digitone downloads;
 - Octatrack MKI or MKII: `OCTATRACK_OS1.40C.syx` or `OCTATRACK_OS1.40C.bin`
   (one file serves both), from Elektron's Octatrack downloads.
 
@@ -82,8 +92,8 @@ the file by its hash.
 1. **Your stock OS file**: the first time, elekloader asks for it (a `.syx`,
    a `.bin` or Elektron's `.zip`); **Change stock firmware...** (top right)
    picks another. The header then shows the device and OS version with a
-   tick. Mods made for another device are hidden unless you tick **Show mods
-   for other devices**.
+   tick. Mods made for another device or OS version are hidden unless you
+   tick **Show mods for other firmware**.
 2. **+ Install from file...**: add the `.elemod` files of the mods you want.
    They are copied into your library.
 3. **Tick the mods** (or double-click them). Each mod's status shows as you
@@ -173,13 +183,15 @@ Every set of format-2 mods needs the **core** mod for its device. The
 Windows and macOS apps have them built in, and each release carries them:
 one source, [mods/core/core.s](mods/core/core.s), built with each device's addresses
 ([mods/core](mods/core) for the Digitakt mk1, [mods/core-dn1](mods/core-dn1)
-for the Digitone mk1). The Octatrack's, [mods/core-ot](mods/core-ot), is
+for the Digitone mk1). Each `mod.json` gives the addresses of every OS it
+supports (its `os`, and its `ports`): the stock file you build with picks
+them. The Octatrack's, [mods/core-ot](mods/core-ot), is
 only the boot copier, with no hook bus: it reserves RAM for mods and copies
 their code there. To build one yourself, use the SDK (below):
 
 ```bash
-python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx                          # the Digitakt mk1's
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # the Digitone mk1's
+python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.54.syx                          # the Digitakt mk1's (or 1.53)
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # the Digitone mk1's (or 1.43)
 python -m elekloader.sdk.build mods/core-ot --stock OCTATRACK_OS1.40C.syx                    # the Octatrack's
 ```
 
@@ -260,12 +272,13 @@ release. It needs these repository secrets:
 ```bash
 python tests/test_units.py        # needs nothing
 ELEKLOADER_STOCK=Digitakt_OS1.53.syx ELEKLOADER_MODS=path/to/mods python tests/test_link.py
-ELEKLOADER_STOCK=... ELEKLOADER_MODS=... python tests/test_sdk.py   # the example needs the cross compiler
+ELEKLOADER_STOCK=... ELEKLOADER_STOCK_154=Digitakt_OS1.54.syx ELEKLOADER_MODS=... python tests/test_sdk.py   # the example needs the cross compiler
+ELEKLOADER_RELEASES=folder/of/stock/files python tests/test_releases.py   # every known release, and its cores
 ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=bundle.elemod ELEKLOADER_CTOOL_SYX=its-build.syx python tests/test_patcher.py
 ELEKLOADER_OT_SYX=OCTATRACK_OS1.40C.syx ELEKLOADER_OT_BIN=OCTATRACK_OS1.40C.bin python tests/test_octatrack.py
 ELEKLOADER_OT_SYX=... ELEKLOADER_OCTABAM=path/to/octabam python tests/test_octabam.py   # octabam optional
 ELEKLOADER_DN_SYX=Digitone_and_Digitone_Keys_OS1.43.syx python tests/test_digitone.py
-ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
+ELEKLOADER_STOCK=... ELEKLOADER_STOCK_154=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
 node tests/test_web.mjs build/site   # the web page's engine, in Pyodide (packaging/build_web.py first)
 ```
 

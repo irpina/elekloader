@@ -3,7 +3,8 @@
 This guide is for people and for coding agents. Every step has a command
 and the output that means it worked; the last sections map every refusal to
 its fix and give a definition of done. The format itself is
-[FORMAT.md](FORMAT.md); the Digitakt mk1 addresses below are OS 1.53's.
+[FORMAT.md](FORMAT.md); the Digitakt mk1 addresses below are OS 1.53's, the
+Digitone mk1's 1.43's. Building for another OS version (1.54, 1.44) is 3.10.
 
 ## 0. Pick a path
 
@@ -103,14 +104,17 @@ event (lower first; the shipped mods use 10-90).
 
 The events, their prototypes and their conventions are the same on both
 devices; only the sites differ. The sites core owns (do not patch them):
-- Digitakt mk1 1.53: 0x40000538, 0x4000a770, 0x4000a7d6, 0x4000b770,
-  0x4000b7ba, 0x40058800, 0x40077428, 0x400784c8;
+- Digitakt mk1 1.53 and 1.54: 0x40000538, 0x4000a770, 0x4000a7d6,
+  0x4000b770, 0x4000b7ba, 0x40058800, 0x40077428, 0x400784c8;
 - Digitone mk1 1.43: 0x40000538, 0x4001900c, 0x40019072, 0x40019d9c,
-  0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c.
+  0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c;
+- Digitone mk1 1.44: the same, but 0x40072a54, 0x4009d128 and 0x4009e53c
+  for the last three.
 
-A firmware routine your mod calls has its own address on each device: look
-it up for the release you target, and build one `.elemod` per device (a
-mod's `device` and `os` pick the stock file).
+A firmware routine your mod calls has its own address on each device and
+each OS version: look it up for the release you target, and build one
+`.elemod` per device and OS (a mod's `device` and `os`, or one of its
+`ports`, pick the stock file: 3.10).
 
 ### SRC machines (core 2.1, Digitakt mk1)
 
@@ -143,7 +147,8 @@ does. `core_track_machine[t]` (8 bytes) is each track's own machine as the
 render last took it, for a mod whose machine renders as a stock one:
 `core_machine(id)` returns an added machine's descriptor, or 0.
 
-Core 2.1 owns these sites too (`mods/core/mod.json` says what each is):
+Core 2.1 owns these sites too (`mods/core/mod.json` says what each is;
+in 1.54 they are at the same addresses, but 0x400a1706 is 0x400a1862):
 0x40011322, 0x400225f0, 0x40022fe6, 0x40028f7e, 0x40029e9c, 0x4002a4e0,
 0x4002a76e, 0x4002a9e8, 0x4002aee0, 0x4002ba7e, 0x40039dac, 0x40039dcc,
 0x40039e80, 0x40039e86, 0x4003a43e, 0x4003afe4, 0x4003afee, 0x4003b448,
@@ -183,6 +188,7 @@ small square in the top-right corner of every screen.
 | `collections`, `contribute` | tables you declare, and entries you add to others' ([FORMAT.md](FORMAT.md)) |
 | `weak` | names you import that may be missing; they then read as zero |
 | `resources`, `requires`, `conflicts` | rules 9 and 11 |
+| `ports` | the same mod for other OS versions of the device: per OS, the keys that differ there (3.10) |
 
 **3.3 Write the code.** Call firmware routines through function pointers at
 their addresses, as `hello.c` does. There is no C library. Keep interrupt-level
@@ -263,6 +269,45 @@ menu, then send the stock `.syx`.
 (Install from file) or pass it to `elekloader.patch`. Bump `version` on
 every change.
 
+**3.10 Another OS version.** A mod is built for one release: its `.elemod`
+names that stock file's hash, and the loader refuses it with any other
+(`core 2.1 is made for Digitakt mk1 1.53; the stock file is Digitakt mk1
+1.54`). When Elektron releases an OS, build your mod again for it. Every
+address your mod names may have moved: its sites (re-read their stock
+bytes), its `defsym`, and the firmware routines your C code calls. The rest
+of `mod.json` stays as it is. Give the new OS's values under `ports`, and
+the stock file you build with picks them:
+
+```json
+ "os": "1.53",
+ "cflags": ["-DFILLRECT_AT=0x400c19a6"],
+ "defsym": {"DRAWALL": "0x400ca382"},
+ "sites": [{"addr": "0x401ab9b0", "stock": "00000400", "op": "bytes", "new": "00000500"}],
+ "ports": {
+  "1.54": {
+   "cflags": ["-DFILLRECT_AT=0x400c1bce"],
+   "defsym": {"DRAWALL": "0x400ca5aa"},
+   "sites": [{"addr": "0x401abcb0", "stock": "00000400", "op": "bytes", "new": "00000500"}]
+  }
+ }
+```
+
+- A port's keys replace the top level's for its OS, whole: give every site
+  and every `defsym`, not only the ones that moved. It may not change `id`,
+  `version`, `device` or `os`.
+- Built from a 1.54 stock file, the SDK writes `my-mod-1.0-os1.54.elemod`;
+  from 1.53, `my-mod-1.0.elemod`, as before. Ship one file per OS, and lint
+  each with that OS's core (`core-2.1-os1.54.elemod`).
+- C code gets its addresses from `cflags` (`-D`), as
+  [examples/hello-marker](../examples/hello-marker) does; assembly from
+  `defsym`, as [mods/core](../mods/core) does.
+- From Digitakt mk1 1.53 to 1.54, and Digitone mk1 1.43 to 1.44, only the
+  main OS changed, and most of it only moved: by a few hundred bytes at
+  most, and the RAM past the image by 0x1000. A window of the old code with
+  its absolute addresses masked out usually finds a routine again in the
+  new image. Check every match by its bytes, then run the build in an
+  emulator (3.8).
+
 ## 4. Path A: a whole build
 
 If you already build a patched firmware in one piece, `mkmod` turns it into
@@ -283,7 +328,7 @@ python -m elekloader.mkmod --stock Digitakt_OS1.53.syx --build my-cfw.syx \
   example an octabam build for the Octatrack:
   `python -m elekloader.mkmod --stock OCTATRACK_OS1.40C.syx --build built.syx --diff --meta meta.json --out my.elemod`.
 - The build may append one blob at the stock main OS's end (0x4025CA40 on
-  the Digitakt mk1 1.53); the ELF's `__run_start`, `__bss_end`,
+  the Digitakt mk1 1.53, 0x4025DA40 on 1.54); the ELF's `__run_start`, `__bss_end`,
   `__fast_start` and `__fast_len` describe where it runs.
 - `meta.json`: `id`, `title`, `category`, `description`, `license`, `names`,
   `regions`, `requires`, and `data_sites` for data patches that happen to
@@ -400,6 +445,7 @@ Some differences from an octabam build, by design:
 | message contains | means | fix |
 |---|---|---|
 | `made for a firmware elekloader does not know` | the target or stock file is not a supported release | use the exact stock file; check its hash against `devices/` |
+| `is made for <device> 1.53; the stock file is <device> 1.54` / `mod.json is for ... 1.53; the stock file is ... 1.54` | the mod is for another OS version | build it for that OS: a port (3.10) |
 | `the stock bytes are ..., not ...` (SDK) / `not the ones it expects` | the address is wrong, or the OS version differs | re-read the stock bytes at that address |
 | `ends mid-instruction`, `sweeps land on the start`, `does not decode` | the site does not cover whole instructions | move or widen the site to instruction boundaries (disassemble the stock main OS) |
 | `... overlap (0x...-0x...)` | another mod patches or claims those bytes | subscribe to an event instead, or agree with that mod's author |

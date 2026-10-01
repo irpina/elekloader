@@ -99,7 +99,7 @@ def make_dmg(app, dmg, volname, work):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--core', required=True, nargs='+',
-                    help='the core .elemod files to build in, one per device')
+                    help='the core .elemod files to build in, one per device and OS')
     ap.add_argument('--identity', help='the Developer ID Application identity to sign with '
                     '(default: ad hoc, not for a release)')
     ap.add_argument('--notarize', action='store_true',
@@ -127,9 +127,9 @@ def main(argv=None):
             sys.exit('%s is %s, not the core mod' % (path, core.id))
         name = os.path.basename(path)
         if name in cores:
-            sys.exit('two cores named %s: give each device\'s its own file name' % name)
-        if any(c.dev.key == core.dev.key for c in cores.values()):
-            sys.exit('%s: a second core for the %s' % (path, core.dev.name))
+            sys.exit('two cores named %s: give each device and OS its own file name' % name)
+        if any(c.dev.key == core.dev.key and c.rel == core.rel for c in cores.values()):
+            sys.exit('%s: a second core for the %s %s' % (path, core.dev.name, core.rel.version))
         cores[name] = core
 
     build = os.path.join(ROOT, 'build', 'macos')

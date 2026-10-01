@@ -191,6 +191,47 @@ def test_devices():
         raise AssertionError('accepted an unknown target')
 
 
+def test_each_release_is_known_by_its_own_hash():
+    """Every release of every profile is identified as itself, and its .elemod
+    target names it alone."""
+    seen = set()
+    for d in devices.devices():
+        for v, r in d.releases.items():
+            assert r.version == v and r.syx_sha256 not in seen
+            seen.add(r.syx_sha256)
+            assert devices.identify(r.syx_sha256) == (d, r)
+            assert devices.for_target(devices.target_of(d, r)) == (d, r)
+    dt = devices.devices()[0]
+    assert sorted(dt.releases) == ['1.53', '1.54']
+    assert dt.image_end(dt.releases['1.54']) == 0x4025DA40
+
+
+def test_a_mod_json_port_is_built_for_its_os():
+    from elekloader.sdk import build
+    dt = [d for d in devices.devices() if d.key == 'digitakt-mk1'][0]
+    dn = [d for d in devices.devices() if d.key == 'digitone-mk1'][0]
+    mod = {'id': 'm', 'version': '1', 'device': 'digitakt-mk1', 'os': '1.53',
+           'defsym': {'X': '0x1'}, 'sites': ['a'],
+           'ports': {'1.54': {'defsym': {'X': '0x2'}}}}
+    got, ported = build.for_release(mod, dt, dt.releases['1.53'])
+    assert got is mod and not ported
+    got, ported = build.for_release(mod, dt, dt.releases['1.54'])
+    assert ported and got['os'] == '1.54' and got['defsym'] == {'X': '0x2'}
+    assert got['sites'] == ['a'] and mod['defsym'] == {'X': '0x1'}   # the rest kept, mod unchanged
+
+    def refused(m, d, r, *words):
+        try:
+            build.for_release(m, d, r)
+        except build.BuildError as e:
+            assert all(w in str(e) for w in words), e
+        else:
+            raise AssertionError('built')
+    refused(mod, dn, dn.releases['1.43'], 'digitakt-mk1 1.53 (ports: 1.54)', 'digitone-mk1 1.43')
+    refused(dict(mod, ports={}), dt, dt.releases['1.54'], 'is for digitakt-mk1 1.53;')
+    refused(dict(mod, ports={'1.54': {'id': 'other'}}), dt, dt.releases['1.54'], 'changes id')
+    refused(dict(mod, ports={'1.54': ['defsym']}), dt, dt.releases['1.54'], '"ports"')
+
+
 def test_section_alignment():
     """A section's alignment is a power of two up to 4,096 (USB descriptors want 32)."""
     d, r = devices.identify(devices.devices()[0].releases['1.53'].syx_sha256)

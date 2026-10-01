@@ -188,7 +188,7 @@ function renderShop() {
   $('device-note').textContent = !chosen
     ? (sd ? `Every device's mods. Your stock file is for the ${sd.name}.`
       : 'Every device\'s mods. Select your device to see the ones that fit it.')
-    : sd && sd.key === chosen.key ? `For your ${sd.name}, OS ${st.stock.os}: what you add is ticked for your build.`
+    : sd && sd.key === chosen.key ? `For your ${sd.name}, OS ${st.stock.os}: what you add for that OS is ticked for your build.`
       : sd ? `Your stock file is for the ${sd.name}, so mods for the ${chosen.name} can't go into this build.`
         : `Mods for the ${chosen.name}. To build, you need its stock OS ${chosen.os} file (step 1).`;
   $('device-note').className = 'device-note' + (chosen && sd && sd.key !== chosen.key ? ' warn' : '');
@@ -207,7 +207,8 @@ function renderShop() {
 
 function card(e) {
   const have = owned(e);
-  const fitsStock = dev() && dev().key === e.device;
+  const otherOs = dev() && dev().key === e.device && e.os && e.os !== st.stock.os;
+  const fitsStock = dev() && dev().key === e.device && !otherOs;
   let action;
   if (!e.available) {
     action = el('button', { type: 'button', class: 'buy', disabled: true }, 'Not released yet');
@@ -229,6 +230,7 @@ function card(e) {
     el('h3', {}, e.title, ' ', el('span', { class: 'ver' }, e.version || '')),
     el('p', { class: 'by' }, [e.author && 'by ' + e.author, e.license].filter(Boolean).join(' · ')),
     el('p', { class: 'summary' }, e.summary || e.description || ''),
+    otherOs ? el('p', { class: 'muted small' }, `Made for OS ${e.os}; your stock file is OS ${st.stock.os}.`) : '',
     e.available ? el('details', { class: 'more' }, el('summary', {}, 'More'),
       el('p', { class: 'desc' }, e.description), el('p', { class: 'muted small' }, facts),
       el('p', { class: 'muted small mono' }, `${e.file}\nsha256 ${e.sha256}`))
@@ -647,7 +649,7 @@ function renderMods() {
   }
   const n = shown.filter(d => st.enabled.has(d.path)).length;
   $('mod-count').textContent = `${n} of ${shown.length} mods enabled`
-    + (hidden ? ` · ${hidden} for other devices hidden` : '');
+    + (hidden ? ` · ${hidden} for other firmware hidden` : '');
   $('enable-all').disabled = $('disable-all').disabled = st.busy || !dev();
   renderDetails();
   renderShop();                        // what is owned and ticked shows on its cards

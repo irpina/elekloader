@@ -2,9 +2,12 @@
 """The window's first run, with its file dialogs scripted (pytest, or run with
 python). A hidden Tk window: it needs Tk, and the files, named by environment
 variables; a test whose inputs are missing is skipped, not passed:
-  ELEKLOADER_STOCK    Digitakt_OS1.53.syx
-  ELEKLOADER_OT_SYX   OCTATRACK_OS1.40C.syx
-  ELEKLOADER_MODS     a folder with core-*.elemod (the core the Windows app builds in)
+  ELEKLOADER_STOCK      Digitakt_OS1.53.syx
+  ELEKLOADER_STOCK_154  Digitakt_OS1.54.syx
+  ELEKLOADER_OT_SYX     OCTATRACK_OS1.40C.syx
+  ELEKLOADER_MODS       a folder with core-*.elemod (the cores the Windows app builds
+                        in): core-2.1.elemod (1.53), core-2.1-os1.54.elemod (1.54)
+  ELEKLOADER_DN_SYX, ELEKLOADER_DN_MODS   the Digitone's stock file, and its cores
 """
 import glob
 import io
@@ -108,6 +111,42 @@ def test_the_first_run_on_a_digitakt_lists_core_unticked():
             assert rows(w) == [('core', False)] and w.hidden == 0
         finally:
             w.win.destroy()
+
+
+STOCK_154 = os.environ.get('ELEKLOADER_STOCK_154', '')
+
+
+def test_a_newer_os_gets_its_own_core():
+    """With both Digitakt cores built in (1.53's core-2.1.elemod and 1.54's
+    core-2.1-os1.54.elemod) and a 1.54 stock file, the first run lists and
+    ticks 1.54's core, hides 1.53's, and the set checks."""
+    need(STOCK_154, 'ELEKLOADER_STOCK_154')
+    mods = need(MODS, 'ELEKLOADER_MODS')
+    cores = [os.path.join(mods, n) for n in ('core-2.1.elemod', 'core-2.1-os1.54.elemod')]
+    if not all(os.path.exists(c) for c in cores):
+        raise Skip('ELEKLOADER_MODS lacks core-2.1.elemod or core-2.1-os1.54.elemod')
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+    except Exception as e:
+        raise Skip('no Tk: %s' % e)
+    with tempfile.TemporaryDirectory() as tmp:
+        bundled = os.path.join(tmp, 'bundled')
+        os.makedirs(bundled)
+        for c in cores:
+            shutil.copy(c, bundled)
+        root.withdraw()
+        w = gui.LoaderWindow(root, gui.LoaderModel(STOCK_154, os.path.join(tmp, 'lib'), [bundled],
+                                                   os.path.join(tmp, 'settings.json')))
+        try:
+            assert w.model.rel.version == '1.54'
+            assert rows(w) == [('core', True)] and w.hidden == 1
+            assert [os.path.basename(p) for p in w.enabled] == ['core-2.1-os1.54.elemod']
+            assert 'firmware' in w.count_var.get()
+            r = w.model.check(sorted(w.enabled))
+            assert r['ok'], r
+        finally:
+            root.destroy()
 
 
 DN_SYX = os.environ.get('ELEKLOADER_DN_SYX', '')

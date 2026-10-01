@@ -140,7 +140,7 @@ cores, run the workflow by hand to put them on the site.
 
 ```bash
 curl -fLO "$(python packaging/build_web.py --pyodide-url)"
-python packaging/build_web.py --pyodide pyodide-core-314.0.7.tar.bz2 --core core-2.1.elemod core-dn1-2.0a.elemod --out build/site
+python packaging/build_web.py --pyodide pyodide-core-314.0.7.tar.bz2 --core core-*.elemod --out build/site   # the release's: one per device and OS
 node tests/test_web.mjs build/site
 python -m http.server --directory build/site 8000      # then open http://localhost:8000
 ```

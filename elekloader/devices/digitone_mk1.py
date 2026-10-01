@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Digitone (mk1), and Digitone Keys: one OS file serves both. Two ColdFire
-MCF5441x CPUs; the main OS runs from DDR at 0x40000400. Measured on OS 1.43:
+MCF5441x CPUs; the main OS runs from DDR at 0x40000400. Measured on OS 1.43
+(the numbers below are its own). 1.44's file differs from 1.43's only in
+the main OS (and the version string's section): the same bootstrap, updater
+and second CPU's image, the same SRAM operands, and nothing in its code near
+the DDR area, so what follows holds for both:
 
 - The container: sections 5, 2 (the bootstrap, with the startup menu),
   3 (MAIN OS, packed in the aPLib-shaped codec), 4 (the updater, raw, at
@@ -43,6 +47,11 @@ DEVICE = Device(
             syx_sha256='c5a54cc05b921f2e4bd814834c5365c2a5aa01d7772a9a2961fac1c3095bf9aa',
             main_sha256='3831a477a2a22befb23c42e47e782853da49566ef5d0a1767fcf6c30e6767414',
             main_len=2732208),
+        '1.44': Release(
+            version='1.44',
+            syx_sha256='d4f200d04484333d82822db7744e6484d0def8f2db8ddf55ee2b780cc13c9659',
+            main_sha256='fce648a97c6c5d93b961732e8f8db6b02e0820c6d344c7e2131fa05a4b3168e4',
+            main_len=2736304),
     },
     main_section=3,
     main_load=0x40000400,

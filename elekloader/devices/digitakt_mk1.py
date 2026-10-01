@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Digitakt (mk1): a ColdFire MCF54418; the main OS runs from DDR at
-0x40000400. Measured on OS 1.53 (the digikit research notes):
+0x40000400. Measured on OS 1.53 (the digikit research notes). 1.54's file
+differs from 1.53's only in the main OS (and the version string's
+section): the same bootstrap, updater and coprocessor image, the same SRAM
+operands, and nothing in its code near the DDR area, so what follows holds
+for both:
 
 - The container: sections 5, 2 (bootstrap), 3 (MAIN OS), 4 (updater), 8
   (the coprocessor). Section 3 is packed in the aPLib-shaped codec.
@@ -25,6 +29,11 @@ DEVICE = Device(
             syx_sha256='9bdd44bb6102fb25c143cfab97bc92b7a89c463f795d3112dce89771e29bcc92',
             main_sha256='4b47a9507758ca5669ca02ab2c0374d2c04c98aece445408295cc1dcb265c5df',
             main_len=2475584),
+        '1.54': Release(
+            version='1.54',
+            syx_sha256='f78ba80fa7b1da5fb0e1ff61ad61e9e71aafe79f4364fc49679f3651353e3cf6',
+            main_sha256='5c58bf9e3949ef09977c5fc007a61e8d026931f67f1621238379dfb8ee4d31a2',
+            main_len=2479680),
     },
     main_section=3,
     main_load=0x40000400,

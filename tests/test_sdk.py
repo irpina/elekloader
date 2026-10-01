@@ -3,9 +3,10 @@
 
 Needs files named by environment variables; a test whose inputs are
 missing is skipped, not passed:
-  ELEKLOADER_STOCK   the stock Digitakt_OS1.53.syx
-  ELEKLOADER_MODS    optional: a folder with the core mod (core-*.elemod or
-                     .dtmod); without one, mods/core is built
+  ELEKLOADER_STOCK      the stock Digitakt_OS1.53.syx
+  ELEKLOADER_STOCK_154  optional: Digitakt_OS1.54.syx, for the ports to 1.54
+  ELEKLOADER_MODS       optional: a folder with the core mod (core-*.elemod or
+                        .dtmod); without one, mods/core is built
 Building mods/core or the example also needs the cross toolchain
 (m68k-linux-gnu-as, -gcc and -ld).
 """
@@ -117,13 +118,19 @@ def test_lint():
             assert rc == 1 and any('overlap' in x for x in r['problems'])
 
 
+# The hook bus's events (core.s), which every device's core provides.
+HOOK_BUS = ['ev_draw', 'ev_enc', 'ev_key', 'ev_render_in', 'ev_render_out', 'ev_settings',
+            'ev_tick']
+
+
 def test_core_builds_and_lints():
+    """core 2.1: the hook bus (core.s, 8 sites) and the SRC machine slots
+    (machines.s, Digitakt mk1 only: 31 sites and the table core_machines)."""
     path = built_core()
     with open(path) as fh:
         doc = json.load(fh)
-    assert doc['id'] == 'core' and '.boot' in doc['sections'] and len(doc['sites']) == 8
-    assert sorted(doc['collections']) == ['ev_draw', 'ev_enc', 'ev_key', 'ev_render_in',
-                                          'ev_render_out', 'ev_settings', 'ev_tick']
+    assert doc['id'] == 'core' and '.boot' in doc['sections'] and len(doc['sites']) == 39
+    assert sorted(doc['collections']) == sorted(HOOK_BUS + ['core_machines'])
     rc, r = lint_json(path, '--stock', stock())
     assert rc == 0 and r['link']['order'][0].startswith('core')
 
@@ -153,6 +160,8 @@ def dn_core(tmp, drop=None):
 
 
 def test_digitone_core_builds_and_links():
+    """core-dn1 is core 2.0a: core.s alone, the hook bus without the
+    Digitakt's machine slots, so it is core 2.1 with machines.s left out."""
     with tempfile.TemporaryDirectory() as tmp:
         path = dn_core(tmp)
         with open(path) as fh:
@@ -160,10 +169,20 @@ def test_digitone_core_builds_and_links():
         with open(built_core()) as fh:
             dt = json.load(fh)
         assert dn['target']['device'] == 'digitone-mk1' and len(dn['sites']) == 8
-        assert sorted(dn['collections']) == sorted(dt['collections'])
+        assert sorted(dn['collections']) == HOOK_BUS
+        # The same code, with the Digitone's addresses: core 2.1's core.s, and
+        # each of its labels where core 2.1 has it.
+        assert dn['build']['sources'] == {'core.s': dt['build']['sources']['core.s']}
+        placed = {k: v for k, v in dn['symbols'].items() if v[0] != 'abs'}
+        assert placed == {k: dt['symbols'][k] for k in placed}
+        # core 2.1's sections go on with machines.s where core-dn1's end.
         def sizes(d):
-            return {s: v.get('len', v.get('size')) for s, v in d['sections'].items()}
-        assert sizes(dn) == sizes(dt)       # the same code, with the Digitone's addresses
+            return {s: int(v.get('len', v.get('size'))) for s, v in d['sections'].items()}
+        machines = {}
+        for k, (sec, off) in dt['symbols'].items():
+            if sec != 'abs' and k not in placed:
+                machines[sec] = min(off, machines.get(sec, off))
+        assert machines and sizes(dn) == dict(sizes(dt), **machines)
         rc, r = lint_json(path, '--stock', DN_STOCK)
         assert rc == 0 and r['link']['order'] == ['core 2.0a']
 
@@ -185,6 +204,55 @@ def test_example_builds_and_links():
         path, m = build.build(os.path.join(ROOT, 'examples', 'hello-marker'), stock(), tmp)
         assert m.size('.run') > 0 and 'hello_draw' in m.exports
         rc, r = lint_json(path, '--stock', stock(), '--with', core())
+        assert rc == 0 and 'hello_draw' in r['link']['addresses']
+
+
+STOCK_154 = os.environ.get('ELEKLOADER_STOCK_154', '')
+
+
+def stock_154():
+    if not STOCK_154 or not os.path.exists(STOCK_154):
+        raise Skip('missing ELEKLOADER_STOCK_154')
+    return STOCK_154
+
+
+def test_core_port_to_154_is_the_same_core():
+    """mods/core's 1.54 port: the same code and the same sites, at 1.54's
+    addresses; a 1.53 core is refused on 1.54."""
+    st154 = stock_154()
+    with tempfile.TemporaryDirectory() as tmp:
+        path, _m = build.build(os.path.join(ROOT, 'mods', 'core'), st154, tmp)
+        assert os.path.basename(path) == 'core-2.1-os1.54.elemod'
+        with open(path) as fh:
+            new = json.load(fh)
+        with open(built_core()) as fh:
+            old = json.load(fh)
+        assert new['target']['os'] == '1.54' and old['target']['os'] == '1.53'
+        for k in ('exports', 'collections', 'contribute', 'resources', 'build'):
+            assert new[k] == old[k], k
+        def sizes(d):
+            return {s: v.get('len', v.get('size')) for s, v in d['sections'].items()}
+        assert sizes(new) == sizes(old)
+
+        def what(d):                # each site's new bytes and targets, not where it is
+            return [(s['len'], s['kind'], s['new'], s.get('relocs')) for s in d['sites']]
+        assert what(new) == what(old)
+        rc, r = lint_json(path, '--stock', st154)
+        assert rc == 0, r['problems']
+        rc, r = lint_json(built_core(), '--stock', st154)
+        assert rc == 1 and any('1.53' in x and '1.54' in x for x in r['problems']), r['problems']
+
+
+def test_example_port_to_154_builds_and_links():
+    st154 = stock_154()
+    tc = devices.devices()[0].toolchain
+    if not shutil.which(os.environ.get('ELEKLOADER_CROSS', tc['prefix']) + 'gcc'):
+        raise Skip('no m68k cross compiler')
+    with tempfile.TemporaryDirectory() as tmp:
+        c, _m = build.build(os.path.join(ROOT, 'mods', 'core'), st154, tmp)
+        path, m = build.build(os.path.join(ROOT, 'examples', 'hello-marker'), st154, tmp)
+        assert path.endswith('hello-marker-1.0-os1.54.elemod') and 'hello_draw' in m.exports
+        rc, r = lint_json(path, '--stock', st154, '--with', c)
         assert rc == 0 and 'hello_draw' in r['link']['addresses']
 
 

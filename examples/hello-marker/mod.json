@@ -8,6 +8,10 @@
  "device": "digitakt-mk1",
  "os": "1.53",
  "sources": ["hello.c"],
+ "cflags": ["-DFILLRECT_AT=0x400c19a6"],
+ "ports": {
+  "1.54": {"cflags": ["-DFILLRECT_AT=0x400c1bce"]}
+ },
  "subscribe": [
   {"event": "ev_draw", "fn": "hello_draw", "order": 60}
  ],

@@ -355,7 +355,7 @@ class LoaderWindow:
             ttk.Button(bar, text=text, style='Tool.TButton', command=cmd).pack(side='left', padx=(0, 6))
         self.show_other = tk.BooleanVar(value=False)       # mods for other firmware: hidden
         self.hidden = 0
-        ttk.Checkbutton(bar, text='Show mods for other devices', variable=self.show_other,
+        ttk.Checkbutton(bar, text='Show mods for other firmware', variable=self.show_other,
                         style='Bar.TCheckbutton', command=self._toggle_other
                         ).pack(side='left', padx=(10, 0))
         ttk.Button(bar, text='Save as...', style='Tool.TButton',
@@ -636,7 +636,7 @@ class LoaderWindow:
         n = len([p for p in self.enabled if p in shown])
         text = '%d of %d mods enabled' % (n, len(shown))
         if self.hidden:
-            text += '  ·  %d for other devices hidden' % self.hidden
+            text += '  ·  %d for other firmware hidden' % self.hidden
         self.count_var.set(text)
 
     def _no_mods(self):
@@ -647,7 +647,7 @@ class LoaderWindow:
         self.d_badge.configure(text='')
         hint = [('Install a mod made for this firmware with "Install from file...".', '')]
         if self.hidden:
-            hint += [('\n\n%d mod%s for other devices %s hidden; "Show mods for other devices" '
+            hint += [('\n\n%d mod%s for other firmware %s hidden; "Show mods for other firmware" '
                       'lists them.' % (self.hidden, '' if self.hidden == 1 else 's',
                                        'is' if self.hidden == 1 else 'are'), 'm')]
         for tab in self.d_text:
