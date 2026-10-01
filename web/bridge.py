@@ -91,14 +91,18 @@ def set_stock(args, data):
 
 
 def add_mod(args, data):
-    """Add a mod to the library, as Install from file does: it must load."""
+    """Add a mod to the library, as Install from file does: it must load. From
+    the shop, it must also be the file the shop lists (args['sha256'])."""
     name = _name(args['name'])
     if not name.lower().endswith(elemod.EXTS):
         return {'ok': False, 'file': name, 'error': '%s is not a mod: the file name must end '
                 '%s' % (name, ' or '.join(elemod.EXTS))}
+    raw = data.to_bytes()
+    if args.get('sha256') and hashlib.sha256(raw).hexdigest() != args['sha256']:
+        return {'ok': False, 'file': name, 'error': '%s is not the file the shop lists' % name}
     path = os.path.join(MODS, name)
     with open(path, 'wb') as fh:
-        fh.write(data.to_bytes())
+        fh.write(raw)
     # a file replaced under the same name is read again, not taken from the cache
     model._mods = {k: v for k, v in model._mods.items() if k[0] != path}
     try:

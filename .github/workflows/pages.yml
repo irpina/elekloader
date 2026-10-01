@@ -7,6 +7,10 @@
 # runs the unit tests and the page's bridge under Pyodide on that very site
 # (tests/test_web.mjs), and deploys it.
 #
+# It also puts the mod shop on the site: each mod web/catalog.json lists,
+# from its author's GitHub release, checked against the sha256 the catalog
+# pins.
+#
 # No firmware reaches this workflow, and the site holds none: the page reads
 # the user's stock OS file only in their browser, and builds there.
 #
@@ -53,10 +57,19 @@ jobs:
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "core-*.elemod" --dir build/core
           # the tag, so the page can say whether its package is that release's
           git fetch --depth=1 --no-tags origin "refs/tags/$tag:refs/tags/$tag"
+      - name: The mod shop's files, from their authors' releases
+        run: |
+          # web/catalog.json pins each file's sha256 (build_web.py checks them); one that
+          # cannot be fetched (a draft release) is listed in the shop as not available
+          mkdir -p build/shop
+          python packaging/build_web.py --catalog-list web/catalog.json | while read -r repo tag file; do
+            gh release download "$tag" --repo "$repo" --pattern "$file" --dir build/shop --clobber \
+              || echo "::warning::$repo $tag $file: not downloadable; the shop lists it as not available"
+          done
       - name: Pyodide, the pinned release
         run: curl -fsSL --retry 3 --create-dirs -o build/pyodide-core.tar.bz2 "$(python packaging/build_web.py --pyodide-url)"
       - name: Assemble the site
-        run: python packaging/build_web.py --pyodide build/pyodide-core.tar.bz2 --core build/core/core-*.elemod --release "$TAG" --out build/site
+        run: python packaging/build_web.py --pyodide build/pyodide-core.tar.bz2 --core build/core/core-*.elemod --release "$TAG" --catalog web/catalog.json --catalog-dir build/shop --out build/site
       - name: The engine under Pyodide, from the assembled site
         run: node tests/test_web.mjs build/site
       - uses: actions/upload-pages-artifact@v5

@@ -128,6 +128,148 @@ const st = {
 const dev = () => (st.stock && st.stock.ok ? st.stock.dev : null);
 const desc = p => st.mods.find(d => d.path === p);
 
+// ---- the mod shop ------------------------------------------------------------------------
+// shop/index.json lists the curated mods (packaging/build_web.py, from
+// web/catalog.json); their files are on this site, next to it.
+
+const shop = { items: [], device: S.shopDevice || null, query: '' };
+const cmpVer = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
+const shopItem = d => shop.items.find(e => e.available && e.sha256 === d.sha256);
+const owned = e => st.mods.find(d => !d.builtin && d.sha256 === e.sha256);
+
+async function loadShop() {
+  try {
+    const r = await fetch(new URL('shop/index.json', import.meta.url));
+    shop.items = r.ok ? await r.json() : [];
+  } catch {
+    shop.items = [];
+  }
+  $('open-shop').hidden = !shop.items.length;
+  renderShop();
+  renderMods();
+}
+
+// the devices to pick from: the engine's, or (before it loads) the shop's
+function pickable() {
+  if (st.info) return st.info.devices.map(d => ({ key: d.key, name: d.name, os: d.releases.join(' or ') }));
+  const seen = new Map();
+  for (const e of shop.items) {
+    if (!seen.has(e.device)) seen.set(e.device, { key: e.device, name: e.device_name || e.device, os: e.os || '' });
+  }
+  return [...seen.values()];
+}
+
+function pickDevice(key) {
+  shop.device = key;
+  S.shopDevice = key;
+  saveSettings();
+  renderShop();
+}
+
+function openShop() {
+  if (dev() && !$('shop').open) shop.device = dev().key;
+  renderShop();
+  $('shop').showModal();
+}
+
+function renderShop() {
+  if (!shop.items.length) return;
+  const devs = pickable();
+  const sd = dev();
+  $('device-buttons').replaceChildren(...[{ key: null, name: 'All' }, ...devs].map(d => {
+    const n = shop.items.filter(e => !d.key || e.device === d.key).length;
+    const on = shop.device === d.key;
+    return el('button', { type: 'button', class: 'pick' + (on ? ' on' : ''), 'aria-pressed': String(on),
+      onclick: () => pickDevice(d.key) },
+    d.name, el('span', { class: 'count' }, String(n)),
+    sd && sd.key === d.key ? el('span', { class: 'yours', title: 'Your stock file' }, '⚡') : '');
+  }));
+  const chosen = devs.find(d => d.key === shop.device);
+  $('device-note').textContent = !chosen
+    ? (sd ? `Every device's mods. Your stock file is for the ${sd.name}.`
+      : 'Every device\'s mods. Select your device to see the ones that fit it.')
+    : sd && sd.key === chosen.key ? `For your ${sd.name}, OS ${st.stock.os}: what you add is ticked for your build.`
+      : sd ? `Your stock file is for the ${sd.name}, so mods for the ${chosen.name} can't go into this build.`
+        : `Mods for the ${chosen.name}. To build, you need its stock OS ${chosen.os} file (step 1).`;
+  $('device-note').className = 'device-note' + (chosen && sd && sd.key !== chosen.key ? ' warn' : '');
+  const n = st.enabled.size;
+  $('cart').textContent = n ? `⚡ ${n} in your build: done` : 'Done';
+  const q = shop.query.trim().toLowerCase();
+  const list = shop.items.filter(e => (!shop.device || e.device === shop.device)
+    && (!q || [e.title, e.id, e.summary, e.description, e.category, e.author].join(' ').toLowerCase().includes(q)));
+  $('shop-cards').replaceChildren(...list.map(card));
+  if (!list.length) {
+    $('shop-cards').append(el('p', { class: 'empty muted' }, q ? 'Nothing in the shop matches that.'
+      : `Nothing in the shop for the ${chosen ? chosen.name : 'device'} yet. You can still add your own .elemod files with + Add mods.`));
+  }
+  renderNeed();
+}
+
+function card(e) {
+  const have = owned(e);
+  const fitsStock = dev() && dev().key === e.device;
+  let action;
+  if (!e.available) {
+    action = el('button', { type: 'button', class: 'buy', disabled: true }, 'Not released yet');
+  } else if (have) {
+    action = el('span', { class: 'have' }, st.enabled.has(have.path) ? '✓ In your build' : '✓ In your mods',
+      el('button', { type: 'button', class: 'linkish', disabled: st.busy, onclick: () => removeMod(have.path) }, 'Remove'));
+  } else {
+    action = el('button', { type: 'button', class: 'buy', disabled: !st.ready || st.busy,
+      onclick: ev => shopAdd(e, ev.currentTarget) }, fitsStock || !dev() ? 'Add to build' : 'Add to my mods');
+  }
+  const needs = (e.requires || []).map(r => (r === 'core' && e.needs_core ? `core ${e.needs_core} or newer` : r));
+  const facts = e.available ? [`${e.sites} patch sites`, e.ram ? `${kb(e.ram)} of RAM` : '',
+    needs.length ? 'needs ' + needs.join(', ') : '', e.conflicts.length ? 'not with ' + e.conflicts.join(', ') : '']
+    .filter(Boolean).join(' · ') : '';
+  const device = e.device_name || (pickable().find(d => d.key === e.device) || {}).name || e.device;
+  return el('article', { class: 'card' + (e.available ? '' : ' unavailable') + (have ? ' owned' : '') },
+    el('div', { class: 'card-top' }, e.category ? el('span', { class: 'chip' }, e.category) : '',
+      el('span', { class: 'chip dev' }, device + (e.os ? ' · OS ' + e.os : ''))),
+    el('h3', {}, e.title, ' ', el('span', { class: 'ver' }, e.version || '')),
+    el('p', { class: 'by' }, [e.author && 'by ' + e.author, e.license].filter(Boolean).join(' · ')),
+    el('p', { class: 'summary' }, e.summary || e.description || ''),
+    e.available ? el('details', { class: 'more' }, el('summary', {}, 'More'),
+      el('p', { class: 'desc' }, e.description), el('p', { class: 'muted small' }, facts),
+      el('p', { class: 'muted small mono' }, `${e.file}\nsha256 ${e.sha256}`))
+      : el('p', { class: 'muted small' }, `Its release (${e.tag}) is not published yet.`),
+    el('div', { class: 'card-foot' }, action,
+      el('a', { href: e.available ? e.homepage : e.release_url, rel: 'noreferrer', class: 'src' }, 'Source')));
+}
+
+async function shopAdd(e, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+  try {
+    const r0 = await fetch(new URL('shop/' + e.file, import.meta.url));
+    if (!r0.ok) throw new Error(`${e.file}: ${r0.status} ${r0.statusText}`);
+    const r = await addMod(e.file, await r0.arrayBuffer(), false, e.sha256);
+    if (!r.ok) throw new Error(r.error);
+    await refresh();
+    if (dev() && r.mod.fits) await tickWithCore(r.mod.path);
+    remember();
+    changed();
+    toast(`${e.title} ${e.version} added` + (dev() && r.mod.fits ? ' and ticked.' : ' to your mods.'));
+  } catch (err) {
+    note('Not added: ' + err.message);
+    renderShop();
+  }
+}
+
+// step 2's hint: which stock file the device you picked needs
+function renderNeed() {
+  const d = !dev() && pickable().find(x => x.key === shop.device);
+  $('stock-need').hidden = !d;
+  if (d) $('stock-need').textContent = `For the ${d.name}: Elektron's OS ${d.os} file.`;
+}
+
+function toast(text) {
+  const t = el('div', { class: 'toast', role: 'status' }, text);
+  ($('shop').open ? $('shop') : document.body).append(t);   // above the shop when it is open
+  setTimeout(() => t.classList.add('gone'), 4000);
+  setTimeout(() => t.remove(), 4600);
+}
+
 function profiles() {
   const k = dev().key;
   S.profiles[k] = S.profiles[k] || {};
@@ -162,6 +304,7 @@ async function boot() {
     $('engine').classList.add('ok');
     renderAbout(r);
     st.ready = true;
+    renderShop();                      // its devices, and its Add buttons on
   } catch (e) {
     $('engine').textContent = 'The build engine did not load: ' + e.message;
     $('engine').classList.add('bad');
@@ -211,18 +354,21 @@ async function setStock(name, data) {
     }
     $('version').value = S.versions[k] || r.dev.default_version;
     st.nameEdited = false;
+    shop.device = k;                   // the shop follows the stock file
   } else {
     st.enabled.clear();
   }
   renderStock();
+  renderShop();
   renderCheck(null);                   // no stale result while the check runs again
   renderProfiles();
   await versionChanged();
   changed();
 }
 
-async function addMod(name, data, tickIt = true) {
-  const r = await engine.call('add_mod', { name }, data);
+// sha256: from the shop, the file it lists (the worker refuses any other)
+async function addMod(name, data, tickIt = true, sha256 = null) {
+  const r = await engine.call('add_mod', sha256 ? { name, sha256 } : { name }, data);
   if (!r.ok) return r;
   st.modFiles.set(r.mod.file, data);
   if (S.remember) Files.put('mod:' + r.mod.file, { name: r.mod.file, data }).catch(() => {});
@@ -230,6 +376,28 @@ async function addMod(name, data, tickIt = true) {
     st.enabled = new Set(await engine.call('tick', { enabled: [...st.enabled], path: r.mod.path }));
   }
   return r;
+}
+
+// Tick a mod with what it requires (gui.with_requirements). A shop mod that
+// needs a newer core than the one ticked gets the newest core that fits, in
+// its place: a build has one core.
+async function tickWithCore(p) {
+  const d = desc(p);
+  const want = d && (shopItem(d) || {}).needs_core;
+  if (want) {
+    const cores = st.mods.filter(x => x.id === 'core' && x.fits);
+    const on = cores.find(x => st.enabled.has(x.path));
+    if (on && cmpVer(on.version, want) < 0) {
+      const best = cores.filter(x => cmpVer(x.version, want) >= 0)
+        .sort((a, b) => cmpVer(a.version, b.version)).pop();
+      if (best) {
+        st.enabled.delete(on.path);
+        st.enabled.add(best.path);
+        toast(`Core ${on.version} → ${best.version}: ${d.title} needs core ${want} or newer.`);
+      }
+    }
+  }
+  st.enabled = new Set(await engine.call('tick', { enabled: [...st.enabled], path: p }));
 }
 
 async function addMods(files) {
@@ -262,7 +430,7 @@ async function toggle(p) {
   const d = desc(p);
   if (!d || st.busy || !dev()) return;
   if (st.enabled.has(p)) st.enabled.delete(p);
-  else if (d.fits) st.enabled = new Set(await engine.call('tick', { enabled: [...st.enabled], path: p }));
+  else if (d.fits) await tickWithCore(p);
   else return;                                      // made for other firmware
   remember();
   changed();
@@ -461,7 +629,8 @@ function renderMods() {
     },
     el('td', { class: 'on' }, box),
     el('td', {}, el('span', { class: 'title' }, d.title || d.file),
-      el('span', { class: 'file' }, d.builtin ? `${d.file} · from the release` : d.file)),
+      el('span', { class: 'file' }, d.builtin ? `${d.file} · built in`
+        : shopItem(d) ? `${d.file} · from the shop` : d.file)),
     el('td', {}, d.version || ''),
     el('td', {}, el('span', { class: 'pill ' + cls }, text)),
     el('td', { class: 'num' }, d.error ? '' : kb(d.ram || 0)),
@@ -473,14 +642,15 @@ function renderMods() {
   }));
   if (!shown.length) {
     rows.append(el('tr', {}, el('td', { colspan: 7, class: 'empty' },
-      dev() ? 'No mods for this firmware yet. Add a mod made for it with "+ Add mods".'
-        : 'Add mods with "+ Add mods", or drop .elemod files anywhere on this page.')));
+      dev() ? 'No mods for this firmware yet. Add a mod made for it with "+ Add mods", or browse the mod shop.'
+        : 'Add mods with "+ Add mods", browse the mod shop, or drop .elemod files anywhere on this page.')));
   }
   const n = shown.filter(d => st.enabled.has(d.path)).length;
   $('mod-count').textContent = `${n} of ${shown.length} mods enabled`
     + (hidden ? ` · ${hidden} for other devices hidden` : '');
   $('enable-all').disabled = $('disable-all').disabled = st.busy || !dev();
   renderDetails();
+  renderShop();                        // what is owned and ticked shows on its cards
 }
 
 function renderDetails() {
@@ -753,9 +923,16 @@ function wire() {
     $('forget').hidden = true;
     try { await Files.clear(); } catch { /* nothing kept */ }
   });
+  $('shop-search').addEventListener('input', e => { shop.query = e.target.value; renderShop(); });
+  $('open-shop').addEventListener('click', openShop);
+  $('close-shop').addEventListener('click', () => $('shop').close());
+  $('cart').addEventListener('click', () => { $('shop').close(); $('step-mods').scrollIntoView({ behavior: 'smooth' }); });
+  // a click on the backdrop (the dialog itself, outside its content) closes it
+  $('shop').addEventListener('click', e => { if (e.target === $('shop')) $('shop').close(); });
 }
 
 wire();
 renderMods();
 renderBuildButton();
+loadShop();
 boot();

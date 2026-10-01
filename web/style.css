@@ -151,6 +151,109 @@ input[type=checkbox] { accent-color: var(--arc); width: 16px; height: 16px; vert
 .group { display: inline-flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
 .bar .group .inline { margin-left: 0; }
 
+/* ---- the mod shop: a dialog, opened from "or browse the mod shop" ---- */
+button.shop-open {
+  display: inline-flex; align-items: center; gap: 6px; background: none; cursor: pointer;
+  border: 1px dashed var(--arc-dim); border-radius: 6px; padding: 6px 12px; color: var(--arc);
+  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
+}
+button.shop-open::before {
+  content: ""; width: 13px; height: 13px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13.5 2 5 13.5h6L10 22l9-12h-6.2z' fill='%23ffe14a'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+button.shop-open:hover { border-style: solid; border-color: var(--arc); color: #fff; box-shadow: var(--glow-arc); }
+dialog.shop {
+  width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0;
+  color: var(--text); background-color: var(--bg);
+  background-image: radial-gradient(ellipse 60% 40% at 15% -5%, rgba(63, 216, 255, 0.12), transparent 70%),
+    linear-gradient(rgba(63, 216, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(63, 216, 255, 0.035) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+  border: 1px solid var(--arc-dim); border-radius: 14px;
+  box-shadow: 0 0 40px rgba(63, 216, 255, 0.25), 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+dialog.shop[open] { display: flex; flex-direction: column; }
+dialog.shop::backdrop { background: rgba(2, 4, 10, 0.78); backdrop-filter: blur(3px); }
+.shop-head { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 18px;
+  border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #0c1833, #070d1b); }
+.shop-head::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: linear-gradient(90deg, transparent 0, var(--arc) 20%, #fff 25%, var(--volt) 30%, transparent 50%);
+  background-size: 200% 100%; animation: current 3.2s linear infinite; }
+.shop-head h2 { margin: 0; flex: 1; font-size: 20px; color: var(--volt); text-shadow: var(--glow-volt); }
+button.close { background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--muted);
+  font-size: 22px; line-height: 1; width: 36px; height: 34px; cursor: pointer; }
+button.close:hover { color: #fff; border-color: var(--arc); box-shadow: var(--glow-arc); }
+.shop-body { padding: 16px 18px 18px; overflow: auto; }
+.shop-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 8px; }
+.device-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pick-label { color: var(--volt); font-weight: 800; font-size: 13px; text-transform: uppercase;
+  letter-spacing: 0.08em; text-shadow: var(--glow-volt); }
+.pick-buttons { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+button.pick {
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px;
+  background: var(--raised); border: 1px solid var(--line); color: var(--muted); cursor: pointer;
+  font-weight: 600; transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
+}
+button.pick:hover { border-color: var(--arc); color: var(--text); }
+button.pick.on { color: #06101f; background: linear-gradient(135deg, var(--arc), #9cecff);
+  border-color: var(--arc); box-shadow: var(--glow-arc); }
+button.pick .count { font-family: var(--mono); font-size: 11px; padding: 0 6px; border-radius: 999px;
+  background: rgba(5, 8, 15, 0.55); color: var(--text); }
+button.pick.on .count { background: rgba(6, 16, 31, 0.8); color: var(--arc); }
+button.pick .yours { color: var(--volt); text-shadow: var(--glow-volt); }
+button.pick.on .yours { color: #06101f; text-shadow: none; }
+#shop-search { flex: 1 1 200px; min-width: 160px; max-width: 320px; background: #070d1b;
+  border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; }
+#shop-search:focus { border-color: var(--arc); box-shadow: var(--glow-arc); outline: none; }
+.cart { font-weight: 700; font-size: 14px; color: var(--volt); background: none; cursor: pointer;
+  padding: 6px 12px; border: 1px solid rgba(255, 225, 74, 0.35); border-radius: 999px; white-space: nowrap; }
+.cart:hover { border-color: var(--volt); box-shadow: var(--glow-volt); }
+.device-note { margin: 2px 0 12px; color: var(--muted); font-size: 14px; }
+.device-note.warn { color: var(--warn); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
+.cards .empty { grid-column: 1 / -1; padding: 18px; text-align: center; border: 1px dashed var(--line);
+  border-radius: 10px; margin: 0; }
+.card { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px;
+  background: linear-gradient(180deg, var(--raised), var(--panel)); border: 1px solid var(--line);
+  border-radius: 12px; overflow: hidden; transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
+.card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--arc), var(--volt), transparent); opacity: 0.55; }
+.card:hover { border-color: var(--arc-dim); box-shadow: 0 6px 24px -10px rgba(63, 216, 255, 0.55); transform: translateY(-1px); }
+.card.owned { border-color: rgba(61, 255, 176, 0.45); }
+.card.owned::before { background: linear-gradient(90deg, transparent, var(--ok), transparent); opacity: 0.9; }
+.card.unavailable { opacity: 0.6; }
+.card.unavailable::before { background: repeating-linear-gradient(-45deg, var(--volt) 0 8px, #111 8px 16px); opacity: 0.6; }
+.card-top { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; letter-spacing: 0.04em;
+  border: 1px solid var(--line); color: var(--arc); background: rgba(5, 8, 15, 0.5); }
+.chip.dev { color: var(--muted); }
+.card h3 { margin: 4px 0 0; font-size: 20px; letter-spacing: 0.01em; }
+.card h3 .ver { font-family: var(--mono); font-size: 13px; color: var(--volt); font-weight: 600; }
+.card .by { margin: 0; color: var(--muted); font-size: 13px; }
+.card .summary { margin: 2px 0 0; flex: 1; }
+.card .more summary { font-size: 13px; }
+.card .more .desc { white-space: pre-wrap; font-size: 14px; margin: 6px 0; }
+.card .more p { margin: 4px 0; }
+.card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+button.buy {
+  background: linear-gradient(135deg, var(--volt), #ffc400); color: #1a1300; border: 0; border-radius: 6px;
+  padding: 7px 16px; font-weight: 800; letter-spacing: 0.04em; cursor: pointer; box-shadow: var(--glow-volt);
+}
+button.buy:hover:not(:disabled) { box-shadow: 0 0 22px rgba(255, 225, 74, 0.85); }
+button.buy:disabled { background: var(--raised); color: var(--muted); box-shadow: none; border: 1px solid var(--line); }
+.have { display: inline-flex; align-items: center; gap: 10px; color: var(--ok); font-weight: 700;
+  text-shadow: 0 0 10px rgba(61, 255, 176, 0.35); }
+button.linkish { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline;
+  cursor: pointer; font-weight: 400; text-shadow: none; }
+button.linkish:hover:not(:disabled) { color: var(--bad); }
+.card .src { font-size: 13px; }
+.need { margin: 6px 0 0; color: var(--volt); font-weight: 600; }
+.toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 10;
+  max-width: min(560px, calc(100vw - 32px)); padding: 10px 16px; border-radius: 10px;
+  background: #0d1a33; border: 1px solid var(--arc); color: var(--text); box-shadow: var(--glow-arc);
+  transition: opacity 0.5s; }
+.toast.gone { opacity: 0; }
+
 /* ---- the mod list and the details ---- */
 .mods {
   display: grid; grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr);
@@ -283,5 +386,10 @@ footer p { margin: 4px 0; }
   .engine { margin-left: 0; }
   main { padding: 4px 16px 20px; }
   .top, .notice { padding-left: 16px; padding-right: 16px; }
+  #shop-search { max-width: none; }
+  dialog.shop { width: 100vw; max-width: 100vw; height: 100%; max-height: 100%; margin: 0; border-radius: 0; }
+  .shop-head { padding: 12px 16px; }
+  .shop-head h2 { font-size: 17px; }
+  .shop-body { padding: 14px 16px; }
   th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6) { display: none; }
 }

@@ -4,7 +4,9 @@
 
     python packaging/build_web.py --pyodide-url          # the pinned Pyodide's URL
     python packaging/build_web.py --pyodide pyodide-core-314.0.7.tar.bz2 \\
-        --core core-2.1.elemod [core-dn1-2.0a.elemod ...] --out build/site
+        --core core-2.1.elemod [core-dn1-2.0a.elemod ...] \\
+        [--catalog web/catalog.json --catalog-dir build/shop] --out build/site
+    python packaging/build_web.py --catalog-list web/catalog.json   # what to download
 
 The site holds:
   - web/'s files (the page, its worker and the Python bridge);
@@ -12,14 +14,22 @@ The site holds:
     (`git archive HEAD elekloader`: committed files only, nothing changed),
     zipped the same way every time, so its sha256 follows from the commit:
     the same code a release of that commit carries;
-  - core/: the core mods given (the release's), with core/index.json;
+  - core/: the core mods given (the release's), and the cores the catalog
+    lists, with core/index.json;
+  - shop/: the mod shop: each mod web/catalog.json lists, taken from its
+    author's release (the workflow downloads them into --catalog-dir),
+    checked against the sha256 the catalog pins, and listed in
+    shop/index.json with what its file says about it. A mod goes in only
+    under a licence that allows passing it on (SHOP_LICENCES); one whose
+    file is not there (a draft release) is listed as not available;
   - pyodide/: the pinned Pyodide's runtime, five files from its core
     tarball, which is checked against its sha256 first;
   - LICENSE.txt, NOTICE.txt, pyodide/NOTICE.txt, and build.json (what went in).
 
 Everything the page loads is in the site: it fetches nothing from anywhere
 else. No firmware goes in. The stock OS file is only ever read in the
-user's browser, and each core is checked to be a core mod.
+user's browser, each core is checked to be a core mod, and each of the
+shop's files to be the one the catalog names.
 """
 import argparse
 import hashlib
@@ -45,6 +55,11 @@ PYODIDE_URL = ('https://github.com/pyodide/pyodide/releases/download/%s/pyodide-
 PYODIDE_FILES = ('pyodide.mjs', 'pyodide.asm.mjs', 'pyodide.asm.wasm', 'python_stdlib.zip',
                  'pyodide-lock.json')
 WEB_FILES = ('index.html', 'style.css', 'app.js', 'worker.js', 'bridge.py')
+# licences under which the site may pass a mod on (SPDX identifiers)
+SHOP_LICENCES = {'GPL-2.0', 'GPL-2.0-only', 'GPL-2.0-or-later', 'GPL-3.0', 'GPL-3.0-only',
+                 'GPL-3.0-or-later', 'LGPL-2.1-or-later', 'LGPL-3.0-or-later', 'MIT',
+                 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0', 'MPL-2.0', 'ISC', '0BSD',
+                 'CC0-1.0', 'Unlicense'}
 PAGES_FILE_MAX = 100 << 20           # GitHub Pages: 100 MB a file, 1 GB a site
 PAGES_SITE_MAX = 1 << 30
 
@@ -123,6 +138,64 @@ def cores(paths):
     return out
 
 
+def read_catalog(path):
+    with open(path, encoding='utf-8') as fh:
+        doc = json.load(fh)
+    for it in doc['items']:
+        for k in ('repo', 'tag', 'file', 'sha256', 'device'):
+            if not it.get(k):
+                sys.exit('%s: an item has no "%s"' % (path, k))
+    return doc['items']
+
+
+def shop(path, folder):
+    """The catalog's items, from `folder`. -> (cores [(entry, bytes)],
+    shop [(entry, bytes or None)])."""
+    cs, out = [], []
+    for it in read_catalog(path):
+        f = it['file']
+        base = {'file': f, 'sha256': it['sha256'], 'device': it['device'], 'repo': it['repo'],
+                'tag': it['tag'], 'homepage': 'https://github.com/' + it['repo'],
+                'release_url': 'https://github.com/%s/releases/tag/%s' % (it['repo'], it['tag']),
+                'summary': it.get('summary', ''), 'needs_core': it.get('needs_core')}
+        p = os.path.join(folder, f) if folder else ''
+        if not p or not os.path.exists(p):
+            print('WARNING: %s (%s %s) is not there: the shop lists it as not available'
+                  % (f, it['repo'], it['tag']))
+            if it.get('kind') != 'core':
+                out.append((dict(base, available=False, title=it.get('title', f),
+                                 version=it.get('version', '')), None))
+            continue
+        with open(p, 'rb') as fh:
+            raw = fh.read()
+        if sha(raw) != it['sha256']:
+            sys.exit('%s: sha256 %s, not the %s the catalog names' % (f, sha(raw), it['sha256']))
+        m = elemod.load_any(p)
+        if m.dev.key != it['device']:
+            sys.exit("%s is made for %s, not the catalog's %s" % (f, m.dev.key, it['device']))
+        lic = m.doc.get('license') or it.get('license')
+        if lic not in SHOP_LICENCES:
+            sys.exit('%s: licence %r is not one the site may pass a mod on under (%s)'
+                     % (f, lic, ', '.join(sorted(SHOP_LICENCES))))
+        if it.get('kind') == 'core':
+            if m.id != 'core' or not isinstance(m, link.Mod2):
+                sys.exit('%s is listed as a core but is %r' % (f, m.id))
+            cs.append(({'file': f, 'sha256': it['sha256'], 'id': m.id, 'version': m.version,
+                        'device': m.dev.key, 'os': m.rel.version,
+                        'from': it['repo'] + ' ' + it['tag']}, raw))
+            continue
+        v2 = isinstance(m, link.Mod2)
+        out.append((dict(base, available=True, id=m.id, version=m.version,
+                         title=m.doc.get('title', m.id), description=m.doc.get('description', ''),
+                         category=m.doc.get('category', ''), author=m.doc.get('author', ''),
+                         license=lic, license_from='mod' if m.doc.get('license') else 'catalog',
+                         device_name=m.dev.name, os=m.rel.version, format=2 if v2 else 1,
+                         requires=list(m.requires), conflicts=list(m.conflicts),
+                         ram=(m.size('.run') + m.size('.bss')) if v2 else 0,
+                         fast=m.size('.fast') if v2 else 0, sites=len(m.sites)), raw))
+    return cs, out
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--pyodide-url', action='store_true', help='print the pinned Pyodide\'s URL')
@@ -130,16 +203,32 @@ def main(argv=None):
     ap.add_argument('--core', nargs='*', default=[], help='the core mods to list (the release\'s)')
     ap.add_argument('--release', help='the release the cores come from (its tag, fetched): the '
                                       'page says whether its package is that release\'s')
+    ap.add_argument('--catalog', help="the mod shop's curated list (web/catalog.json)")
+    ap.add_argument('--catalog-dir', help='where its files were downloaded')
+    ap.add_argument('--catalog-list', metavar='CATALOG',
+                    help='print each item as "repo tag file", for the download')
     ap.add_argument('--out', help='the site folder to write (emptied first)')
     a = ap.parse_args(argv)
     if a.pyodide_url:
         print(PYODIDE_URL)
+        return 0
+    if a.catalog_list:
+        for it in read_catalog(a.catalog_list):
+            print(it['repo'], it['tag'], it['file'])
         return 0
     if not a.pyodide or not a.out:
         ap.error('--pyodide and --out are required')
     py = pyodide_files(a.pyodide)
     zipped, names = package_zip()
     cs = cores(a.core)
+    shop_cores, items = shop(a.catalog, a.catalog_dir) if a.catalog else ([], [])
+    for c, raw in shop_cores:                # the catalog's cores join the release's
+        same_name = [x for x, _ in cs if x['file'] == c['file']]
+        if same_name and same_name[0]['sha256'] != c['sha256']:
+            sys.exit("two different %s: the release's and %s's" % (c['file'], c['from']))
+        if not same_name:
+            cs.append((c, raw))
+    cs.sort(key=lambda x: x[0]['file'])
     if os.path.exists(a.out):
         shutil.rmtree(a.out)
     site = {}
@@ -157,6 +246,10 @@ def main(argv=None):
     for c, raw in cs:
         site['core/' + c['file']] = raw
     site['core/index.json'] = json.dumps([c for c, _ in cs], indent=1).encode()
+    for e, raw in items:
+        if raw is not None:
+            site['shop/' + e['file']] = raw
+    site['shop/index.json'] = json.dumps([e for e, _ in items], indent=1).encode()
     commit = git('rev-parse', 'HEAD').decode().strip()
     dirty = bool(git('status', '--porcelain', '--', 'elekloader').strip())
     tree = git('rev-parse', 'HEAD:elekloader').decode().strip()
@@ -173,6 +266,8 @@ def main(argv=None):
         'zip_sha256': sha(zipped), 'zip_files': len(names),
         'pyodide': PYODIDE_VERSION, 'pyodide_tarball_sha256': PYODIDE_SHA256,
         'cores': [c for c, _ in cs],
+        'shop': [{'file': e['file'], 'sha256': e['sha256'], 'available': e['available'],
+                  'from': e['repo'] + ' ' + e['tag']} for e, _ in items],
         'files': {n: sha(b) for n, b in sorted(site.items())},
     }, indent=1).encode()
     for n, b in site.items():
@@ -187,11 +282,13 @@ def main(argv=None):
     for n in sorted(site, key=lambda n: -len(site[n])):
         print('%10d  %s' % (len(site[n]), n))
     print('%10d  in %d files -> %s' % (total, len(site), a.out))
-    print('elekloader %s (%s%s%s), zip sha256 %s; Pyodide %s; cores: %s'
+    print('elekloader %s (%s%s%s), zip sha256 %s; Pyodide %s; cores: %s; shop: %s'
           % (__version__, commit[:12], ', with package changes NOT in the zip' if dirty else '',
              (', the same package as %s' if same else ', not the package of %s') % a.release
              if a.release else '', sha(zipped), PYODIDE_VERSION,
-             ', '.join(c['file'] for c, _ in cs) or 'none'))
+             ', '.join(c['file'] for c, _ in cs) or 'none',
+             ', '.join(e['file'] + ('' if e['available'] else ' (not available)')
+                       for e, _ in items) or 'none'))
     return 0
 
 

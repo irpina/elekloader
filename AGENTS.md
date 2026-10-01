@@ -36,7 +36,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 | `mods/core/`, `mods/core-dn1/` | the core mod (the hook bus every format-2 mod needs): one `core.s`, each device's addresses and sites in its `mod.json` |
 | `mods/core-ot/` | the Octatrack's core: a boot copier only (its RAM reserve and `.boot`), no hook bus |
 | `packaging/`, `.github/workflows/windows-build.yml`, `macos-build.yml` | the apps: `elekloader-<version>-windows.exe`, and `elekloader-<version>-macos.dmg` (signed and notarized), with core built in (`elekloader/bundled`, never committed) |
-| `web/`, `packaging/build_web.py`, `.github/workflows/pages.yml` | the web page (GitHub Pages): elekloader in Pyodide, in a worker; `bridge.py` is its only Python, a thin layer over `gui.LoaderModel` and `patch` (docs/WEB.md). Everything it loads comes from the site itself |
+| `web/`, `packaging/build_web.py`, `.github/workflows/pages.yml` | the web page (GitHub Pages): elekloader in Pyodide, in a worker; `bridge.py` is its only Python, a thin layer over `gui.LoaderModel` and `patch`; `catalog.json` is its mod shop's curated list (docs/WEB.md). Everything it loads comes from the site itself |
 
 Tests:
 
@@ -75,8 +75,10 @@ Rules:
 - **The web page stays on its own site.** It loads nothing from anywhere
   else (no CDN, fonts, analytics or package downloads), sends the user's
   files nowhere, and only offers downloads: no Web MIDI or USB. Its Python
-  goes through `elekloader` unchanged; the site never holds firmware or a
-  build.
+  goes through `elekloader` unchanged. The site never holds firmware or a
+  build; the only mods on it are the cores and the shop's
+  (`web/catalog.json`), each from its author's release, pinned by sha256,
+  under a licence that allows passing it on.
 
 Done means all of these:
 - the tests that could run pass;
