@@ -25,7 +25,13 @@ mod.json:
      "contribute": [{"to", "order", "data", "relocs", "claims"}],
      "weak": ["name"], "copied": [...],
      "resources": {"regions": [...], "names": [...]},
-     "requires": ["core"], "conflicts": [...]}
+     "requires": ["core"], "conflicts": [...],
+     "ports": {"1.54": {"defsym": {...}, "sites": [...]}}}   optional: other OS versions
+
+A port builds the same mod for another release of the device: for that OS,
+its keys replace the top level's (typically defsym, sites, cflags), and the
+.elemod is named <id>-<version>-os<os>.elemod. The stock file says which
+one is built.
 
 A site's "op" says how its new bytes are made:
 
@@ -90,6 +96,33 @@ def run(cmd):
     return r.stdout
 
 
+PORT_FIXED = ('id', 'version', 'device', 'os', 'ports')   # which mod it is: no port changes them
+
+
+def for_release(mod, dev, rel):
+    """mod.json -> (the mod as built for this device and release, whether that is
+    one of its ports). A port's keys replace the top level's for its OS."""
+    ports = mod.get('ports', {})
+    if not isinstance(ports, dict) or not all(isinstance(p, dict) for p in ports.values()):
+        raise BuildError('mod.json: "ports" maps an OS version to the keys that differ there')
+    if mod.get('device', dev.key) == dev.key:
+        if mod.get('os', rel.version) == rel.version:
+            return mod, False
+        if rel.version in ports:
+            port = ports[rel.version]
+            fixed = sorted(k for k in port if k in PORT_FIXED)
+            if fixed:
+                raise BuildError('mod.json: the %s port changes %s; a port gives only what '
+                                 'differs on that OS' % (rel.version, ', '.join(fixed)))
+            out = dict(mod, **port)
+            out['os'] = rel.version
+            return out, True
+    raise BuildError('mod.json is for %s %s%s; the stock file is %s %s'
+                     % (mod.get('device'), mod.get('os'),
+                        ' (ports: %s)' % ', '.join(sorted(ports)) if ports else '',
+                        dev.key, rel.version))
+
+
 def build(mdir, stock_path, out_dir=None, extra=None):
     """-> (the path of the .elemod written, its Mod2). `extra` ({'sites', 'contribute',
     'sources'}) lets a generator add parts it computed."""
@@ -100,9 +133,7 @@ def build(mdir, stock_path, out_dir=None, extra=None):
         stock, dev, rel = formats.load(stock_path)
     except (devices.UnknownFirmware, formats.FormatError) as e:
         raise BuildError(str(e))
-    if mod.get('device', dev.key) != dev.key or mod.get('os', rel.version) != rel.version:
-        raise BuildError('mod.json is for %s %s; the stock file is %s %s'
-                         % (mod.get('device'), mod.get('os'), dev.key, rel.version))
+    mod, ported = for_release(mod, dev, rel)
     image = formats.main_image(stock, dev)
     if sha(image) != rel.main_sha256:
         raise BuildError('the stock main OS is not the known image')
@@ -327,7 +358,8 @@ def build(mdir, stock_path, out_dir=None, extra=None):
         m = link.Mod2(json.loads(raw), mid)                # the loader's own validation
     except elemod.ModError as e:
         raise BuildError('the result does not validate: %s' % e)
-    path = os.path.join(out_dir, '%s-%s.elemod' % (mid, version))
+    path = os.path.join(out_dir, '%s-%s%s.elemod' % (mid, version,
+                                                     '-os' + rel.version if ported else ''))
     with open(path, 'wb') as fh:
         fh.write(raw)
     return path, m

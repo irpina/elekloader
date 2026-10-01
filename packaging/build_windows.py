@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Build elekloader's Windows app: one elekloader.exe with the core mods built in.
 
-    python packaging/build_windows.py --core core-2.1.elemod [core-dn1-2.0a.elemod ...] [--out dist]
+    python packaging/build_windows.py --core core-2.1.elemod [core-2.1-os1.54.elemod ...] [--out dist]
 
 Needs Windows and PyInstaller (packaging/requirements-build.txt). The core
-.elemod files (one per device with linkable mods) are given, not built
+.elemod files (one per device and OS with linkable mods) are given, not built
 here: building one needs the device's stock OS file (python -m
 elekloader.sdk.build mods/core --stock ...), which no build machine may
 hold. The release workflow takes them from the release it builds for.
@@ -37,7 +37,7 @@ def sha(path):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--core', required=True, nargs='+',
-                    help='the core .elemod files to build in, one per device')
+                    help='the core .elemod files to build in, one per device and OS')
     ap.add_argument('--out', default=os.path.join(ROOT, 'dist'), help='where the exe goes')
     a = ap.parse_args(argv)
     if sys.platform != 'win32':
@@ -49,9 +49,9 @@ def main(argv=None):
             sys.exit('%s is %s, not the core mod' % (path, core.id))
         name = os.path.basename(path)
         if name in cores:
-            sys.exit('two cores named %s: give each device\'s its own file name' % name)
-        if any(c.dev.key == core.dev.key for c in cores.values()):
-            sys.exit('%s: a second core for the %s' % (path, core.dev.name))
+            sys.exit('two cores named %s: give each device and OS its own file name' % name)
+        if any(c.dev.key == core.dev.key and c.rel == core.rel for c in cores.values()):
+            sys.exit('%s: a second core for the %s %s' % (path, core.dev.name, core.rel.version))
         cores[name] = core
 
     build = os.path.join(ROOT, 'build', 'windows')

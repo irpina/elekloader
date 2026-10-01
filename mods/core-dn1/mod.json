@@ -29,6 +29,34 @@
   {"addr": "0x4009d108", "stock": "203c7fffffff", "op": "jsr", "target": "core_render_in"},
   {"addr": "0x4009e51c", "stock": "4cee3fffff48", "op": "jsr", "target": "core_render_out"}
  ],
+ "ports": {
+  "1.44": {
+   "defsym": {
+    "DRAWALL": "0x400e5f0e",
+    "KEYDISP": "0x40016fc0",
+    "ENCDISP": "0x40017012",
+    "OP_NEW": "0x400e96c0",
+    "ITEM_CTOR": "0x400dfd9c",
+    "MENU_ADD": "0x400df5d2",
+    "FN_MGR": "0x40165bb0",
+    "DTMR0": "0xFC070000",
+    "PPMSR0": "0xFC04002D",
+    "VBR_FN": "0x40001df4",
+    "SETTINGS_RET": "0x40072a5a",
+    "RENDER_FRAME": "0xb8"
+   },
+   "sites": [
+    {"addr": "0x40000538", "stock": "4eb940001df4", "op": "jsr", "target": "boot"},
+    {"addr": "0x4001900c", "stock": "4eb9400e5ed8", "op": "jsr", "target": "core_tick"},
+    {"addr": "0x40019072", "stock": "4eb9400e5f0e", "op": "jsr", "target": "core_draw"},
+    {"addr": "0x40019d9c", "stock": "4eb940016fc0", "op": "jsr", "target": "core_key"},
+    {"addr": "0x40019de4", "stock": "4eb940017012", "op": "jsr", "target": "core_enc"},
+    {"addr": "0x40072a54", "stock": "205248780002", "op": "jmp", "target": "core_settings"},
+    {"addr": "0x4009d128", "stock": "203c7fffffff", "op": "jsr", "target": "core_render_in"},
+    {"addr": "0x4009e53c", "stock": "4cee3fffff48", "op": "jsr", "target": "core_render_out"}
+   ]
+  }
+ },
  "collections": {
   "ev_tick": 4, "ev_draw": 4, "ev_key": 4, "ev_enc": 4, "ev_settings": 4,
   "ev_render_in": 4, "ev_render_out": 4

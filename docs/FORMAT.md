@@ -116,9 +116,11 @@ Nothing is built unless all of these pass:
 ## The hook bus (Digitakt mk1, Digitone mk1)
 
 This is a convention between mods for these devices, not a rule of the
-loader. The table gives the Digitakt mk1 1.53's sites; the Digitone mk1
-1.43's are 0x4001900c, 0x40019072, 0x40019d9c, 0x40019de4, 0x40072a34,
-0x4009d108 and 0x4009e51c, in the same order (`mods/core-dn1/mod.json`).
+loader. The table gives the Digitakt mk1 1.53's sites, which 1.54 has at
+the same addresses; the Digitone mk1 1.43's are 0x4001900c, 0x40019072,
+0x40019d9c, 0x40019de4, 0x40072a34, 0x4009d108 and 0x4009e51c, in the same
+order, and 1.44 has the last three at 0x40072a54, 0x4009d128 and 0x4009e53c
+(`mods/core-dn1/mod.json`, its `ports`).
 
 The core mod patches each shared site once. It calls the handlers
 subscribed to that event, from a table built by the linker, in order.

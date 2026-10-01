@@ -4,7 +4,8 @@
 #
 # Run it by hand (Actions > windows-build > Run workflow) with the release's
 # tag, once the release exists and carries its core-*.elemod files, one per
-# device with linkable mods (mods/core, mods/core-dn1). They are built with
+# device and OS with linkable mods (mods/core, mods/core-dn1, and their
+# ports: core-2.1-os1.54.elemod, core-dn1-2.0a-os1.44.elemod). They are built with
 # the SDK, which needs each stock OS file, so they are made where those files
 # are and attached to the release first; no firmware ever reaches this
 # workflow.

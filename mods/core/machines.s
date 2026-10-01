@@ -1,10 +1,19 @@
 | SPDX-License-Identifier: GPL-2.0-or-later
-| core (Digitakt mk1, OS 1.53): SRC machine slots. Mods add SRC machines
-| past the stock four through the table core_machines, and the sites below
-| make the firmware list, name, set, load, render and edit them
-| (docs/ADAPTING.md, "SRC machines"). Found in FINDINGS "How SRC machines
-| are wired, and a fifth one" and the survey after it. Digitakt mk1 only:
-| the addresses are this OS's.
+| core (Digitakt mk1): SRC machine slots. Mods add SRC machines past the
+| stock four through the table core_machines, and the sites below make the
+| firmware list, name, set, load, render and edit them (docs/ADAPTING.md,
+| "SRC machines"). Found in FINDINGS "How SRC machines are wired, and a
+| fifth one" and the survey after it. Digitakt mk1 only. The addresses in
+| the comments are OS 1.53's; the code takes them from mod.json's defsym
+| (M_* and the routines), one set per OS:
+|   M_LIST_PUSH     the machine list's push       M_SET_REFUSE  the setter's refusal
+|   M_STEP_ON/SKIP  after a step: on, or skipped  M_OPEN_ON/SKIP  the same, on opening
+|   M_NAME_DEF      the long name past 3          M_SHORT_DEF   the short one
+|   M_ICON_ON       the icon callback, on         M_PARAMS_NONE the descriptor's "none"
+|   M_OWNER_SKIP    Randomize/Reload: not it      M_CC_GENERIC, M_NRPN_GENERIC
+|   M_TRACK_GET     the track machine getter      M_PAGE_GET    the SRC page's getter
+|   ITEM_ID         a menu item's id              BLIT          blit(dst, src, x, y, centre)
+|   RENDER_MACHINE  the render's machine bytes (SRAM)
 
         .section .run, "ax"
 
@@ -99,7 +108,7 @@ core_mlist:
         cmp.l   %d0, %d1
         beq.s   9f                      | none: the list is done
         move.l  %d1, %d2
-8:      move.l  #0x40022fc0, (%sp)
+8:      move.l  #M_LIST_PUSH, (%sp)
 9:      rts
 
 | The machine setter 0x400225ca refuses a machine past 3 (was: moveq #3,d0 ;
@@ -113,7 +122,7 @@ core_mset:
         move.l  %d2, %d1
         bsr.w   cm_find
         bne.s   8f
-        move.l  #0x40022708, (%sp)      | refused
+        move.l  #M_SET_REFUSE, (%sp)    | refused
 8:      rts
 
 | The menu's cursor follows the machine only while machine + 1 <= 4. The
@@ -132,8 +141,8 @@ core_mstep:
         move.l  (%sp)+, %d1             | our return address
         clr.l   -(%sp)
         move.l  %d2, -(%sp)
-        jmp     0x4002a4ec
-9:      move.l  #0x4002a4fa, (%sp)
+        jmp     M_STEP_ON
+9:      move.l  #M_STEP_SKIP, (%sp)
         rts
 
 | ... and on opening, at 0x4002a9e8 in 0x4002a736 (was: moveq #4,d4 ;
@@ -152,8 +161,8 @@ core_mopen:
         clr.l   -(%sp)
         move.l  %d0, -(%sp)
         move.l  %d2, -(%sp)
-        jmp     0x4002a9f8
-9:      move.l  #0x4002aa02, (%sp)
+        jmp     M_OPEN_ON
+9:      move.l  #M_OPEN_SKIP, (%sp)
         rts
 
 | The names: 0x4007910c (long) and 0x4007912c (short) return a default
@@ -167,7 +176,7 @@ core_mname:
         movea.l %d0, %a0
         move.l  M_NAME(%a0), %d0
         rts
-1:      move.l  #0x401c4084, %d0
+1:      move.l  #M_NAME_DEF, %d0
         rts
 
 core_mshort:
@@ -177,7 +186,7 @@ core_mshort:
         movea.l %d0, %a0
         move.l  M_SHORT(%a0), %d0
         rts
-1:      move.l  #0x401c1d2f, %d0
+1:      move.l  #M_SHORT_DEF, %d0
         rts
 
 | The menu's icons: the item's icon callback 0x40029e9c picks one of four
@@ -185,8 +194,6 @@ core_mshort:
 | movem.l d2-d4,(sp)), by jmp: (sp) return, 8 the item, 12 the screen, 16
 | x, 20 y. An added machine with an icon gets it drawn as the stock ones
 | are, blit(screen, icon, x + 2, y - 1, 0), a tail call.
-        .equ    ITEM_ID,  0x400c3fb8    | a menu item's id: the machine
-        .equ    BLIT,     0x400c2960    | blit(dst, src, x, y, centre)
         .globl  core_micon
 core_micon:
         move.l  8(%sp), -(%sp)
@@ -214,7 +221,7 @@ core_micon:
         jmp     BLIT
 8:      lea     -12(%sp), %sp           | the replaced instructions
         movem.l %d2-%d4, (%sp)
-        jmp     0x40029ea4
+        jmp     M_ICON_ON
 
 | A sound parameter's descriptor for a machine: 0x40078f44(index, machine)
 | has eight machine parameters (indices 0x11-0x18) for each of 0-3, and none
@@ -234,7 +241,7 @@ core_mparams:
         movea.l %d0, %a1
         move.l  M_PARAMS(%a1), %d0
 8:      rts
-7:      move.l  #0x40078f54, (%sp)
+7:      move.l  #M_PARAMS_NONE, (%sp)
         rts
 
 | The render's machine byte: 0x4007725a(sound, t) copies the sound's
@@ -257,7 +264,7 @@ core_mrender:
         beq.s   1f                      | unknown: itself (an empty window)
         movea.l %d0, %a1
         move.l  M_RENDER(%a1), %d1
-1:      lea     0x800018bc, %a1
+1:      lea     RENDER_MACHINE, %a1
         move.b  %d1, 0(%a1,%d2.l)
         move.l  (%sp)+, %d2
         rts
@@ -308,12 +315,12 @@ core_mload:
         .globl  core_mplays, core_mplays_page
 core_mplays_page:
         move.l  4(%sp), -(%sp)
-        jsr     0x4002b5d4
+        jsr     M_PAGE_GET
         addq.l  #4, %sp
         bra.s   cm_plays
 core_mplays:
         move.l  4(%sp), -(%sp)
-        jsr     0x4002200a
+        jsr     M_TRACK_GET
         addq.l  #4, %sp
 cm_plays:
         moveq   #3, %d1
@@ -384,7 +391,7 @@ core_mowner:
 1:      move.l  (%sp)+, %d0
         cmp.l   %d1, %d0
         beq.s   8f
-        move.l  #0x40011332, (%sp)
+        move.l  #M_OWNER_SKIP, (%sp)
 8:      rts
 
 | MIDI CC 16-23 (0x4007919e: was moveq #3,d2 ; cmp.l d1,d2 ; bcs.s
@@ -409,7 +416,7 @@ core_mcc:
 8:      rts
 7:      move.l  (%sp)+, %d0
         movea.l (%sp)+, %a1
-        move.l  #0x400791fe, (%sp)
+        move.l  #M_CC_GENERIC, (%sp)
         rts
 
 core_mnrpn:
@@ -428,7 +435,7 @@ core_mnrpn:
 7:      movea.l (%sp)+, %a1
         move.l  %d1, %d0
         moveq   #3, %d1
-        move.l  #0x40079268, (%sp)
+        move.l  #M_NRPN_GENERIC, (%sp)
         rts
 
 | ============================ .bss ========================================
