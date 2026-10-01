@@ -780,6 +780,15 @@ def bare_metal(dev):
             return len(fh.read()) == 7
 
 
+def inside_checkout(path):
+    """Is `path` inside the git checkout this elekloader runs from?"""
+    repo = os.path.dirname(os.path.dirname(HERE))
+    if not os.path.exists(os.path.join(repo, '.git')):     # installed, not a checkout
+        return False
+    path, repo = os.path.realpath(path), os.path.realpath(repo)
+    return os.path.commonpath([path, repo]) == repo
+
+
 # ---- the command ----------------------------------------------------------------------
 
 def main(argv=None):
@@ -789,10 +798,15 @@ def main(argv=None):
     ap.add_argument('--stock', default=os.environ.get('ELEKLOADER_OT_SYX'),
                     help='the stock OCTATRACK_OS1.40C.syx (default: $ELEKLOADER_OT_SYX)')
     ap.add_argument('--module', action='append', help='a module directory name (default: all)')
-    ap.add_argument('--out', default='octabam-mods', help='where the folders and .elemod go')
+    ap.add_argument('--out', required=True,
+                    help='where the folders and .elemod go: outside the elekloader checkout, '
+                         'since they carry octabam\'s sources')
     ap.add_argument('--core', help='the Octatrack core .elemod (default: build mods/core-ot)')
     ap.add_argument('--no-check', action='store_true', help='build, but skip the check')
     a = ap.parse_args(argv)
+    if inside_checkout(a.out):
+        ap.error('%s is inside the elekloader checkout: converted mods carry octabam\'s '
+                 'sources, so write them somewhere else' % a.out)
     if not a.stock:
         ap.error('--stock is required (or set ELEKLOADER_OT_SYX)')
     st, dev, rel = formats.load(a.stock)

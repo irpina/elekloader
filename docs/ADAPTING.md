@@ -310,10 +310,12 @@ linkable mod for the Octatrack's core (`mods/core-ot`):
 ```bash
 git clone --recurse-submodules https://github.com/sambanks/octabam
 python -m elekloader.sdk.octabam --octabam octabam --stock OCTATRACK_OS1.40C.syx \
-    [--module recorder-hold ...] --out octabam-mods
+    [--module recorder-hold ...] --out ~/octabam-mods
 ```
 
-Each converted module gets:
+`--out` must be outside the elekloader checkout: the converted mods carry
+octabam's sources, and they stay out of this repository. Each converted
+module gets:
 - a mod folder: `mod.json`, octabam's sources, generated glue, and octabam's
   licence;
 - a built `octabam-<name>-<commit>.elemod`.

@@ -296,6 +296,12 @@ def test_pinned_code_stays_where_it_is_pinned():
     assert any('the same bytes for 5407 as for the chip' in x for x in lines), lines
 
 
+def test_converted_mods_stay_out_of_the_checkout():
+    assert octabam.inside_checkout(os.path.join(ROOT, 'octabam-mods')) == \
+        os.path.exists(os.path.join(ROOT, '.git'))
+    assert not octabam.inside_checkout(tempfile.gettempdir())
+
+
 def test_refusals():
     from types import SimpleNamespace as NS
     img = stock()
