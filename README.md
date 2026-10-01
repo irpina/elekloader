@@ -5,8 +5,9 @@ file Elektron publishes for your device. elekloader builds a custom OS
 file on your own machine, and you flash it the way you flash any OS update.
 
 - **Nothing from Elektron is distributed.** A mod (`.elemod`) carries only
-  its author's bytes plus hashes of the stock bytes it expects. Every build
-  starts from your own stock file, recognised by its hash.
+  its author's bytes, the short instruction fragments needed to hook the OS,
+  and hashes of the stock bytes it expects. Every build starts from your own
+  stock file, recognised by its hash.
 - **The bootloader is never touched.** Mods can only change the main OS:
   the file format has no way to say anything else. Each output file is
   re-read and verified before it is written. So the stock OS file always
@@ -23,6 +24,16 @@ file on your own machine, and you flash it the way you flash any OS update.
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
 
 ## Install
+
+**In your browser, nothing to install:** <https://irpina.github.io/elekloader/>.
+Drop in your stock OS file and your mods, tick them, build, and download the
+`.syx` (and, for the Octatrack, the `.bin`). The build runs in the page, in
+Python compiled to WebAssembly ([Pyodide](https://pyodide.org)), with
+elekloader's own code, unchanged. The page shows its version and commit, and
+whether that is the latest release's. Your files are never uploaded, the
+site hosts no firmware, and it fetches nothing from any other site. The
+latest release's core for your device is listed and ticked for you. See
+[docs/WEB.md](docs/WEB.md).
 
 **Windows:** download `elekloader-<version>-windows.exe` from
 [Releases](https://github.com/irpina/elekloader/releases/latest) and run it.
@@ -255,6 +266,7 @@ ELEKLOADER_OT_SYX=OCTATRACK_OS1.40C.syx ELEKLOADER_OT_BIN=OCTATRACK_OS1.40C.bin 
 ELEKLOADER_OT_SYX=... ELEKLOADER_OCTABAM=path/to/octabam python tests/test_octabam.py   # octabam optional
 ELEKLOADER_DN_SYX=Digitone_and_Digitone_Keys_OS1.43.syx python tests/test_digitone.py
 ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
+node tests/test_web.mjs build/site   # the web page's engine, in Pyodide (packaging/build_web.py first)
 ```
 
 A test whose input files are not given is skipped, not passed. Firmware

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Everything comes from this site. The worker that runs Pyodide is not
+     covered by this policy (a <meta> CSP never reaches a worker): it keeps
+     itself to this site, see worker.js. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>elekloader</title>
+<meta name="description" content="Custom firmware for Elektron devices, built in your browser from your own stock OS file and the mods you choose. Nothing is uploaded.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%2305080f'/%3E%3Cpath d='M13.5 2 5 13.5h6L10 22l9-12h-6.2z' fill='%23ffe14a'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#05080f">
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="b1">ELEK</span><svg class="bolt" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.5h6L10 22l9-12h-6.2z"/></svg><span class="b2">LOADER</span>
+    <span class="sub">mods for Elektron firmware, built in your browser</span></div>
+  <div class="engine" id="engine" role="status">Powering up the build engine&hellip;</div>
+</header>
+
+<section class="notice" aria-label="About this page">
+  <p><strong>Nothing is uploaded.</strong> Your stock OS file and your mods stay in this browser
+    tab; the build runs here, in Python compiled to WebAssembly. <strong>No firmware is hosted on
+    this site</strong>: you bring Elektron's file. elekloader is not affiliated with Elektron, and
+    flashing custom firmware is at your own risk.</p>
+  <p class="links"><a href="https://github.com/irpina/elekloader#readme" rel="noreferrer">README</a>
+    &middot; <a href="https://github.com/irpina/elekloader#flash-it" rel="noreferrer">How to flash, and how to recover</a>
+    &middot; <a href="https://github.com/irpina/elekloader" rel="noreferrer">Source</a></p>
+</section>
+
+<main>
+  <section class="step" id="step-stock">
+    <h2><span class="n">1</span> Your stock OS file</h2>
+    <div class="drop" id="stock-drop" tabindex="0" role="button" aria-describedby="stock-hint">
+      <p class="big">Drop the stock OS file Elektron publishes for your device here, or
+        <span class="like-link">choose it</span>.</p>
+      <p class="muted" id="stock-hint">A <code>.syx</code>, a <code>.bin</code> (Octatrack), or
+        Elektron's <code>.zip</code> as you downloaded it. It is recognised by its hash.</p>
+      <input type="file" id="stock-file" accept=".syx,.bin,.zip" hidden>
+    </div>
+    <div class="stock" id="stock" hidden></div>
+    <label class="remember"><input type="checkbox" id="remember">
+      Keep my stock file and mods in this browser for next time (IndexedDB: they stay on this
+      computer, in this browser)</label>
+    <button type="button" class="tool small" id="forget" hidden>Forget them</button>
+  </section>
+
+  <section class="step" id="step-mods">
+    <h2><span class="n">2</span> Mods</h2>
+    <div class="bar">
+      <button type="button" class="tool" id="add-mods">+ Add mods&hellip;</button>
+      <input type="file" id="mod-files" accept=".elemod,.dtmod" multiple hidden>
+      <button type="button" class="tool" id="enable-all">Enable all</button>
+      <button type="button" class="tool" id="disable-all">Disable all</button>
+      <label class="inline"><input type="checkbox" id="show-other"> Show mods for other devices</label>
+      <span class="grow"></span>
+      <span class="group">
+        <label class="inline" for="profile">Profile</label>
+        <select id="profile"></select>
+        <button type="button" class="tool" id="save-profile">Save as&hellip;</button>
+        <button type="button" class="tool" id="delete-profile">Delete</button>
+      </span>
+    </div>
+    <div class="mods">
+      <table id="mod-table">
+        <thead><tr><th class="on"><span class="sr">Enabled</span></th><th>Mod</th><th>Version</th>
+          <th>Status</th><th class="num">RAM</th><th class="num">Order</th><th class="x"><span class="sr">Remove</span></th></tr></thead>
+        <tbody id="mod-rows"></tbody>
+      </table>
+      <p class="muted" id="mod-count"></p>
+      <aside class="details" id="details" aria-live="polite"></aside>
+    </div>
+  </section>
+
+  <section class="step" id="step-check">
+    <h2><span class="n">3</span> Check</h2>
+    <div id="check" class="check" aria-live="polite"><p class="muted">Choose your stock OS file first.</p></div>
+  </section>
+
+  <section class="step" id="step-build">
+    <h2><span class="n">4</span> Build</h2>
+    <div class="buildrow">
+      <label>OS version shown <input id="version" size="11" autocomplete="off" spellcheck="false"></label>
+      <span class="muted" id="version-rule"></span>
+      <label class="grow">File name <input id="out-name" autocomplete="off" spellcheck="false"></label>
+      <button type="button" class="accent" id="build" disabled>BUILD FIRMWARE</button>
+    </div>
+    <p class="bad" id="version-error" hidden></p>
+    <div class="progress" id="progress" hidden>
+      <div class="bar-track"><div class="bar-fill" id="progress-fill"></div></div>
+      <p id="progress-stage"></p>
+      <ol class="log" id="progress-log"></ol>
+    </div>
+  </section>
+
+  <section class="step" id="step-result" hidden>
+    <h2><span class="n">5</span> Your firmware</h2>
+    <div id="result"></div>
+  </section>
+</main>
+
+<footer>
+  <p id="about"></p>
+  <p>GPL-2.0-or-later: <a href="LICENSE.txt">LICENSE</a> &middot; <a href="NOTICE.txt">NOTICE</a>
+    &middot; <a href="pyodide/NOTICE.txt">Pyodide and Python's licences</a></p>
+</footer>
+</body>
+</html>
