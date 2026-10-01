@@ -148,7 +148,7 @@ function remember() {
 async function boot() {
   const t0 = performance.now();
   const tick = setInterval(() => {
-    $('engine').textContent = `Loading the build engine… ${secs(performance.now() - t0)}`;
+    $('engine').textContent = `Powering up the build engine… ${secs(performance.now() - t0)}`;
   }, 200);
   try {
     const r = await engine.call('init');
