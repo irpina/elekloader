@@ -367,6 +367,16 @@ def test_real_modules_convert_and_check():
     assert not done['lofi-amf-fix'].size('.run') and len(done['lofi-amf-fix'].sites) == 2
 
 
+def test_real_usb_midi_with_a_bare_metal_assembler():
+    """USB MIDI's unit reproduces its author's bytes only with an assembler that resolves
+    references to its own global labels, as octabam's m68k-elf does."""
+    real()
+    if not octabam.bare_metal(DEV):
+        raise Skip('the configured assembler is not bare metal (ELEKLOADER_CROSS=m68k-elf-)')
+    done = convert_all(['usb-midi'])
+    assert done['usb-midi'].size('.run') > 0
+
+
 def test_real_refusals():
     ob = real()
     for n, words in (('busverb', 'DSP code'), ('analog-bassdrum', 'DSP56300'),

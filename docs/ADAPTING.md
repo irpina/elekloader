@@ -381,13 +381,17 @@ Some differences from an octabam build, by design:
   as octabam's ledger does for MIDI SCENES and SCENES P2.
 - **A `jmp` detour** whose six bytes end inside an instruction is
   nop-padded to that instruction's end.
-- **The assembler.** Ubuntu's `m68k-linux-gnu-as` never shortens an unsized
-  branch to `.s`; the bare-metal `m68k-elf-as` octabam builds with does.
-  - A source with unsized branches assembles longer here: the same code,
-    but not the same bytes.
-  - The converter says so when it starts.
-  - A unit whose author pinned its bytes (USB MIDI) fails its check.
-  - `ELEKLOADER_CROSS=m68k-elf-` uses a bare-metal toolchain instead.
+- **The assembler.** octabam builds with the bare-metal `m68k-elf` binutils.
+  Ubuntu's `m68k-linux-gnu-as` is for a Linux target: it leaves every
+  reference to a global label to the linker (a shared library may preempt a
+  global), where `m68k-elf-as` resolves it in a shorter PC-relative form.
+  - With `m68k-linux-gnu`, such code assembles longer: the same code, but
+    not the same bytes. A unit whose author pinned its bytes (USB MIDI)
+    fails its check.
+  - The converter uses `m68k-elf-` when it is on the PATH (or
+    `ELEKLOADER_CROSS`), and says at the start which kind it has.
+  - To build it: GNU binutils, `configure --target=m68k-elf`, then
+    `make all-gas all-ld all-binutils`.
 
 ## 5. When the loader refuses: message → fix
 

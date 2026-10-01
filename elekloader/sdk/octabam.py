@@ -759,21 +759,25 @@ def check(ob, plan, mod_path, core_path, stock_path, work):
     return lines
 
 
-def relaxes(dev):
-    """Does the configured assembler shorten `bra` to a near label to bra.s? None if it
-    cannot be run."""
+def bare_metal(dev):
+    """Does the configured assembler resolve a reference to a global label of the same
+    section itself, as octabam's bare-metal m68k-elf-as does? An assembler for a Linux
+    target leaves it to the linker (a shared library may preempt a global), so `tst.b g`
+    stays a relocated absolute operand, 2 bytes longer than the PC-relative form. None if
+    it cannot be run."""
     import tempfile
     with tempfile.TemporaryDirectory() as t:
-        s, o = os.path.join(t, 'r.s'), os.path.join(t, 'r.o')
+        s, o = os.path.join(t, 'g.s'), os.path.join(t, 'g.o')
         with open(s, 'w') as fh:
-            fh.write('        .text\n        bra     1f\n        nop\n1:      rts\n')
+            fh.write('        .text\n        .globl  g\n        tst.b   g\n        rts\n'
+                     'g:      .byte   0\n')
         try:
             _gnu(dev, t, ['as', '-mcpu=54455', '-o', o, s])
             _gnu(dev, t, ['objcopy', '-O', 'binary', '-j', '.text', o, s + '.bin'])
         except (CheckError, OSError):
             return None
         with open(s + '.bin', 'rb') as fh:
-            return len(fh.read()) == 6
+            return len(fh.read()) == 7
 
 
 # ---- the command ----------------------------------------------------------------------
@@ -794,6 +798,8 @@ def main(argv=None):
     st, dev, rel = formats.load(a.stock)
     if dev.key != DEVICE:
         ap.error('the stock file is for the %s, not the Octatrack' % dev.name)
+    if 'ELEKLOADER_CROSS' not in os.environ and shutil.which('m68k-elf-as'):
+        os.environ['ELEKLOADER_CROSS'] = 'm68k-elf-'      # octabam's own toolchain
     image = formats.main_image(st, dev)
     ob = Octabam(a.octabam)
     names = a.module or sorted(set(ob.modules) | set(ob.broken))
@@ -807,11 +813,15 @@ def main(argv=None):
             ap.error('no mods/core-ot here: give --core')
         core, _m = sdkbuild.build(CORE_DIR, a.stock, os.path.join(a.out, 'core'))
     print('octabam %s: %d modules' % (ob.commit, len(ob.modules)))
-    if relaxes(dev) is False:
-        print('NOTE      this assembler (%sas) never shortens an unsized branch to .s; octabam\'s '
-              '(m68k-elf) does, so a source with one assembles longer here: the same code, not '
-              'the same bytes. A unit whose author pinned its bytes fails its check. Set '
-              'ELEKLOADER_CROSS to an m68k-elf- toolchain to match.' % _tool(dev, ''))
+    print('assembler %sas (%s)' % (_tool(dev, ''), {True: 'bare metal, as octabam builds',
+                                                      False: 'a Linux target',
+                                                      None: 'not found'}[bare_metal(dev)]))
+    if bare_metal(dev) is False:
+        print('NOTE      this assembler leaves every reference to a global label to the linker, '
+              'where octabam\'s bare-metal m68k-elf-as resolves it in a shorter PC-relative form. '
+              'Such code assembles longer here: the same code, not the same bytes, and a unit '
+              'whose author pinned its bytes (USB MIDI) fails its check. Install m68k-elf '
+              'binutils (it is used when found), or set ELEKLOADER_CROSS=m68k-elf-.')
     failed = 0
     for n in names:
         if n in ob.broken:

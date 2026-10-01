@@ -284,16 +284,20 @@ def test_fixed_code_is_a_site_with_absolute_symbols():
                        'requires': ['core']}, fh)
         return build.build(d, SYX, tmp)
 
-    code = ('        .text\n        .globl  fx_loop\nfx_loop: lea     fx_loop,%a0\n'
-            '        jsr     arena_base\n        rts\n')
+    # A destination operand stays absolute with every assembler (a bare-metal one turns
+    # a source operand naming its own label into a PC-relative one), so the relocations
+    # are the same whichever builds it.
+    code = ('        .text\n        .globl  fx_loop, fx_word\nfx_loop: move.l  %d0,fx_word\n'
+            '        jsr     arena_base\n        rts\nfx_word: .long   0\n')
     with tempfile.TemporaryDirectory() as tmp:
         path, m = attempt(tmp, '0x400d64e0', code)
         s = m.sites[0]
-        assert (s['addr'], s['len'], s['kind']) == (0x400d64e0, 14, 'data')
-        assert s['stock_sha256'] == sha(bytes(14))
+        assert (s['addr'], s['len'], s['kind']) == (0x400d64e0, 18, 'data')
+        assert s['stock_sha256'] == sha(bytes(18))
         assert m.symbols['fx_start'] == ('abs', 0x400d64e0) == m.symbols['fx_loop']
-        assert (2, 'abs32', 'abs', 0x400d64e0) in s['relocs']            # lea fx_loop
-        assert (8, 'abs32', 'sym:arena_base', 0) in s['relocs']        # jsr arena_base
+        assert m.symbols['fx_word'] == ('abs', 0x400d64ee)
+        assert (2, 'abs32', 'abs', 0x400d64ee) in s['relocs'], s['relocs']   # move.l d0,fx_word
+        assert (8, 'abs32', 'sym:arena_base', 0) in s['relocs']            # jsr arena_base
         assert not m.size('.run') and m.imports == ['arena_base']
         for addr, text, words in (('0x400d2000', code, 'not inside a free area'),
                                   ('0x400d7c30', code, 'not inside a free area'),
