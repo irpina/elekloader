@@ -76,8 +76,9 @@ def git(*args):
 
 def package_zip():
     """The elekloader package as HEAD has it, zipped reproducibly: the blobs as
-    committed (no line-ending conversion), sorted, one fixed date, stored
-    uncompressed (so no zlib version changes a byte). -> (bytes, names)."""
+    committed (no line-ending conversion), sorted, one fixed date, made "on
+    Unix" whatever the OS, stored uncompressed (so no zlib version changes a
+    byte). -> (bytes, names)."""
     tar = tarfile.open(fileobj=io.BytesIO(
         git('-c', 'core.autocrlf=false', 'archive', '--format=tar', 'HEAD', 'elekloader')))
     files = sorted((m.name, tar.extractfile(m).read()) for m in tar.getmembers() if m.isfile())
@@ -86,6 +87,7 @@ def package_zip():
         for name, data in files:
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             info.external_attr = 0o644 << 16
+            info.create_system = 3          # zipfile writes the running OS's (0 on Windows)
             z.writestr(info, data)
     return out.getvalue(), [n for n, _ in files]
 
