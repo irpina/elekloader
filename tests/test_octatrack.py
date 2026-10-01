@@ -6,6 +6,7 @@ Needs the stock files, which never go in the repo, named by environment
 variables; a test whose inputs are missing is skipped, not passed:
   ELEKLOADER_OT_SYX   OCTATRACK_OS1.40C.syx
   ELEKLOADER_OT_BIN   OCTATRACK_OS1.40C.bin
+Building mods/core-ot also needs the cross assembler (m68k-linux-gnu-as).
 """
 import json
 import os
@@ -14,7 +15,8 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(HERE))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, ROOT)
 
 from elekloader import devices, elek, elemod, formats, link, mkmod, patch   # noqa: E402
 from elekloader.elemod import sha                                           # noqa: E402
@@ -185,12 +187,113 @@ def test_verify_refuses_a_changed_header():
     expect(lambda: formats.verify(bad, st, img, DEV), 'header')
 
 
-def test_no_linkable_mods_yet():
-    doc = {'elemod': 2, 'id': 'x', 'version': '1', 'target': devices.target_of(DEV, REL),
-           'sections': {}}
-    m = link.Mod2(doc, 'x')
+# ---- linkable mods and the core -------------------------------------------------------------
+
+PAGE, PAGES, STOCK_PAGES = 6144, 1707, 14602
+
+
+def test_linkable_mods_need_the_octatrack_core():
+    """The Octatrack links format-2 mods in the arena's bottom pages, with its
+    own core (mods/core-ot)."""
+    assert DEV.linkable() and DEV.ddr == (0x40A955E0, 0x40A955E0 + PAGE * PAGES)
+    site = (0x400b5839, b'OS UPDATE!')
     st, img = stock()
-    expect(lambda: link.link([m], img), 'no linkable')
+    o = site[0] - DEV.main_load
+    doc = {'elemod': 2, 'id': 'x', 'version': '1', 'target': devices.target_of(DEV, REL),
+           'sections': {}, 'requires': ['core'],
+           'sites': [{'addr': '0x%08x' % site[0], 'len': len(site[1]), 'kind': 'data',
+                      'stock_sha256': sha(img[o:o + len(site[1])]), 'new': site[1].hex()}]}
+    problems = link.check([link.Mod2(doc, 'x')], img)
+    assert any('requires core' in p for p in problems), problems
+
+
+def test_the_core_moves_the_arena_past_its_reserve():
+    """Every arena write in mods/core-ot follows from one number, the pages it
+    takes: the base and base + one page move up by the reserve; the page
+    count, the fill limit and the clear length (one page more than the count)
+    shrink by it. Each stock value is checked against the stock image."""
+    with open(os.path.join(ROOT, 'mods', 'core-ot', 'mod.json')) as fh:
+        j = json.load(fh)
+    lo, hi = DEV.ddr
+    moved = {lo: hi, lo + PAGE: hi + PAGE,
+             STOCK_PAGES: STOCK_PAGES - PAGES, STOCK_PAGES + 1: STOCK_PAGES + 1 - PAGES,
+             (STOCK_PAGES + 1) * PAGE: (STOCK_PAGES + 1 - PAGES) * PAGE}
+    st, img = stock()
+    seen = {}
+    for s in j['sites']:
+        o = int(s['addr'], 16) - DEV.main_load
+        old = bytes.fromhex(s['stock'])
+        assert img[o:o + len(old)] == old, s['addr']
+        if s['op'] == 'bytes':
+            assert moved[int(s['stock'], 16)] == int(s['new'], 16), s['addr']
+            seen[int(s['stock'], 16)] = seen.get(int(s['stock'], 16), 0) + 1
+    assert seen == {lo: 23, lo + PAGE: 1, STOCK_PAGES: 2, STOCK_PAGES + 1: 1,
+                    (STOCK_PAGES + 1) * PAGE: 1}
+    assert [s['op'] for s in j['sites']].count('jsr') == 1
+
+
+def test_a_site_can_add_to_its_target():
+    """sdk.build's `addend`: a site's relocation carries it (no toolchain needed:
+    a mod of sites only). Only a site with a target takes one."""
+    from elekloader.sdk import build
+    need(SYX)
+    with tempfile.TemporaryDirectory() as tmp:
+        d = os.path.join(tmp, 'm')
+        os.makedirs(d)
+        site = {'addr': '0x400d64a0', 'stock': '4000e79c', 'op': 'ptr', 'target': 'arena_base',
+                'addend': 8}
+        doc = {'id': 'addend', 'version': '1', 'device': 'octatrack', 'os': '1.40C',
+               'sites': [site], 'requires': ['core']}
+        with open(os.path.join(d, 'mod.json'), 'w') as fh:
+            json.dump(doc, fh)
+        path, m = build.build(d, SYX, tmp)
+        assert m.sites[0]['relocs'] == [(0, 'abs32', 'sym:arena_base', 8)], m.sites[0]['relocs']
+        assert m.imports == ['arena_base']
+        doc['sites'] = [{'addr': '0x400d64a0', 'stock': '4000e79c', 'op': 'bytes',
+                         'new': '00000000', 'addend': 8}]
+        with open(os.path.join(d, 'mod.json'), 'w') as fh:
+            json.dump(doc, fh)
+        try:
+            build.build(d, SYX, tmp)
+        except build.BuildError as e:
+            assert 'addend needs a target' in str(e)
+        else:
+            raise AssertionError('an addend without a target was built')
+
+
+def test_core_builds_and_links():
+    """mods/core-ot with a mod that puts a marker in .run: the boot site calls
+    .boot at the end of the image, and the run image the linker placed after
+    .boot is what .boot copies to the reserve."""
+    import shutil
+    from elekloader.sdk import build
+    need(SYX)
+    if not shutil.which(os.environ.get('ELEKLOADER_CROSS', DEV.toolchain['prefix']) + 'as'):
+        raise Skip('no m68k cross assembler to build mods/core-ot')
+    st, img = stock()
+    with tempfile.TemporaryDirectory() as tmp:
+        core, _m = build.build(os.path.join(ROOT, 'mods', 'core-ot'), SYX, tmp)
+        d = os.path.join(tmp, 'marker')
+        os.makedirs(d)
+        with open(os.path.join(d, 'marker.s'), 'w') as fh:
+            fh.write('        .section .run, "ax"\n        .globl  otmarker\n'
+                     'otmarker: .ascii "ELEKLOADER MARKER"\n        .balign 4\n'
+                     '        .section .bss\n        .balign 4\notbss:  .skip   64\n')
+        with open(os.path.join(d, 'mod.json'), 'w') as fh:
+            json.dump({'id': 'ot-marker', 'version': '1', 'device': 'octatrack', 'os': '1.40C',
+                       'sources': ['marker.s'], 'requires': ['core']}, fh)
+        marker, _m = build.build(d, SYX, tmp)
+        outputs, man = patch.build(SYX, [core, marker], version='CORE TEST',
+                                   log=lambda *a: None)
+    new = formats.main_image(formats.parse(outputs['syx'], DEV), DEV)
+    end = DEV.image_end(REL)
+    boot = DEV.main_load + len(img)
+    assert end == boot
+    o = 0x4000050c - DEV.main_load
+    assert new[o:o + 6] == b'\x4e\xb9' + struct.pack('>I', boot)
+    assert new[len(img):].find(b'ELEKLOADER MARKER') > 0
+    o = 0x4000045e - DEV.main_load
+    assert new[o:o + 4] == struct.pack('>I', DEV.ddr[1])
 
 
 def test_mkmod_diff_round_trip():
