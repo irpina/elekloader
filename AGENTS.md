@@ -36,6 +36,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 | `mods/core/`, `mods/core-dn1/` | the core mod (the hook bus every format-2 mod needs): one `core.s`, each device's addresses and sites in its `mod.json` |
 | `mods/core-ot/` | the Octatrack's core: a boot copier only (its RAM reserve and `.boot`), no hook bus |
 | `packaging/`, `.github/workflows/windows-build.yml`, `macos-build.yml` | the apps: `elekloader-<version>-windows.exe`, and `elekloader-<version>-macos.dmg` (signed and notarized), with core built in (`elekloader/bundled`, never committed) |
+| `web/`, `packaging/build_web.py`, `.github/workflows/pages.yml` | the web page (GitHub Pages): elekloader in Pyodide, in a worker; `bridge.py` is its only Python, a thin layer over `gui.LoaderModel` and `patch` (docs/WEB.md). Everything it loads comes from the site itself |
 
 Tests:
 
@@ -48,6 +49,8 @@ ELEKLOADER_OT_SYX=... ELEKLOADER_OT_BIN=... python tests/test_octatrack.py
 ELEKLOADER_OT_SYX=... ELEKLOADER_OCTABAM=... python tests/test_octabam.py
 ELEKLOADER_DN_SYX=... python tests/test_digitone.py
 ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
+python packaging/build_web.py --pyodide pyodide-core-<v>.tar.bz2 --core core-*.elemod --out build/site
+node tests/test_web.mjs build/site                           # the web page's engine, in Pyodide
 ```
 
 A test whose files are not given is skipped, not passed. Say which ran.
@@ -69,6 +72,11 @@ Rules:
 - **The writer must stay byte-exact.** With the maintainers' test files,
   `test_writer_matches_c_tool` and `test_writer_no_change_is_stock` must
   pass.
+- **The web page stays on its own site.** It loads nothing from anywhere
+  else (no CDN, fonts, analytics or package downloads), sends the user's
+  files nowhere, and only offers downloads: no Web MIDI or USB. Its Python
+  goes through `elekloader` unchanged; the site never holds firmware or a
+  build.
 
 Done means all of these:
 - the tests that could run pass;

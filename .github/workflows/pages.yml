@@ -1,0 +1,77 @@
+# The web patcher (web/) on GitHub Pages: elekloader in the browser, in Pyodide.
+#
+# On every push to main, and by hand (Actions > pages > Run workflow). It takes
+# the core mods from the latest release (as windows-build takes them from its
+# release), the elekloader package as this commit has it, and the pinned
+# Pyodide (checked against its sha256 by build_web.py). It assembles the site,
+# runs the unit tests and the page's bridge under Pyodide on that very site
+# (tests/test_web.mjs), and deploys it.
+#
+# No firmware reaches this workflow, and the site holds none: the page reads
+# the user's stock OS file only in their browser, and builds there.
+#
+# Pages must be on, with GitHub Actions as its source (Settings > Pages). Once
+# a new release carries its core-*.elemod files, run this by hand to put them
+# on the site.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# one deployment at a time; a newer run waits rather than cancelling one midway
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Unit tests
+        run: python tests/test_units.py
+      - name: The core mods, from the latest release
+        run: |
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "core-*.elemod" --dir build/core
+          # the tag, so the page can say whether its package is that release's
+          git fetch --depth=1 --no-tags origin "refs/tags/$tag:refs/tags/$tag"
+      - name: Pyodide, the pinned release
+        run: curl -fsSL --retry 3 --create-dirs -o build/pyodide-core.tar.bz2 "$(python packaging/build_web.py --pyodide-url)"
+      - name: Assemble the site
+        run: python packaging/build_web.py --pyodide build/pyodide-core.tar.bz2 --core build/core/core-*.elemod --release "$TAG" --out build/site
+      - name: The engine under Pyodide, from the assembled site
+        run: node tests/test_web.mjs build/site
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

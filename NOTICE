@@ -48,5 +48,7 @@ Elektron, Digitakt, Digitone, Syntakt and Analog are trademarks of Elektron
 Music Machines. elekloader is not affiliated with or endorsed by Elektron.
 It contains no Elektron firmware and distributes nothing derived from it:
 every build happens on the user's machine, from the stock OS file the user
-supplies. Mods carry only their authors' own bytes, plus hashes of the stock
-bytes they expect.
+supplies. Mods carry only their authors' own bytes, plus short instruction
+fragments needed to hook the OS (runs of stock bytes under 8 bytes long, and
+the instructions a hook displaces, are stored as they are), and hashes of
+the stock bytes they expect.
