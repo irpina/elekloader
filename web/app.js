@@ -135,7 +135,7 @@ const desc = p => st.mods.find(d => d.path === p);
 
 const shop = { items: [] };
 const lib = { device: S.libDevice || null, type: S.libType || null, sort: S.libSort || 'collection', query: '' };
-const OWN = '\u0000own';                         // the "Your files" type
+const OWN = '\u0000own';                         // the "Your files" kind
 const cmpVer = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
 const shopItem = d => shop.items.find(e => e.available && e.sha256 === d.sha256);
 const owned = e => st.mods.find(d => !d.builtin && d.sha256 === e.sha256);
@@ -238,7 +238,7 @@ function setFilter(k, v) {
 function filtered(entries) {
   const q = lib.query.trim().toLowerCase();
   return entries.filter(en => (!lib.device || en.device === lib.device)
-    && (!lib.type || (lib.type === OWN ? !!en.own : en.category === lib.type))
+    && (!lib.type || (lib.type === OWN ? !!en.own : !en.own && en.category === lib.type))
     && (!q || [en.title, en.id, en.summary, en.category, en.author].join(' ').toLowerCase().includes(q)));
 }
 
@@ -252,84 +252,21 @@ function sorted(list) {
   return list;                                     // the catalog's order, then your files
 }
 
-const ICONS = {
-  all: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
-  Sampling: 'M3 12h2l2-6 3 12 3-9 2 6 2-3h4',
-  Performance: 'M5 20V10M10 20V4M15 20v-7M20 20v-4',
-  Framework: 'M12 3 4 7.5v9L12 21l8-4.5v-9zM4 7.5 12 12l8-4.5M12 12v9',
-  'Whole build': 'M5 4h14v16H5zM9 8h6M9 12h6M9 16h3',
-  own: 'M6 3h9l3 3v15H6zM14 3v4h4',
-  device: 'M4 6h16v12H4zM8 10h1M8 14h8',
-  config: 'M6 3h9l3 3v15H6zM14 3v4h4M9 13h6',
-  other: 'M12 4v16M4 12h16',
-};
+// ---- small drawings: the icons, a card's cover ----
 
-function navItem(label, icon, n, on, onclick, extra = '') {
-  return el('li', {}, el('button', { type: 'button', class: 'side-item' + (on ? ' on' : ''), onclick,
-    'aria-pressed': String(!!on) },
-  svgIcon(ICONS[icon] || ICONS.other), label, extra, n != null ? el('span', { class: 'n' }, String(n)) : ''));
-}
-
-function svgIcon(d) {
-  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+const SVG = 'http://www.w3.org/2000/svg';
+const PLUS = 'M12 5v14M5 12h14';
+const BOLT = 'M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z';
+function icon(d, cls = 'ico') {
+  const s = document.createElementNS(SVG, 'svg');
   s.setAttribute('viewBox', '0 0 24 24');
-  s.setAttribute('class', 'ico');
+  s.setAttribute('class', cls);
   s.setAttribute('aria-hidden', 'true');
-  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  const p = document.createElementNS(SVG, 'path');
   p.setAttribute('d', d);
   s.append(p);
   return s;
 }
-
-function renderLibrary() {
-  const all = libEntries();
-  const sd = dev();
-  const inLib = location.hash !== '#build';
-  // the sidebar: types and devices, with their counts
-  const cats = [...new Set(all.map(en => en.category).filter(Boolean))].sort();
-  const ownN = all.filter(en => en.own).length;
-  const forDev = lib.device ? all.filter(en => en.device === lib.device) : all;
-  $('nav-types').replaceChildren(
-    navItem('All mods', 'all', forDev.length, inLib && !lib.type, () => setFilter('type', null)),
-    ...cats.map(c => navItem(c, c, forDev.filter(en => en.category === c).length, inLib && lib.type === c,
-      () => setFilter('type', c))),
-    ownN ? navItem('Your files', 'own', forDev.filter(en => en.own).length, inLib && lib.type === OWN,
-      () => setFilter('type', OWN)) : '');
-  const devs = pickable();
-  $('nav-devices').replaceChildren(...devs.map(d => navItem(d.name, 'device',
-    all.filter(en => en.device === d.key).length, lib.device === d.key,
-    () => setFilter('device', lib.device === d.key ? null : d.key),
-    sd && sd.key === d.key ? el('span', { class: 'yours', title: 'Your stock file' }) : '')));
-  // the filters: the same choices
-  const opt = (v, t, on) => el('option', { value: v, selected: on }, t);
-  $('f-device').replaceChildren(opt('', 'All devices', !lib.device),
-    ...devs.map(d => opt(d.key, d.name, lib.device === d.key)));
-  $('f-type').replaceChildren(opt('', 'All types', !lib.type), ...cats.map(c => opt(c, c, lib.type === c)),
-    ownN ? opt(OWN, 'Your files', lib.type === OWN) : '');
-  $('f-sort').value = lib.sort;
-  // the head
-  const chosen = devs.find(d => d.key === lib.device);
-  const list = sorted(filtered(all));
-  $('lib-count').textContent = `${list.length} mod${list.length === 1 ? '' : 's'}`;
-  $('lib-fw').textContent = sd ? `${sd.name} · OS ${st.stock.os}` : 'No stock file yet';
-  $('device-note').textContent = !chosen
-    ? (sd ? `Every device's mods. Your stock file is for the ${sd.name}.`
-      : 'Every device\'s mods. Pick your device to see the ones that fit it.')
-    : sd && sd.key === chosen.key ? `For your ${sd.name}, OS ${st.stock.os}: what you add for that OS is ticked for your build.`
-      : sd ? `Your stock file is for the ${sd.name}, so mods for the ${chosen.name} can't go into this build.`
-        : `Mods for the ${chosen.name}. To build, you need its stock OS ${chosen.os} file.`;
-  $('device-note').className = 'device-note' + (chosen && sd && sd.key !== chosen.key ? ' warn' : '');
-  $('lib-cards').replaceChildren(...list.map(card));
-  if (!list.length) {
-    $('lib-cards').append(el('p', { class: 'empty' }, lib.query.trim() ? 'No mod matches that.'
-      : `No mods ${chosen ? 'for the ' + chosen.name + ' ' : ''}here yet. You can add your own .elemod files with + Add .elemod.`));
-  }
-  renderNeed();
-}
-
-// ---- a card's head: line art drawn from the mod, in its type's colour ----
-
-const TINT = { Sampling: 't-teal', Performance: 't-violet', Framework: 't-gold' };
 
 function seeded(s) {                               // a small deterministic generator
   let h = 2166136261;
@@ -337,102 +274,165 @@ function seeded(s) {                               // a small deterministic gene
   return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296;
 }
 
-function art(en) {
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 280 156');
-  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+// a cover's line: drawn from the mod's kind, varied by its name
+function trace(en) {
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', '0 0 200 100');
   svg.setAttribute('aria-hidden', 'true');
   const add = (tag, a) => {
-    const e = document.createElementNS(NS, tag);
+    const e = document.createElementNS(SVG, tag);
     for (const [k, v] of Object.entries(a)) e.setAttribute(k, String(v));
     svg.append(e);
-    return e;
   };
   const rnd = seeded(en.id + en.device);
-  const ink = { stroke: 'currentColor', fill: 'none', 'stroke-linecap': 'round' };
-  if (en.category === 'Sampling') {                // a waveform, cut into slices
-    const n = 46, x0 = 70, w = 140;
-    for (let i = 0; i < n; i++) {
-      const t = i / n;
-      const env = Math.min(1, t * 9) * Math.exp(-2.4 * t) * (0.55 + 0.45 * rnd());
-      const h = 4 + 46 * env;
-      add('line', { ...ink, x1: x0 + i * w / n, y1: 76 - h, x2: x0 + i * w / n, y2: 76 + h,
-        'stroke-width': 1.6, opacity: 0.55 + 0.45 * (1 - t) });
+  const line = { fill: 'none', stroke: 'currentColor', 'stroke-width': 2.4, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+  const faint = { stroke: 'currentColor', 'stroke-opacity': 0.4, 'stroke-width': 1.5, 'stroke-dasharray': '3 5' };
+  const pts = [];
+  if (en.category === 'Sampling') {                // a hit that decays, cut into slices
+    for (let x = 0; x <= 200; x += 2) {
+      const t = x / 200, env = Math.min(1, t * 14) * Math.exp(-3.2 * t);
+      pts.push(`${x},${64 - 30 * env * Math.sin(x * 0.8 + 6 * rnd()) * (0.75 + 0.25 * rnd())}`);
     }
-    for (const t of [0.2, 0.43, 0.7]) {
-      add('line', { stroke: 'currentColor', 'stroke-width': 1, 'stroke-dasharray': '2 3', opacity: 0.6,
-        x1: x0 + t * w, y1: 26, x2: x0 + t * w, y2: 126 });
+    for (const t of [0.2, 0.4, 0.62, 0.82]) add('line', { ...faint, x1: t * 200, y1: 34, x2: t * 200, y2: 94 });
+    add('polyline', { ...line, points: pts.join(' ') });
+  } else if (en.category === 'Performance') {      // a load that settles under a ceiling
+    let y = 88;
+    for (let x = 0; x <= 200; x += 8) {
+      y = Math.max(42, Math.min(90, y + (rnd() - 0.62) * 13));
+      pts.push(`${x},${y}`);
     }
-  } else if (en.category === 'Performance') {      // a level meter and a line over it
-    const pts = [];
-    for (let i = 0; i < 14; i++) {
-      const v = 0.25 + 0.6 * (i / 13) * (0.7 + 0.3 * rnd());
-      const x = 78 + i * 9.5;
-      add('rect', { x, y: 112 - 70 * v, width: 5, height: 70 * v, rx: 1.5, fill: 'currentColor',
-        opacity: 0.25 + 0.6 * (i / 13) });
-      pts.push(`${x + 2.5},${100 - 70 * v - 8 - 6 * rnd()}`);
+    add('line', { ...faint, x1: 0, y1: 36, x2: 200, y2: 36 });
+    add('polyline', { ...line, points: pts.join(' ') });
+  } else if (en.category === 'Framework') {        // a bus with taps
+    add('line', { ...line, x1: 0, y1: 70, x2: 200, y2: 70 });
+    for (let i = 0; i < 5; i++) {
+      const x = 16 + i * 38 + 8 * rnd(), up = i % 2 ? -1 : 1;
+      add('polyline', { ...line, points: `${x},70 ${x},${70 - up * 20} ${x + 14},${70 - up * 20}` });
+      add('circle', { cx: x + 14, cy: 70 - up * 20, r: 3.5, fill: 'currentColor' });
     }
-    add('polyline', { ...ink, points: pts.join(' '), 'stroke-width': 1.4, opacity: 0.9 });
-  } else if (en.category === 'Framework') {        // nodes on a bus
-    const ns = Array.from({ length: 6 }, (_, i) => [86 + i * 22 + 8 * rnd(), 56 + (i % 2) * 40 + 10 * rnd()]);
-    add('line', { ...ink, x1: 70, y1: 78, x2: 210, y2: 78, 'stroke-width': 1, opacity: 0.5 });
-    for (const [x, y] of ns) add('line', { ...ink, x1: x, y1: y, x2: x, y2: 78, 'stroke-width': 1, opacity: 0.5 });
-    for (const [x, y] of ns) add('circle', { cx: x, cy: y, r: 5, fill: '#1c1c20', stroke: 'currentColor', 'stroke-width': 1.4 });
-  } else {                                         // a ring of steps
-    const n = 16, on = new Set(Array.from({ length: 6 }, () => Math.floor(rnd() * n)));
-    for (let i = 0; i < n; i++) {
-      const a = i / n * 2 * Math.PI - Math.PI / 2;
-      add('circle', { cx: 140 + 38 * Math.cos(a), cy: 76 + 38 * Math.sin(a), r: on.has(i) ? 4 : 3,
-        fill: on.has(i) ? 'currentColor' : 'none', stroke: 'currentColor', 'stroke-width': 1.2,
-        opacity: on.has(i) ? 0.95 : 0.45 });
+  } else {                                         // a pulse train
+    let x = 0, hi = false;
+    pts.push('0,88');
+    while (x < 200) {
+      x += 10 + 24 * rnd();
+      pts.push(`${x},${hi ? 50 : 88}`, `${x},${hi ? 88 : 50}`);
+      hi = !hi;
     }
-    add('circle', { ...ink, cx: 140, cy: 76, r: 18, 'stroke-width': 1, opacity: 0.4 });
+    add('polyline', { ...line, points: pts.join(' ') });
   }
   return svg;
 }
 
+// ---- the library: the kinds in the sidebar, device chips, a shelf per kind ----
+
+const KIND_HUE = { Sampling: 196, Performance: 268, Framework: 24, 'Whole build': 140 };
+
+// a kind in the sidebar: its colour, its name, how many
+function kindItem(label, n, on, onclick, swatch) {
+  return el('li', {}, el('button', { type: 'button', class: 'side-item' + (on ? ' on' : ''), 'aria-pressed': String(on), onclick },
+    swatch, label, el('span', { class: 'n' }, String(n))));
+}
+
+function swatchFor(kind) {
+  const sw = el('span', { class: 'swatch' });
+  sw.style.setProperty('--h', String(KIND_HUE[kind] ?? 330));
+  return sw;
+}
+
+function renderLibrary() {
+  const all = libEntries();
+  const sd = dev();
+  const devs = pickable();
+  const inLib = location.hash !== '#build';
+  const forDev = lib.device ? all.filter(en => en.device === lib.device) : all;
+  const kinds = [...new Set(all.filter(en => !en.own).map(en => en.category).filter(Boolean))];
+  const ownN = forDev.filter(en => en.own).length;
+  $('nav-types').replaceChildren(
+    kindItem('All mods', forDev.length, inLib && !lib.type, () => setFilter('type', null), el('span', { class: 'swatch all' })),
+    ...kinds.map(k => kindItem(k, forDev.filter(en => !en.own && en.category === k).length, inLib && lib.type === k,
+      () => setFilter('type', k), swatchFor(k))),
+    ownN || lib.type === OWN ? kindItem('Your files', ownN, inLib && lib.type === OWN, () => setFilter('type', OWN),
+      el('span', { class: 'swatch own' })) : '');
+  $('device-buttons').replaceChildren(...[{ key: null, name: 'All' }, ...devs].map(d => {
+    const on = lib.device === d.key;
+    return el('button', { type: 'button', class: 'chip' + (on ? ' on' : ''), 'aria-pressed': String(on),
+      onclick: () => setFilter('device', d.key) },
+    sd && sd.key === d.key ? el('span', { class: 'yours', title: 'Your stock file is for this device' }) : '',
+    d.name, el('span', { class: 'n' }, String(all.filter(en => !d.key || en.device === d.key).length)));
+  }));
+  $('f-sort').value = lib.sort;
+  const chosen = devs.find(d => d.key === lib.device);
+  $('device-note').textContent = !chosen
+    ? (sd ? `Every device's mods. Your stock file is for the ${sd.name}.`
+      : 'Every device\'s mods. Pick your device to see the ones that fit it.')
+    : sd && sd.key === chosen.key ? `For your ${sd.name}, OS ${st.stock.os}: what you add for that OS is ticked for your build.`
+      : sd ? `Your stock file is for the ${sd.name}, so mods for the ${chosen.name} can't go into this build.`
+        : `Mods for the ${chosen.name}. To build, you need its stock OS ${chosen.os} file.`;
+  $('device-note').className = 'device-note' + (chosen && sd && sd.key !== chosen.key ? ' warn' : '');
+  const list = sorted(filtered(all));
+  const shelves = new Map();                       // in the order the kinds first appear; your files last
+  for (const en of list) {
+    const k = en.own ? 'Your files' : en.category || 'Other';
+    if (!shelves.has(k)) shelves.set(k, []);
+    shelves.get(k).push(en);
+  }
+  const own = shelves.get('Your files');
+  if (own) { shelves.delete('Your files'); shelves.set('Your files', own); }
+  $('lib-cards').replaceChildren(...[...shelves].map(([name, ens]) => el('section', { class: 'shelf' },
+    el('h2', {}, name, el('span', { class: 'n' }, String(ens.length))), el('div', { class: 'cards' }, ...ens.map(card)))));
+  if (!list.length) {
+    $('lib-cards').append(el('p', { class: 'empty' }, lib.query.trim() ? 'No mod matches that.'
+      : `No mods ${chosen ? 'for the ' + chosen.name + ' ' : ''}here yet. Add your own with + Your .elemod.`));
+  }
+  renderNeed();
+}
+
+// what a card's button does now, if anything
+function action(en, s) {
+  const sd = dev();
+  if (!en.available) return null;
+  if (s.inBuild) {
+    return { kind: 'in', label: `Take ${en.title} out of your build (it stays in your mods)`, disabled: st.busy || !sd,
+      run: () => untick(s.mine.map(d => d.path)) };
+  }
+  if (s.fitting && sd) {
+    return { kind: 'add', label: `Add ${en.title} to your build`, disabled: st.busy,
+      run: async () => { await tickWithCore(s.fitting.path); remember(); changed(); } };
+  }
+  if (s.toAdd.length) {
+    return { kind: 'add', label: `Add ${en.title}`, disabled: !st.ready || st.busy, run: ev => shopAdd(s.toAdd, ev.currentTarget) };
+  }
+  return null;                                     // in your mods already, for another device or OS
+}
+
 function card(en) {
   const s = entryState(en);
-  const sd = dev();
-  let action;
-  if (!en.available) {
-    action = el('button', { type: 'button', class: 'add', disabled: true }, 'Soon');
-  } else if (s.inBuild) {
-    action = el('button', { type: 'button', class: 'add on', disabled: st.busy || !sd,
-      title: 'Take it out of your build (it stays in your mods)',
-      onclick: () => untick(s.mine.map(d => d.path)) }, '✓ In build');
-  } else if (s.fitting && sd) {
-    action = el('button', { type: 'button', class: 'add', disabled: st.busy,
-      onclick: async () => { await tickWithCore(s.fitting.path); remember(); changed(); } }, '+ Add');
-  } else if (s.toAdd.length) {
-    action = el('button', { type: 'button', class: 'add', disabled: !st.ready || st.busy,
-      onclick: ev => shopAdd(s.toAdd, ev.currentTarget) }, '+ Add');
-  } else {
-    action = el('button', { type: 'button', class: 'add have', disabled: true }, '✓ Added');
-  }
+  const act = action(en, s);
   const pick = s.pick || {};
-  const sites = en.shop ? pick.sites : (pick.sites || []).length;
-  const tint = TINT[en.category] || 't-rose';
   const open = () => openSheet(en);
-  return el('article', { class: ['card', tint, s.inBuild ? 'in-build' : '', en.available ? '' : 'unavailable'].join(' ') },
-    el('button', { type: 'button', class: 'art', onclick: open, 'aria-label': `About ${en.title}` },
-      art(en),
-      el('span', { class: 'lbl top' }, en.category || 'Mod'),
-      el('span', { class: 'pip' }),
-      el('span', { class: 'lbl b1' }, deviceName(en.device)),
-      el('span', { class: 'lbl b2' }, en.oses.length ? 'OS ' + en.oses.join(' · ') : '')),
+  const cover = el('button', { type: 'button', class: 'cover', onclick: open, 'aria-label': `About ${en.title}` },
+    trace(en), el('span', { class: 'name' }, en.title));
+  cover.style.setProperty('--h', String(Math.round((KIND_HUE[en.category] ?? 330) + 36 * seeded(en.id)() - 18)));
+  const button = act
+    ? el('button', { type: 'button', class: 'add' + (act.kind === 'in' ? ' in' : ''), disabled: act.disabled,
+      title: act.label, onclick: act.run }, act.kind === 'in' ? '✓ In build' : '+ Add')
+    : el('button', { type: 'button', class: 'add have', disabled: true }, en.available ? '✓ Added' : 'Soon');
+  const sites = en.shop ? pick.sites : (pick.sites || []).length;
+  return el('article', { class: 'card' + (s.inBuild ? ' live' : '') + (en.available ? '' : ' unavailable') },
+    cover,
     el('div', { class: 'card-body' },
-      el('div', { class: 'card-title' },
-        el('div', {}, el('h3', {}, en.title), el('span', { class: 'ver' }, en.version ? 'v' + en.version : '')),
-        action),
-      el('div', { class: 'meta' },
-        el('span', {}, en.author || 'Unknown author'), el('span', {}, deviceName(en.device)),
-        el('span', {}, en.category || '—'), el('span', {}, en.license || 'licence not stated')),
-      el('p', { class: 'summary' }, en.summary),
-      s.otherOs ? el('p', { class: 'note' }, `Made for OS ${pick.os}; your stock file is OS ${st.stock.os}.`) : '',
+      el('div', { class: 'card-main' },
+        el('div', { class: 'card-title' },
+          el('div', {},
+            el('h3', {}, en.title, en.version ? el('span', { class: 'ver' }, 'v' + en.version) : ''),
+            el('p', { class: 'meta' }, [deviceName(en.device), en.oses.length ? 'OS ' + en.oses.join(', ') : '']
+              .filter(Boolean).join(' · '))),
+          button),
+        el('p', { class: 'summary' }, en.summary),
+        s.otherOs ? el('p', { class: 'note' }, `Made for OS ${pick.os}; your stock file is OS ${st.stock.os}.`) : '',
+        !en.available && en.shop ? el('p', { class: 'note' }, `Its release (${en.shop[0].tag}) is not published yet.`) : ''),
       el('div', { class: 'card-foot' },
-        el('span', {}, sites != null && en.available ? `${sites} patch sites` : (en.shop ? `Release ${en.shop[0].tag} not published yet` : '')),
+        el('span', {}, en.available && sites != null ? `${sites} patch sites` : ''),
         el('span', { class: 'links' },
           el('button', { type: 'button', class: 'linkish', onclick: open }, 'Details'),
           s.mine.length && !st.busy ? el('button', { type: 'button', class: 'linkish',
@@ -463,10 +463,19 @@ function openSheet(en) {
       el('p', { class: 'muted mono' }, en.shop.filter(x => x.available)
         .map(x => `${x.file}${en.shop.length > 1 ? ` (OS ${x.os})` : ''}\nsha256 ${x.sha256}`).join('\n')
         || `Its release (${e.tag}) is not published yet.`),
-      el('p', {}, el('a', { href: e.available ? e.homepage : e.release_url, rel: 'noreferrer' }, 'Source and release')),
     ];
   }
-  $('sheet-body').replaceChildren(...parts);
+  // what you can do with it: the card's action, Remove, its source
+  const act = action(en, s);
+  const close = () => $('mod-sheet').close();
+  const acts = el('div', { class: 'sheet-acts' },
+    act ? el('button', { type: 'button', class: 'btn ' + (act.kind === 'in' ? 'outline' : 'primary'), disabled: act.disabled,
+      onclick: ev => { close(); act.run(ev); } }, act.kind === 'in' ? 'Take it out of the build' : 'Add') : '',
+    s.mine.length && !st.busy ? el('button', { type: 'button', class: 'btn outline',
+      onclick: () => { close(); removeMods(s.mine.map(x => x.path)); } }, 'Remove') : '',
+    en.shop ? el('a', { class: 'btn outline', rel: 'noreferrer',
+      href: en.shop[0].available ? en.shop[0].homepage : en.shop[0].release_url }, 'Source') : '');
+  $('sheet-body').replaceChildren(acts, ...parts);
   $('mod-sheet').showModal();
 }
 
@@ -519,45 +528,69 @@ function toast(text) {
   setTimeout(() => t.remove(), 4600);
 }
 
-// ---- the shell: the views, the sidebar's configurations, the status bar ----
+// ---- the frame: the two views, your setup, the counts ----
 
 function route() {
   const build = location.hash === '#build';
   $('view-library').hidden = build;
   $('view-build').hidden = !build;
-  $('crumb-text').textContent = build ? 'Build' : 'Mods';
-  $('cfg-btn').classList.toggle('on', build);
-  document.title = build ? 'Build · elekloader' : 'Mod library · elekloader';
-  document.querySelector('.content').scrollTop = 0;
+  document.title = build ? 'Build · elekloader' : 'Mods · elekloader';
+  $('content').scrollTop = 0;
+  $('topbar').classList.remove('solid');
   window.scrollTo(0, 0);
   renderLibrary();
   renderChrome();
 }
 
+// a row in Your setup: a square, a title, a line under it
+function setupRow({ thumb, title, sub, on, current, href, onclick }) {
+  return el('li', {}, el(href ? 'a' : 'button', { class: ['row', on ? 'on' : '', current ? 'current' : ''].join(' '),
+    ...(href ? { href } : { type: 'button', onclick }) },
+  thumb, el('span', { class: 'row-text' }, el('strong', {}, title), el('span', {}, sub))));
+}
+
 function renderChrome() {
   const s = st.stock, sd = dev();
   const n = st.enabled.size;
-  $('cfg-count').textContent = String(n);
-  $('cfg-count').classList.toggle('on', n > 0);
-  $('status-sel').textContent = `${n} mod${n === 1 ? '' : 's'} selected`;
-  const fw = sd ? `${sd.name} · OS ${s.os}` : s && !s.ok ? 'Not a stock file elekloader knows' : 'No stock file chosen';
-  $('status-fw').className = 'status' + (sd ? ' ok' : s && !s.ok ? ' bad' : '');
-  $('status-fw-text').textContent = fw;
-  $('fw-dot').className = 'fw-dot' + (sd ? ' ok' : s && !s.ok ? ' bad' : '');
-  $('fw-title').textContent = sd ? fw : 'Choose firmware';
-  $('fw-line').textContent = sd ? s.file : 'Start with your own stock OS file.';
-  $('build-os').textContent = sd ? fw : 'No stock file';
-  $('build-title').textContent = sd && S.profile[sd.key] ? S.profile[sd.key] : 'Build';
-  // the configurations: this device's profiles
-  const box = $('nav-profiles');
-  if (!sd) {
-    box.replaceChildren(el('li', { class: 'side-empty' }, 'Choose your stock file to keep configurations.'));
-  } else {
-    const k = sd.key, names = Object.keys(profiles()).sort();
-    box.replaceChildren(...names.map(name => navItem(name, 'config', (profiles()[name] || []).length,
-      location.hash === '#build' && S.profile[k] === name,
-      () => { loadProfile(name); location.hash = '#build'; })));
+  const build = location.hash === '#build';
+  for (const id of ['cfg-count', 'nav-count', 'tab-count']) {
+    $(id).textContent = String(n);
+    $(id).classList.toggle('on', n > 0);
   }
+  for (const [id, on] of [['nav-library', !build], ['nav-build', build], ['tab-library', !build], ['tab-build', build]]) {
+    $(id).classList.toggle('on', on);
+    if (on) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current');
+  }
+  $('cfg-btn').hidden = build;
+  const prof = sd && S.profile[sd.key];
+  $('build-eyebrow').textContent = prof ? 'Profile' : 'Build';
+  $('build-title').textContent = prof || 'Your firmware';
+  $('build-sub').textContent = sd
+    ? `${sd.name} · OS ${s.os} · ${n} mod${n === 1 ? '' : 's'} ticked · changes save in this browser`
+    : 'Drop in your stock OS file, check the mods you ticked, and build.';
+  // your setup: the stock file, then this device's profiles
+  const rows = [sd
+    ? setupRow({ thumb: el('span', { class: 'thumb stock-ok' }, icon(BOLT, '')), title: `${sd.name} · OS ${s.os}`,
+      sub: 'Stock OS · ' + s.file, href: '#build' })
+    : s && !s.ok
+      ? setupRow({ thumb: el('span', { class: 'thumb stock-bad' }, '!'), title: 'Not a stock OS elekloader knows',
+        sub: s.file, href: '#build' })
+      : setupRow({ thumb: el('span', { class: 'thumb' }, icon(PLUS, 'ico')), title: 'Your stock OS file',
+        sub: 'Drop it in on Build', href: '#build' })];
+  if (sd) {
+    const k = sd.key;
+    for (const name of Object.keys(profiles()).sort()) {
+      const th = el('span', { class: 'thumb profile' }, name.slice(0, 1).toUpperCase());
+      th.style.setProperty('--h', String(Math.round(360 * seeded(name)())));
+      const m = (profiles()[name] || []).length;
+      rows.push(setupRow({ thumb: th, title: name, sub: `Profile · ${m} mod${m === 1 ? '' : 's'}`,
+        on: build && S.profile[k] === name, current: S.profile[k] === name,
+        onclick: () => { loadProfile(name); location.hash = '#build'; } }));
+    }
+  } else {
+    rows.push(el('li', { class: 'side-empty' }, 'Your profiles show here once your stock file is in.'));
+  }
+  $('side-rows').replaceChildren(...rows);
   $('save-profile').disabled = !sd || st.busy;
 }
 
@@ -581,7 +614,7 @@ function remember() {
 async function boot() {
   const t0 = performance.now();
   const tick = setInterval(() => {
-    $('engine').textContent = `Powering up the build engine… ${secs(performance.now() - t0)}`;
+    $('engine').textContent = `Starting the build engine… ${secs(performance.now() - t0)}`;
   }, 200);
   try {
     const r = await engine.call('init');
@@ -1235,15 +1268,16 @@ function wire() {
     if (location.hash === '#build') location.hash = '#library';
     renderLibrary();
   });
-  $('f-device').addEventListener('change', e => setFilter('device', e.target.value || null));
-  $('f-type').addEventListener('change', e => setFilter('type', e.target.value || null));
   $('f-sort').addEventListener('change', e => setFilter('sort', e.target.value || 'collection'));
   // the sheets: their close buttons, and a click on the backdrop
   for (const [sheet, close] of [['mod-sheet', 'sheet-close'], ['about-sheet', 'about-close']]) {
     $(close).addEventListener('click', () => $(sheet).close());
     $(sheet).addEventListener('click', e => { if (e.target === $(sheet)) $(sheet).close(); });
   }
-  $('about-open').addEventListener('click', () => $('about-sheet').showModal());
+  for (const id of ['about-open', 'tab-about']) $(id).addEventListener('click', () => $('about-sheet').showModal());
+  // the top bar goes solid once the page scrolls under it
+  $('content').addEventListener('scroll', () => $('topbar').classList.toggle('solid', $('content').scrollTop > 48),
+    { passive: true });
   window.addEventListener('hashchange', route);
 }
 

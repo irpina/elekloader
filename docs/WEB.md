@@ -7,19 +7,22 @@ for the Octatrack, the `.bin`), with the build manifest. The build runs in
 the page. Nothing is uploaded, and the site hosts no firmware.
 
 The page is an app with two views:
-- **The library** (`#library`): every mod as a card. The sidebar filters it by
-  type and by device; so do the Device, Type and Sort menus, and the search
-  in the top bar.
-- **The build** (`#build`): your stock file (Base firmware), the mods you
-  ticked (Selected mods), the check, and Build firmware, then the downloads.
+- **Mods** (`#library`): every mod as a card, on a shelf per kind (Sampling,
+  Performance, ...; your own files last). The sidebar's Kinds, the device
+  chips and the search filter it, and Sort orders it.
+- **Build** (`#build`): your stock OS file, your mods (the list, the profile,
+  the details), the check, and Build firmware, then the downloads.
 
 Around them:
-- **The sidebar** also lists your configurations: the sets of mods you tick,
-  per device, which the desktop window calls profiles. **+** saves the
-  ticked mods as a new one.
-- **Its foot** shows your stock file, or asks for one.
-- **The status bar** shows the stock file, the build engine and how many
-  mods are ticked.
+- **The sidebar**: the two views, the kinds of mod with their counts, and
+  Your setup.
+- **Your setup**: your stock file, then this device's
+  profiles (the sets of mods you tick, as in the desktop window). **+** saves
+  the ticked mods as a new profile.
+- **Its foot** shows the build engine, and opens About (licences, how to
+  recover).
+- **On a phone** the page is one column (Your setup at its end), and a tab
+  bar switches between Mods, Build and About.
 
 ## How it works
 
@@ -58,18 +61,20 @@ The page never talks to a device: it has no Web MIDI and no USB access.
 ## The mod shop: the library's cards
 
 The library shows the shop's curated mods, and the `.elemod` files you added
-yourself (type "Your files"). Once you have dropped in a stock file, it
+yourself (the "Your files" shelf). Once you have dropped in a stock file, it
 opens on that file's device. A device you pick before that says which stock
 OS file it needs.
 
-Each card's head is line art drawn for its type. Below it are the mod's
-title, version, author, device, type and licence (from the mod file itself)
-and a one-line summary from the catalog. **Details** shows what it changes,
+Each card's cover is the mod's name over line art drawn for its kind (a
+sliced waveform for Sampling, a level under a ceiling for Performance), in
+its kind's colour. Below it are the mod's title, version, device and OS
+versions, the summary from the catalog, and its patch sites. The cover and
+**Details** open a sheet with its author, kind and licence, what it changes,
 and the files with their sha256.
 
 - **+ Add** puts the mod in your mods and ticks it with what it requires.
-- **✓ In build** marks a ticked mod; a click takes it out of the build, and
-  it stays in your mods.
+- **✓ In build** marks a mod in your build; a click takes it out of the
+  build, and it stays in your mods.
 - **Remove** takes it out of your mods.
 
 A mod built for several OS versions of a device (its files for 1.53 and
