@@ -1,15 +1,30 @@
 # elekloader in the browser
 
 <https://irpina.github.io/elekloader/> is elekloader's patcher as a static
-web page. You pick mods from its shop or add your own `.elemod` files, drop
-in your stock OS file, tick mods, and download the patched `.syx` (and, for
-the Octatrack, the `.bin`), with the build manifest. The build runs in the
-page. Nothing is uploaded, and the site hosts no firmware.
+web page. You pick mods from its library or add your own `.elemod` files,
+drop in your stock OS file, tick mods, and download the patched `.syx` (and,
+for the Octatrack, the `.bin`), with the build manifest. The build runs in
+the page. Nothing is uploaded, and the site hosts no firmware.
+
+The page is an app with two views:
+- **The library** (`#library`): every mod as a card. The sidebar filters it by
+  type and by device; so do the Device, Type and Sort menus, and the search
+  in the top bar.
+- **The build** (`#build`): your stock file (Base firmware), the mods you
+  ticked (Selected mods), the check, and Build firmware, then the downloads.
+
+Around them:
+- **The sidebar** also lists your configurations: the sets of mods you tick,
+  per device, which the desktop window calls profiles. **+** saves the
+  ticked mods as a new one.
+- **Its foot** shows your stock file, or asks for one.
+- **The status bar** shows the stock file, the build engine and how many
+  mods are ticked.
 
 ## How it works
 
 ```
-index.html + app.js  (the page: the shop, the list, the check, the build, the downloads)
+index.html + app.js  (the page: the library, your mods, the check, the build, the downloads)
       |  postMessage: your files' bytes, ticks; results back
 worker.js            (a module worker, so the page never blocks)
       |
@@ -40,15 +55,22 @@ The page shows the device's recovery text before it lets you download.
 Flash the file yourself, as with any OS update ([README](../README.md#flash-it)).
 The page never talks to a device: it has no Web MIDI and no USB access.
 
-## The mod shop
+## The mod shop: the library's cards
 
-**or browse the mod shop**, next to **+ Add mods**, opens a shop of curated
-mods. **Select your device** shows the mods made for it (or every device's,
-with "All"); once you have dropped in a stock file, the shop opens on its
-device. A device you pick before that says which stock OS file it needs. Each card shows the mod's
-title, version, author, licence and what it changes (from the mod file
-itself), with a one-line summary from the catalog. **Add to build** puts
-the mod in your mods and ticks it with what it requires.
+The library shows the shop's curated mods, and the `.elemod` files you added
+yourself (type "Your files"). Once you have dropped in a stock file, it
+opens on that file's device. A device you pick before that says which stock
+OS file it needs.
+
+Each card's head is line art drawn for its type. Below it are the mod's
+title, version, author, device, type and licence (from the mod file itself)
+and a one-line summary from the catalog. **Details** shows what it changes,
+and the files with their sha256.
+
+- **+ Add** puts the mod in your mods and ticks it with what it requires.
+- **✓ In build** marks a ticked mod; a click takes it out of the build, and
+  it stays in your mods.
+- **Remove** takes it out of your mods.
 
 A mod built for several OS versions of a device (its files for 1.53 and
 1.54, say) is one card, which lists the OS versions it has. With a stock

@@ -51,6 +51,8 @@ def _device(d, rel=None):
 def describe(path):
     d = model.describe(path)
     d['builtin'] = os.path.dirname(path) == CORE
+    if 'error' not in d:
+        d['os'] = model.mod(path).rel.version      # the OS version it is made for (the library's cards)
     return d
 
 

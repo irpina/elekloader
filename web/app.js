@@ -128,11 +128,14 @@ const st = {
 const dev = () => (st.stock && st.stock.ok ? st.stock.dev : null);
 const desc = p => st.mods.find(d => d.path === p);
 
-// ---- the mod shop ------------------------------------------------------------------------
-// shop/index.json lists the curated mods (packaging/build_web.py, from
-// web/catalog.json); their files are on this site, next to it.
+// ---- the library -------------------------------------------------------------------------
+// The shop's mods (shop/index.json: packaging/build_web.py, from web/catalog.json;
+// their files are on this site, next to it) and the mods you added yourself,
+// as one collection of cards, one per mod.
 
-const shop = { items: [], device: S.shopDevice || null, query: '' };
+const shop = { items: [] };
+const lib = { device: S.libDevice || null, type: S.libType || null, sort: S.libSort || 'collection', query: '' };
+const OWN = '\u0000own';                         // the "Your files" type
 const cmpVer = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
 const shopItem = d => shop.items.find(e => e.available && e.sha256 === d.sha256);
 const owned = e => st.mods.find(d => !d.builtin && d.sha256 === e.sha256);
@@ -155,6 +158,54 @@ function shopPick(g) {
   return (sd && g.find(e => e.device === sd.key && e.os === st.stock.os)) || g[g.length - 1];
 }
 
+// Every card: {shop: group} for the shop's, {own: [descs]} for your own files
+// (a mod not from the shop and not built in), with what the cards show.
+function libEntries() {
+  const out = [];
+  for (const g of shopGroups(shop.items)) {
+    const e = g[g.length - 1];
+    out.push({ shop: g, title: e.title || e.id, id: e.id || e.title, version: e.version || '',
+      device: e.device, category: e.category || '', author: e.author || '', license: e.license || '',
+      summary: e.summary || e.description || '', oses: g.map(x => x.os).filter(Boolean),
+      available: g.some(x => x.available) });
+  }
+  const own = new Map();
+  for (const d of st.mods) {
+    if (d.builtin || d.error || shopItem(d)) continue;
+    const k = [d.id, d.version, d.for_device].join('|');
+    if (!own.has(k)) own.set(k, []);
+    own.get(k).push(d);
+  }
+  for (const ds of own.values()) {
+    ds.sort((a, b) => cmpVer(a.os || '', b.os || ''));
+    const d = ds[0];
+    out.push({ own: ds, title: d.title || d.id, id: d.id, version: d.version || '', device: d.for_device,
+      category: d.category || (d.format === 1 ? 'Whole build' : ''), author: d.author || '',
+      license: d.license || '', summary: d.description || '', oses: ds.map(x => x.os).filter(Boolean),
+      available: true });
+  }
+  return out;
+}
+
+// What a card stands for now: the installed files that are its, the one that
+// fits the stock file, whether it is in the build, and what Add would add.
+function entryState(en) {
+  const sd = dev();
+  const mine = en.shop ? en.shop.map(owned).filter(Boolean) : en.own;
+  const fitting = mine.find(d => d.fits);
+  const inBuild = mine.some(d => st.enabled.has(d.path));
+  let toAdd = [];
+  if (en.shop) {
+    const pick = shopPick(en.shop);
+    // with a stock file, the file for its OS; before one, every OS's (the list hides the others)
+    const files = sd ? [pick] : en.shop.filter(x => x.available);
+    toAdd = files.filter(x => x.available && !owned(x));
+  }
+  const pick = en.shop ? shopPick(en.shop) : (fitting || mine[0]);
+  const otherOs = sd && sd.key === en.device && !fitting && pick && pick.os !== st.stock.os;
+  return { mine, fitting, inBuild, toAdd, pick, otherOs };
+}
+
 async function loadShop() {
   try {
     const r = await fetch(new URL('shop/index.json', import.meta.url));
@@ -162,8 +213,6 @@ async function loadShop() {
   } catch {
     shop.items = [];
   }
-  $('open-shop').hidden = !shop.items.length;
-  renderShop();
   renderMods();
 }
 
@@ -176,93 +225,249 @@ function pickable() {
   }
   return [...seen.values()];
 }
+const deviceName = key => (pickable().find(d => d.key === key) || {}).name || key;
 
-function pickDevice(key) {
-  shop.device = key;
-  S.shopDevice = key;
+function setFilter(k, v) {
+  lib[k] = v;
+  S['lib' + k[0].toUpperCase() + k.slice(1)] = v;
   saveSettings();
-  renderShop();
+  if (location.hash !== '#library' && location.hash !== '') location.hash = '#library';
+  renderLibrary();
 }
 
-function openShop() {
-  if (dev() && !$('shop').open) shop.device = dev().key;
-  renderShop();
-  $('shop').showModal();
+function filtered(entries) {
+  const q = lib.query.trim().toLowerCase();
+  return entries.filter(en => (!lib.device || en.device === lib.device)
+    && (!lib.type || (lib.type === OWN ? !!en.own : en.category === lib.type))
+    && (!q || [en.title, en.id, en.summary, en.category, en.author].join(' ').toLowerCase().includes(q)));
 }
 
-function renderShop() {
-  if (!shop.items.length) return;
-  const devs = pickable();
+function sorted(list) {
+  const by = lib.sort;
+  if (by === 'name') return [...list].sort((a, b) => a.title.localeCompare(b.title));
+  if (by === 'device') {
+    return [...list].sort((a, b) => deviceName(a.device).localeCompare(deviceName(b.device))
+      || a.title.localeCompare(b.title));
+  }
+  return list;                                     // the catalog's order, then your files
+}
+
+const ICONS = {
+  all: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  Sampling: 'M3 12h2l2-6 3 12 3-9 2 6 2-3h4',
+  Performance: 'M5 20V10M10 20V4M15 20v-7M20 20v-4',
+  Framework: 'M12 3 4 7.5v9L12 21l8-4.5v-9zM4 7.5 12 12l8-4.5M12 12v9',
+  'Whole build': 'M5 4h14v16H5zM9 8h6M9 12h6M9 16h3',
+  own: 'M6 3h9l3 3v15H6zM14 3v4h4',
+  device: 'M4 6h16v12H4zM8 10h1M8 14h8',
+  config: 'M6 3h9l3 3v15H6zM14 3v4h4M9 13h6',
+  other: 'M12 4v16M4 12h16',
+};
+
+function navItem(label, icon, n, on, onclick, extra = '') {
+  return el('li', {}, el('button', { type: 'button', class: 'side-item' + (on ? ' on' : ''), onclick,
+    'aria-pressed': String(!!on) },
+  svgIcon(ICONS[icon] || ICONS.other), label, extra, n != null ? el('span', { class: 'n' }, String(n)) : ''));
+}
+
+function svgIcon(d) {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('class', 'ico');
+  s.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', d);
+  s.append(p);
+  return s;
+}
+
+function renderLibrary() {
+  const all = libEntries();
   const sd = dev();
-  $('device-buttons').replaceChildren(...[{ key: null, name: 'All' }, ...devs].map(d => {
-    const n = shopGroups(shop.items.filter(e => !d.key || e.device === d.key)).length;
-    const on = shop.device === d.key;
-    return el('button', { type: 'button', class: 'pick' + (on ? ' on' : ''), 'aria-pressed': String(on),
-      onclick: () => pickDevice(d.key) },
-    d.name, el('span', { class: 'count' }, String(n)),
-    sd && sd.key === d.key ? el('span', { class: 'yours', title: 'Your stock file' }, '⚡') : '');
-  }));
-  const chosen = devs.find(d => d.key === shop.device);
+  const inLib = location.hash !== '#build';
+  // the sidebar: types and devices, with their counts
+  const cats = [...new Set(all.map(en => en.category).filter(Boolean))].sort();
+  const ownN = all.filter(en => en.own).length;
+  const forDev = lib.device ? all.filter(en => en.device === lib.device) : all;
+  $('nav-types').replaceChildren(
+    navItem('All mods', 'all', forDev.length, inLib && !lib.type, () => setFilter('type', null)),
+    ...cats.map(c => navItem(c, c, forDev.filter(en => en.category === c).length, inLib && lib.type === c,
+      () => setFilter('type', c))),
+    ownN ? navItem('Your files', 'own', forDev.filter(en => en.own).length, inLib && lib.type === OWN,
+      () => setFilter('type', OWN)) : '');
+  const devs = pickable();
+  $('nav-devices').replaceChildren(...devs.map(d => navItem(d.name, 'device',
+    all.filter(en => en.device === d.key).length, lib.device === d.key,
+    () => setFilter('device', lib.device === d.key ? null : d.key),
+    sd && sd.key === d.key ? el('span', { class: 'yours', title: 'Your stock file' }) : '')));
+  // the filters: the same choices
+  const opt = (v, t, on) => el('option', { value: v, selected: on }, t);
+  $('f-device').replaceChildren(opt('', 'All devices', !lib.device),
+    ...devs.map(d => opt(d.key, d.name, lib.device === d.key)));
+  $('f-type').replaceChildren(opt('', 'All types', !lib.type), ...cats.map(c => opt(c, c, lib.type === c)),
+    ownN ? opt(OWN, 'Your files', lib.type === OWN) : '');
+  $('f-sort').value = lib.sort;
+  // the head
+  const chosen = devs.find(d => d.key === lib.device);
+  const list = sorted(filtered(all));
+  $('lib-count').textContent = `${list.length} mod${list.length === 1 ? '' : 's'}`;
+  $('lib-fw').textContent = sd ? `${sd.name} · OS ${st.stock.os}` : 'No stock file yet';
   $('device-note').textContent = !chosen
     ? (sd ? `Every device's mods. Your stock file is for the ${sd.name}.`
-      : 'Every device\'s mods. Select your device to see the ones that fit it.')
+      : 'Every device\'s mods. Pick your device to see the ones that fit it.')
     : sd && sd.key === chosen.key ? `For your ${sd.name}, OS ${st.stock.os}: what you add for that OS is ticked for your build.`
       : sd ? `Your stock file is for the ${sd.name}, so mods for the ${chosen.name} can't go into this build.`
-        : `Mods for the ${chosen.name}. To build, you need its stock OS ${chosen.os} file (step 1).`;
+        : `Mods for the ${chosen.name}. To build, you need its stock OS ${chosen.os} file.`;
   $('device-note').className = 'device-note' + (chosen && sd && sd.key !== chosen.key ? ' warn' : '');
-  const n = st.enabled.size;
-  $('cart').textContent = n ? `⚡ ${n} in your build: done` : 'Done';
-  const q = shop.query.trim().toLowerCase();
-  const list = shopGroups(shop.items.filter(e => (!shop.device || e.device === shop.device)
-    && (!q || [e.title, e.id, e.summary, e.description, e.category, e.author].join(' ').toLowerCase().includes(q))));
-  $('shop-cards').replaceChildren(...list.map(card));
+  $('lib-cards').replaceChildren(...list.map(card));
   if (!list.length) {
-    $('shop-cards').append(el('p', { class: 'empty muted' }, q ? 'Nothing in the shop matches that.'
-      : `Nothing in the shop for the ${chosen ? chosen.name : 'device'} yet. You can still add your own .elemod files with + Add mods.`));
+    $('lib-cards').append(el('p', { class: 'empty' }, lib.query.trim() ? 'No mod matches that.'
+      : `No mods ${chosen ? 'for the ' + chosen.name + ' ' : ''}here yet. You can add your own .elemod files with + Add .elemod.`));
   }
   renderNeed();
 }
 
-function card(g) {
-  const e = shopPick(g);
-  // with a stock file, the file for its OS; before one, every OS's (the window hides the others)
-  const files = dev() ? [e] : g.filter(x => x.available);
-  const haves = files.map(owned).filter(Boolean);
-  const have = files.length && haves.length === files.length ? haves : null;
-  const otherOs = dev() && dev().key === e.device && e.os && e.os !== st.stock.os;
-  const fitsStock = dev() && dev().key === e.device && !otherOs;
-  const oses = g.map(x => x.os).filter(Boolean);
-  let action;
-  if (!e.available) {
-    action = el('button', { type: 'button', class: 'buy', disabled: true }, 'Not released yet');
-  } else if (have) {
-    action = el('span', { class: 'have' }, have.some(d => st.enabled.has(d.path)) ? '✓ In your build' : '✓ In your mods',
-      el('button', { type: 'button', class: 'linkish', disabled: st.busy,
-        onclick: () => removeMods(have.map(d => d.path)) }, 'Remove'));
-  } else {
-    action = el('button', { type: 'button', class: 'buy', disabled: !st.ready || st.busy,
-      onclick: ev => shopAdd(files.filter(x => !owned(x)), ev.currentTarget) },
-    fitsStock || !dev() ? 'Add to build' : 'Add to my mods');
+// ---- a card's head: line art drawn from the mod, in its type's colour ----
+
+const TINT = { Sampling: 't-teal', Performance: 't-violet', Framework: 't-gold' };
+
+function seeded(s) {                               // a small deterministic generator
+  let h = 2166136261;
+  for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296;
+}
+
+function art(en) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 280 156');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('aria-hidden', 'true');
+  const add = (tag, a) => {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(a)) e.setAttribute(k, String(v));
+    svg.append(e);
+    return e;
+  };
+  const rnd = seeded(en.id + en.device);
+  const ink = { stroke: 'currentColor', fill: 'none', 'stroke-linecap': 'round' };
+  if (en.category === 'Sampling') {                // a waveform, cut into slices
+    const n = 46, x0 = 70, w = 140;
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      const env = Math.min(1, t * 9) * Math.exp(-2.4 * t) * (0.55 + 0.45 * rnd());
+      const h = 4 + 46 * env;
+      add('line', { ...ink, x1: x0 + i * w / n, y1: 76 - h, x2: x0 + i * w / n, y2: 76 + h,
+        'stroke-width': 1.6, opacity: 0.55 + 0.45 * (1 - t) });
+    }
+    for (const t of [0.2, 0.43, 0.7]) {
+      add('line', { stroke: 'currentColor', 'stroke-width': 1, 'stroke-dasharray': '2 3', opacity: 0.6,
+        x1: x0 + t * w, y1: 26, x2: x0 + t * w, y2: 126 });
+    }
+  } else if (en.category === 'Performance') {      // a level meter and a line over it
+    const pts = [];
+    for (let i = 0; i < 14; i++) {
+      const v = 0.25 + 0.6 * (i / 13) * (0.7 + 0.3 * rnd());
+      const x = 78 + i * 9.5;
+      add('rect', { x, y: 112 - 70 * v, width: 5, height: 70 * v, rx: 1.5, fill: 'currentColor',
+        opacity: 0.25 + 0.6 * (i / 13) });
+      pts.push(`${x + 2.5},${100 - 70 * v - 8 - 6 * rnd()}`);
+    }
+    add('polyline', { ...ink, points: pts.join(' '), 'stroke-width': 1.4, opacity: 0.9 });
+  } else if (en.category === 'Framework') {        // nodes on a bus
+    const ns = Array.from({ length: 6 }, (_, i) => [86 + i * 22 + 8 * rnd(), 56 + (i % 2) * 40 + 10 * rnd()]);
+    add('line', { ...ink, x1: 70, y1: 78, x2: 210, y2: 78, 'stroke-width': 1, opacity: 0.5 });
+    for (const [x, y] of ns) add('line', { ...ink, x1: x, y1: y, x2: x, y2: 78, 'stroke-width': 1, opacity: 0.5 });
+    for (const [x, y] of ns) add('circle', { cx: x, cy: y, r: 5, fill: '#1c1c20', stroke: 'currentColor', 'stroke-width': 1.4 });
+  } else {                                         // a ring of steps
+    const n = 16, on = new Set(Array.from({ length: 6 }, () => Math.floor(rnd() * n)));
+    for (let i = 0; i < n; i++) {
+      const a = i / n * 2 * Math.PI - Math.PI / 2;
+      add('circle', { cx: 140 + 38 * Math.cos(a), cy: 76 + 38 * Math.sin(a), r: on.has(i) ? 4 : 3,
+        fill: on.has(i) ? 'currentColor' : 'none', stroke: 'currentColor', 'stroke-width': 1.2,
+        opacity: on.has(i) ? 0.95 : 0.45 });
+    }
+    add('circle', { ...ink, cx: 140, cy: 76, r: 18, 'stroke-width': 1, opacity: 0.4 });
   }
-  const needs = (e.requires || []).map(r => (r === 'core' && e.needs_core ? `core ${e.needs_core} or newer` : r));
-  const facts = e.available ? [`${e.sites} patch sites`, e.ram ? `${kb(e.ram)} of RAM` : '',
-    needs.length ? 'needs ' + needs.join(', ') : '', e.conflicts.length ? 'not with ' + e.conflicts.join(', ') : '']
-    .filter(Boolean).join(' · ') : '';
-  const device = e.device_name || (pickable().find(d => d.key === e.device) || {}).name || e.device;
-  return el('article', { class: 'card' + (e.available ? '' : ' unavailable') + (have ? ' owned' : '') },
-    el('div', { class: 'card-top' }, e.category ? el('span', { class: 'chip' }, e.category) : '',
-      el('span', { class: 'chip dev' }, device + (oses.length ? ' · OS ' + oses.join(', ') : ''))),
-    el('h3', {}, e.title, ' ', el('span', { class: 'ver' }, e.version || '')),
-    el('p', { class: 'by' }, [e.author && 'by ' + e.author, e.license].filter(Boolean).join(' · ')),
-    el('p', { class: 'summary' }, e.summary || e.description || ''),
-    otherOs ? el('p', { class: 'muted small' }, `Made for OS ${e.os}; your stock file is OS ${st.stock.os}.`) : '',
-    e.available ? el('details', { class: 'more' }, el('summary', {}, 'More'),
-      el('p', { class: 'desc' }, e.description), el('p', { class: 'muted small' }, facts),
-      el('p', { class: 'muted small mono' }, g.filter(x => x.available)
-        .map(x => `${x.file}${g.length > 1 ? ` (OS ${x.os})` : ''}\nsha256 ${x.sha256}`).join('\n')))
-      : el('p', { class: 'muted small' }, `Its release (${e.tag}) is not published yet.`),
-    el('div', { class: 'card-foot' }, action,
-      el('a', { href: e.available ? e.homepage : e.release_url, rel: 'noreferrer', class: 'src' }, 'Source')));
+  return svg;
+}
+
+function card(en) {
+  const s = entryState(en);
+  const sd = dev();
+  let action;
+  if (!en.available) {
+    action = el('button', { type: 'button', class: 'add', disabled: true }, 'Soon');
+  } else if (s.inBuild) {
+    action = el('button', { type: 'button', class: 'add on', disabled: st.busy || !sd,
+      title: 'Take it out of your build (it stays in your mods)',
+      onclick: () => untick(s.mine.map(d => d.path)) }, '✓ In build');
+  } else if (s.fitting && sd) {
+    action = el('button', { type: 'button', class: 'add', disabled: st.busy,
+      onclick: async () => { await tickWithCore(s.fitting.path); remember(); changed(); } }, '+ Add');
+  } else if (s.toAdd.length) {
+    action = el('button', { type: 'button', class: 'add', disabled: !st.ready || st.busy,
+      onclick: ev => shopAdd(s.toAdd, ev.currentTarget) }, '+ Add');
+  } else {
+    action = el('button', { type: 'button', class: 'add have', disabled: true }, '✓ Added');
+  }
+  const pick = s.pick || {};
+  const sites = en.shop ? pick.sites : (pick.sites || []).length;
+  const tint = TINT[en.category] || 't-rose';
+  const open = () => openSheet(en);
+  return el('article', { class: ['card', tint, s.inBuild ? 'in-build' : '', en.available ? '' : 'unavailable'].join(' ') },
+    el('button', { type: 'button', class: 'art', onclick: open, 'aria-label': `About ${en.title}` },
+      art(en),
+      el('span', { class: 'lbl top' }, en.category || 'Mod'),
+      el('span', { class: 'pip' }),
+      el('span', { class: 'lbl b1' }, deviceName(en.device)),
+      el('span', { class: 'lbl b2' }, en.oses.length ? 'OS ' + en.oses.join(' · ') : '')),
+    el('div', { class: 'card-body' },
+      el('div', { class: 'card-title' },
+        el('div', {}, el('h3', {}, en.title), el('span', { class: 'ver' }, en.version ? 'v' + en.version : '')),
+        action),
+      el('div', { class: 'meta' },
+        el('span', {}, en.author || 'Unknown author'), el('span', {}, deviceName(en.device)),
+        el('span', {}, en.category || '—'), el('span', {}, en.license || 'licence not stated')),
+      el('p', { class: 'summary' }, en.summary),
+      s.otherOs ? el('p', { class: 'note' }, `Made for OS ${pick.os}; your stock file is OS ${st.stock.os}.`) : '',
+      el('div', { class: 'card-foot' },
+        el('span', {}, sites != null && en.available ? `${sites} patch sites` : (en.shop ? `Release ${en.shop[0].tag} not published yet` : '')),
+        el('span', { class: 'links' },
+          el('button', { type: 'button', class: 'linkish', onclick: open }, 'Details'),
+          s.mine.length && !st.busy ? el('button', { type: 'button', class: 'linkish',
+            onclick: () => removeMods(s.mine.map(d => d.path)) }, 'Remove') : '',
+          en.shop ? el('a', { href: en.available ? en.shop[0].homepage : en.shop[0].release_url, rel: 'noreferrer' }, 'Source') : ''))));
+}
+
+// a card's details: what an installed file says about itself, or the catalog's
+function openSheet(en) {
+  const s = entryState(en);
+  const d = s.fitting || s.mine[0];
+  $('sheet-title').textContent = `${en.title} ${en.version ? 'v' + en.version : ''}`;
+  let parts;
+  if (d) {
+    parts = detailParts(d);
+  } else {
+    const e = s.pick;
+    const needs = (e.requires || []).map(r => (r === 'core' && e.needs_core ? `core ${e.needs_core} or newer` : r));
+    parts = [
+      el('p', { class: 'muted' }, [deviceName(en.device), en.oses.length && 'OS ' + en.oses.join(', '),
+        en.category, en.author && 'by ' + en.author, en.license].filter(Boolean).join(' · ')),
+      el('p', { class: 'desc' }, e.description || en.summary || ''),
+      e.available ? el('h4', {}, 'What it changes') : '',
+      e.available ? el('p', { class: 'muted' }, [`${e.sites} patch sites`, e.ram ? `${kb(e.ram)} of RAM` : '',
+        needs.length ? 'needs ' + needs.join(', ') : '', e.conflicts && e.conflicts.length
+          ? 'not with ' + e.conflicts.join(', ') : ''].filter(Boolean).join(' · ')) : '',
+      el('h4', {}, en.shop.length > 1 ? 'Files' : 'File'),
+      el('p', { class: 'muted mono' }, en.shop.filter(x => x.available)
+        .map(x => `${x.file}${en.shop.length > 1 ? ` (OS ${x.os})` : ''}\nsha256 ${x.sha256}`).join('\n')
+        || `Its release (${e.tag}) is not published yet.`),
+      el('p', {}, el('a', { href: e.available ? e.homepage : e.release_url, rel: 'noreferrer' }, 'Source and release')),
+    ];
+  }
+  $('sheet-body').replaceChildren(...parts);
+  $('mod-sheet').showModal();
 }
 
 // a card's files (one, or before a stock file every OS's): added, and the one
@@ -290,22 +495,70 @@ async function shopAdd(files, btn) {
       ? ` to your mods, for OS ${files.map(x => x.os).join(' and ')}.` : ' to your mods.'));
   } catch (err) {
     note('Not added: ' + err.message);
-    renderShop();
+    renderLibrary();
   }
 }
 
-// step 2's hint: which stock file the device you picked needs
+async function untick(paths) {
+  for (const p of paths) st.enabled.delete(p);
+  remember();
+  changed();
+}
+
+// the base firmware's hint: which stock file the device you picked needs
 function renderNeed() {
-  const d = !dev() && pickable().find(x => x.key === shop.device);
+  const d = !dev() && pickable().find(x => x.key === lib.device);
   $('stock-need').hidden = !d;
   if (d) $('stock-need').textContent = `For the ${d.name}: Elektron's OS ${d.os} file.`;
 }
 
 function toast(text) {
   const t = el('div', { class: 'toast', role: 'status' }, text);
-  ($('shop').open ? $('shop') : document.body).append(t);   // above the shop when it is open
+  document.body.append(t);
   setTimeout(() => t.classList.add('gone'), 4000);
   setTimeout(() => t.remove(), 4600);
+}
+
+// ---- the shell: the views, the sidebar's configurations, the status bar ----
+
+function route() {
+  const build = location.hash === '#build';
+  $('view-library').hidden = build;
+  $('view-build').hidden = !build;
+  $('crumb-text').textContent = build ? 'Build' : 'Mods';
+  $('cfg-btn').classList.toggle('on', build);
+  document.title = build ? 'Build · elekloader' : 'Mod library · elekloader';
+  document.querySelector('.content').scrollTop = 0;
+  window.scrollTo(0, 0);
+  renderLibrary();
+  renderChrome();
+}
+
+function renderChrome() {
+  const s = st.stock, sd = dev();
+  const n = st.enabled.size;
+  $('cfg-count').textContent = String(n);
+  $('cfg-count').classList.toggle('on', n > 0);
+  $('status-sel').textContent = `${n} mod${n === 1 ? '' : 's'} selected`;
+  const fw = sd ? `${sd.name} · OS ${s.os}` : s && !s.ok ? 'Not a stock file elekloader knows' : 'No stock file chosen';
+  $('status-fw').className = 'status' + (sd ? ' ok' : s && !s.ok ? ' bad' : '');
+  $('status-fw-text').textContent = fw;
+  $('fw-dot').className = 'fw-dot' + (sd ? ' ok' : s && !s.ok ? ' bad' : '');
+  $('fw-title').textContent = sd ? fw : 'Choose firmware';
+  $('fw-line').textContent = sd ? s.file : 'Start with your own stock OS file.';
+  $('build-os').textContent = sd ? fw : 'No stock file';
+  $('build-title').textContent = sd && S.profile[sd.key] ? S.profile[sd.key] : 'Build';
+  // the configurations: this device's profiles
+  const box = $('nav-profiles');
+  if (!sd) {
+    box.replaceChildren(el('li', { class: 'side-empty' }, 'Choose your stock file to keep configurations.'));
+  } else {
+    const k = sd.key, names = Object.keys(profiles()).sort();
+    box.replaceChildren(...names.map(name => navItem(name, 'config', (profiles()[name] || []).length,
+      location.hash === '#build' && S.profile[k] === name,
+      () => { loadProfile(name); location.hash = '#build'; })));
+  }
+  $('save-profile').disabled = !sd || st.busy;
 }
 
 function profiles() {
@@ -342,7 +595,7 @@ async function boot() {
     $('engine').classList.add('ok');
     renderAbout(r);
     st.ready = true;
-    renderShop();                      // its devices, and its Add buttons on
+    renderLibrary();                   // its devices, and its Add buttons on
   } catch (e) {
     $('engine').textContent = 'The build engine did not load: ' + e.message;
     $('engine').classList.add('bad');
@@ -392,12 +645,12 @@ async function setStock(name, data) {
     }
     $('version').value = S.versions[k] || r.dev.default_version;
     st.nameEdited = false;
-    shop.device = k;                   // the shop follows the stock file
+    lib.device = k;                    // the library follows the stock file
   } else {
     st.enabled.clear();
   }
   renderStock();
-  renderShop();
+  renderLibrary();
   renderCheck(null);                   // no stale result while the check runs again
   renderProfiles();
   await versionChanged();
@@ -687,21 +940,27 @@ function renderMods() {
   }));
   if (!shown.length) {
     rows.append(el('tr', {}, el('td', { colspan: 7, class: 'empty' },
-      dev() ? 'No mods for this firmware yet. Add a mod made for it with "+ Add mods", or browse the mod shop.'
-        : 'Add mods with "+ Add mods", browse the mod shop, or drop .elemod files anywhere on this page.')));
+      dev() ? 'No mods for this firmware yet. Add one from the library, or drop an .elemod file anywhere on this page.'
+        : 'Add mods from the library, or drop .elemod files anywhere on this page.')));
   }
   const n = shown.filter(d => st.enabled.has(d.path)).length;
   $('mod-count').textContent = `${n} of ${shown.length} mods enabled`
     + (hidden ? ` · ${hidden} for other firmware hidden` : '');
   $('enable-all').disabled = $('disable-all').disabled = st.busy || !dev();
   renderDetails();
-  renderShop();                        // what is owned and ticked shows on its cards
+  renderLibrary();                     // what is owned and ticked shows on its cards
+  renderChrome();
 }
 
 function renderDetails() {
   const box = $('details');
   const d = st.selected && desc(st.selected);
   if (!d) { box.replaceChildren(el('p', { class: 'muted' }, 'Select a mod to see what it does and what it changes.')); return; }
+  box.replaceChildren(...detailParts(d));
+}
+
+// what a mod file says about itself (the build view's details, and a card's sheet)
+function detailParts(d) {
   const [cls, text] = rowStatus(d);
   const sec = (title, ...kids) => [el('h4', {}, title), ...kids];
   const parts = [
@@ -742,7 +1001,7 @@ function renderDetails() {
     parts.push(...sec('Licence', el('p', { class: 'muted' }, d.license || 'not stated')));
     parts.push(...sec('File', el('p', { class: 'muted mono' }, `${d.file}\nsha256 ${d.sha256}`)));
   }
-  box.replaceChildren(...parts);
+  return parts;
 }
 
 function renderCheck(r) {
@@ -787,7 +1046,7 @@ function renderBuildButton() {
     ? (d.exact_len ? `exactly ${d.version_len} characters` : `1 to ${d.version_len} characters`) : '';
   $('build').disabled = !(st.ready && d && st.check && st.check.ok && st.versionOk && !st.busy
     && st.checkedFor === [...st.enabled].sort().join('\n'));
-  $('build').textContent = st.busy ? 'BUILDING…' : 'BUILD FIRMWARE';
+  $('build').textContent = st.busy ? 'Building…' : 'Build firmware';
   for (const id of ['version', 'out-name', 'add-mods', 'save-profile', 'delete-profile', 'profile']) {
     $(id).disabled = st.busy || (id !== 'add-mods' && !d);
   }
@@ -795,11 +1054,24 @@ function renderBuildButton() {
 
 function renderProfiles() {
   const sel = $('profile');
-  if (!dev()) { sel.replaceChildren(); return; }
+  if (!dev()) { sel.replaceChildren(); renderChrome(); return; }
   const k = dev().key;
   const names = Object.keys(profiles()).sort();
   sel.replaceChildren(...names.map(n => el('option', { value: n }, n)));
   sel.value = S.profile[k] || names[0] || '';
+  renderChrome();
+}
+
+// a configuration (the window's profile): its mods ticked, those that are here
+function loadProfile(name) {
+  S.profile[dev().key] = name;
+  const names = profiles()[name] || [];
+  st.enabled = new Set(st.mods.filter(d => d.fits && names.includes(d.file)).map(d => d.path));
+  const missing = names.filter(n => !st.mods.some(d => d.file === n));
+  saveSettings();
+  renderProfiles();
+  changed();
+  if (missing.length) note('This configuration also names mods that are not added here: ' + missing.join(', '));
 }
 
 function renderResult(r, ms) {
@@ -910,19 +1182,9 @@ function wire() {
   $('disable-all').addEventListener('click', () => { st.enabled.clear(); remember(); changed(); });
   $('show-other').checked = S.showOther;
   $('show-other').addEventListener('change', e => { S.showOther = e.target.checked; saveSettings(); renderMods(); });
-  const loadProfile = name => {
-    S.profile[dev().key] = name;
-    const names = profiles()[name] || [];
-    st.enabled = new Set(st.mods.filter(d => d.fits && names.includes(d.file)).map(d => d.path));
-    const missing = names.filter(n => !st.mods.some(d => d.file === n));
-    saveSettings();
-    renderProfiles();
-    changed();
-    if (missing.length) note('This profile also names mods that are not added here: ' + missing.join(', '));
-  };
   $('profile').addEventListener('change', e => loadProfile(e.target.value));
   $('save-profile').addEventListener('click', () => {
-    const name = (prompt('Profile name:') || '').trim();
+    const name = (prompt('Name the configuration (the mods ticked now):') || '').trim();
     if (!name) return;
     S.profile[dev().key] = name;
     remember();
@@ -931,7 +1193,7 @@ function wire() {
   $('delete-profile').addEventListener('click', () => {
     const k = dev().key;
     const name = S.profile[k];
-    if (!name || !confirm(`Delete the profile "${name}"? (The mods stay.)`)) return;
+    if (!name || !confirm(`Delete the configuration "${name}"? (The mods stay.)`)) return;
     delete profiles()[name];
     const next = Object.keys(profiles()).sort()[0];
     if (next) {
@@ -968,15 +1230,25 @@ function wire() {
     $('forget').hidden = true;
     try { await Files.clear(); } catch { /* nothing kept */ }
   });
-  $('shop-search').addEventListener('input', e => { shop.query = e.target.value; renderShop(); });
-  $('open-shop').addEventListener('click', openShop);
-  $('close-shop').addEventListener('click', () => $('shop').close());
-  $('cart').addEventListener('click', () => { $('shop').close(); $('step-mods').scrollIntoView({ behavior: 'smooth' }); });
-  // a click on the backdrop (the dialog itself, outside its content) closes it
-  $('shop').addEventListener('click', e => { if (e.target === $('shop')) $('shop').close(); });
+  $('search').addEventListener('input', e => {
+    lib.query = e.target.value;
+    if (location.hash === '#build') location.hash = '#library';
+    renderLibrary();
+  });
+  $('f-device').addEventListener('change', e => setFilter('device', e.target.value || null));
+  $('f-type').addEventListener('change', e => setFilter('type', e.target.value || null));
+  $('f-sort').addEventListener('change', e => setFilter('sort', e.target.value || 'collection'));
+  // the sheets: their close buttons, and a click on the backdrop
+  for (const [sheet, close] of [['mod-sheet', 'sheet-close'], ['about-sheet', 'about-close']]) {
+    $(close).addEventListener('click', () => $(sheet).close());
+    $(sheet).addEventListener('click', e => { if (e.target === $(sheet)) $(sheet).close(); });
+  }
+  $('about-open').addEventListener('click', () => $('about-sheet').showModal());
+  window.addEventListener('hashchange', route);
 }
 
 wire();
+route();
 renderMods();
 renderBuildButton();
 loadShop();

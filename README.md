@@ -26,7 +26,7 @@ file on your own machine, and you flash it the way you flash any OS update.
 ## Install
 
 **In your browser, nothing to install:** <https://irpina.github.io/elekloader/>.
-Drop in your stock OS file, add your mods or browse the mod shop, tick them,
+Drop in your stock OS file, add mods from its library or your own, tick them,
 build, and download the `.syx` (and, for the Octatrack, the `.bin`). The build runs in the page, in
 Python compiled to WebAssembly ([Pyodide](https://pyodide.org)), with
 elekloader's own code, unchanged. The page shows its version and commit, and
