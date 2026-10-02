@@ -10,126 +10,186 @@
 <meta name="referrer" content="no-referrer">
 <title>elekloader</title>
 <meta name="description" content="Custom firmware for Elektron devices, built in your browser from your own stock OS file and the mods you choose. Nothing is uploaded.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%2305080f'/%3E%3Cpath d='M13.5 2 5 13.5h6L10 22l9-12h-6.2z' fill='%23ffe14a'/%3E%3C/svg%3E">
-<meta name="theme-color" content="#05080f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23f5cf45'/%3E%3Cpath d='M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z' fill='%23161616'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#131316">
 <link rel="stylesheet" href="style.css">
 <script type="module" src="app.js"></script>
 </head>
 <body>
-<header class="top">
-  <div class="brand"><span class="b1">ELEK</span><svg class="bolt" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.5h6L10 22l9-12h-6.2z"/></svg><span class="b2">LOADER</span>
-    <span class="sub">mods for Elektron firmware, built in your browser</span></div>
-  <div class="engine" id="engine" role="status">Powering up the build engine&hellip;</div>
+<div class="app">
+
+<aside class="side" aria-label="Navigation">
+  <a class="brand" href="#library" aria-label="elekloader: the mods">
+    <span class="mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg></span>
+    <span class="brand-text"><strong>elekloader</strong><small>Elektron firmware mods</small></span></a>
+  <nav class="side-nav">
+    <a class="nav-link" id="nav-library" href="#library">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>Mods</a>
+    <a class="nav-link" id="nav-build" href="#build">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg>Build<span class="badge" id="nav-count">0</span></a>
+    <h3 class="side-h">Kinds</h3>
+    <ul class="side-list" id="nav-types"></ul>
+    <h3 class="side-h">Your setup
+      <button type="button" class="round" id="save-profile" title="Save the ticked mods as a new profile" aria-label="New profile">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></h3>
+    <ul class="rows" id="side-rows"></ul>
+  </nav>
+  <div class="side-foot">
+    <p class="engine" id="engine" role="status">Starting the build engine&hellip;</p>
+    <p class="fine">Unofficial: not affiliated with Elektron. Nothing is uploaded, and no firmware is hosted
+      here. <button type="button" class="linkish" id="about-open">About, licences, how to recover</button></p>
+  </div>
+</aside>
+
+<header class="topbar" id="topbar">
+  <label class="search"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+    <input type="search" id="search" placeholder="Search mods" aria-label="Search mods" autocomplete="off"></label>
+  <span class="grow"></span>
+  <a class="btn outline" href="#build" id="cfg-btn">
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg>Build<span class="count" id="cfg-count">0</span></a>
 </header>
 
-<section class="notice" aria-label="About this page">
-  <p><strong>Nothing is uploaded.</strong> Your stock OS file and your mods stay in this browser
-    tab; the build runs here, in Python compiled to WebAssembly. <strong>No firmware is hosted on
-    this site</strong>: you bring Elektron's file. elekloader is not affiliated with Elektron, and
-    flashing custom firmware is at your own risk.</p>
-  <p class="links"><a href="https://github.com/irpina/elekloader#readme" rel="noreferrer">README</a>
-    &middot; <a href="https://github.com/irpina/elekloader#flash-it" rel="noreferrer">How to flash, and how to recover</a>
-    &middot; <a href="https://github.com/irpina/elekloader" rel="noreferrer">Source</a></p>
-</section>
-
-<main>
-  <section class="step" id="step-stock">
-    <h2><span class="n">1</span> Your stock OS file</h2>
-    <div class="drop" id="stock-drop" tabindex="0" role="button" aria-describedby="stock-hint">
-      <p class="big">Drop the stock OS file Elektron publishes for your device here, or
-        <span class="like-link">choose it</span>.</p>
-      <p class="need" id="stock-need" hidden></p>
-      <p class="muted" id="stock-hint">A <code>.syx</code>, a <code>.bin</code> (Octatrack), or
-        Elektron's <code>.zip</code> as you downloaded it. It is recognised by its hash.</p>
-      <input type="file" id="stock-file" accept=".syx,.bin,.zip" hidden>
-    </div>
-    <div class="stock" id="stock" hidden></div>
-    <label class="remember"><input type="checkbox" id="remember">
-      Keep my stock file and mods in this browser for next time (IndexedDB: they stay on this
-      computer, in this browser)</label>
-    <button type="button" class="tool small" id="forget" hidden>Forget them</button>
-  </section>
-
-  <section class="step" id="step-mods">
-    <h2><span class="n">2</span> Your mods</h2>
-    <div class="bar">
-      <button type="button" class="tool" id="add-mods">+ Add mods&hellip;</button>
-      <input type="file" id="mod-files" accept=".elemod,.dtmod" multiple hidden>
-      <button type="button" class="shop-open" id="open-shop" hidden>or browse the mod shop</button>
-      <button type="button" class="tool" id="enable-all">Enable all</button>
-      <button type="button" class="tool" id="disable-all">Disable all</button>
-      <label class="inline"><input type="checkbox" id="show-other"> Show mods for other firmware</label>
+<main class="content" id="content">
+  <section class="view" id="view-library" aria-labelledby="lib-title">
+    <header class="page-head">
+      <p class="eyebrow">Library</p>
+      <h1 id="lib-title">Mods</h1>
+      <p class="sub">New tricks for your Elektron box. Pick the mods, bring your own stock OS file, and the
+        firmware is built right here: nothing leaves this tab.</p>
+    </header>
+    <div class="filters">
+      <span class="chips" id="device-buttons" role="group" aria-label="Device"></span>
       <span class="grow"></span>
-      <span class="group">
-        <label class="inline" for="profile">Profile</label>
-        <select id="profile"></select>
-        <button type="button" class="tool" id="save-profile">Save as&hellip;</button>
-        <button type="button" class="tool" id="delete-profile">Delete</button>
-      </span>
+      <label class="inline" for="f-sort">Sort</label>
+      <select id="f-sort">
+        <option value="collection">As listed</option>
+        <option value="name">Name</option>
+        <option value="device">Device</option>
+      </select>
+      <button type="button" class="btn outline small" id="add-mods">+ Your .elemod</button>
+      <input type="file" id="mod-files" accept=".elemod,.dtmod" multiple hidden>
     </div>
-    <div class="mods">
-      <table id="mod-table">
-        <thead><tr><th class="on"><span class="sr">Enabled</span></th><th>Mod</th><th>Version</th>
-          <th>Status</th><th class="num">RAM</th><th class="num">Order</th><th class="x"><span class="sr">Remove</span></th></tr></thead>
-        <tbody id="mod-rows"></tbody>
-      </table>
-      <p class="muted" id="mod-count"></p>
-      <aside class="details" id="details" aria-live="polite"></aside>
-    </div>
+    <p class="device-note" id="device-note"></p>
+    <div class="shelves" id="lib-cards"></div>
+    <p class="muted small lib-foot">Every mod here comes from its author's release, checked by its sha256
+      against the site's list. Your own <code>.elemod</code> files appear here too, under Your files.</p>
   </section>
 
-  <section class="step" id="step-check">
-    <h2><span class="n">3</span> Check</h2>
-    <div id="check" class="check" aria-live="polite"><p class="muted">Choose your stock OS file first.</p></div>
-  </section>
+  <section class="view" id="view-build" aria-labelledby="build-title" hidden>
+    <header class="page-head head-build">
+      <div class="tile" id="build-cover"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg></div>
+      <div class="head-text">
+        <p class="eyebrow" id="build-eyebrow">Build</p>
+        <h1 id="build-title">Your firmware</h1>
+        <p class="sub" id="build-sub">Drop in your stock OS file, check the mods you ticked, and build.</p>
+      </div>
+    </header>
+    <div class="build-grid">
+      <div class="col">
+        <section class="step" id="step-stock">
+          <h2><span class="n">01</span>Your stock OS file</h2>
+          <div class="drop" id="stock-drop" tabindex="0" role="button" aria-describedby="stock-hint">
+            <svg class="drop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+            <p class="big">Drop the stock OS file Elektron publishes for your device here, or
+              <span class="like-link">choose it</span>.</p>
+            <p class="need" id="stock-need" hidden></p>
+            <p class="muted small" id="stock-hint">A <code>.syx</code>, a <code>.bin</code> (Octatrack), or
+              Elektron's <code>.zip</code> as you downloaded it. It is recognised by its hash, and never uploaded.</p>
+            <input type="file" id="stock-file" accept=".syx,.bin,.zip" hidden>
+          </div>
+          <div class="stock" id="stock" hidden></div>
+          <label class="remember"><input type="checkbox" id="remember">
+            Keep my stock file and mods in this browser for next time</label>
+          <button type="button" class="btn outline small" id="forget" hidden>Forget them</button>
+        </section>
 
-  <section class="step" id="step-build">
-    <h2><span class="n">4</span> Build</h2>
-    <div class="buildrow">
-      <label>OS version shown <input id="version" size="11" autocomplete="off" spellcheck="false"></label>
-      <span class="muted" id="version-rule"></span>
-      <label class="grow">File name <input id="out-name" autocomplete="off" spellcheck="false"></label>
-      <button type="button" class="accent" id="build" disabled>BUILD FIRMWARE</button>
-    </div>
-    <p class="bad" id="version-error" hidden></p>
-    <div class="progress" id="progress" hidden>
-      <div class="bar-track"><div class="bar-fill" id="progress-fill"></div></div>
-      <p id="progress-stage"></p>
-      <ol class="log" id="progress-log"></ol>
-    </div>
-  </section>
+        <section class="step" id="step-mods">
+          <h2><span class="n">02</span>Your mods <span class="tally" id="mod-count"></span></h2>
+          <div class="bar">
+            <label class="inline" for="profile">Profile</label>
+            <select id="profile"></select>
+            <button type="button" class="btn outline small" id="delete-profile">Delete</button>
+            <span class="grow"></span>
+            <button type="button" class="btn outline small" id="enable-all">Enable all</button>
+            <button type="button" class="btn outline small" id="disable-all">Disable all</button>
+            <a class="btn outline small" href="#library">+ More mods</a>
+          </div>
+          <table id="mod-table" class="tracks">
+            <thead><tr><th class="on"><span class="sr">Enabled</span></th><th>Mod</th><th>Version</th>
+              <th>Status</th><th class="num">RAM</th><th class="num">Order</th><th class="x"><span class="sr">Remove</span></th></tr></thead>
+            <tbody id="mod-rows"></tbody>
+          </table>
+          <label class="remember"><input type="checkbox" id="show-other"> Show mods for other firmware</label>
+          <aside class="details" id="details" aria-live="polite"></aside>
+        </section>
+      </div>
 
-  <section class="step" id="step-result" hidden>
-    <h2><span class="n">5</span> Your firmware</h2>
-    <div id="result"></div>
+      <div class="col">
+        <section class="step" id="step-check">
+          <h2><span class="n">03</span>Check</h2>
+          <div id="check" class="check" aria-live="polite"><p class="muted">Choose your stock OS file first.</p></div>
+        </section>
+
+        <section class="step" id="step-build">
+          <h2><span class="n">04</span>Build</h2>
+          <div class="buildrow">
+            <label>OS version shown <input id="version" size="11" autocomplete="off" spellcheck="false"></label>
+            <span class="muted small" id="version-rule"></span>
+          </div>
+          <div class="buildrow">
+            <label class="grow">File name <input id="out-name" autocomplete="off" spellcheck="false"></label>
+          </div>
+          <p class="bad" id="version-error" hidden></p>
+          <button type="button" class="btn primary wide" id="build" disabled>Build firmware</button>
+          <p class="muted small">Built here, in this tab. This page never talks to your device: you flash
+            the result yourself, like any OS update.</p>
+          <div class="progress" id="progress" hidden>
+            <div class="bar-track"><div class="bar-fill" id="progress-fill"></div></div>
+            <p id="progress-stage"></p>
+            <ol class="log" id="progress-log"></ol>
+          </div>
+        </section>
+
+        <section class="step" id="step-result" hidden>
+          <h2><span class="n">05</span>Your firmware</h2>
+          <div id="result"></div>
+        </section>
+      </div>
+    </div>
   </section>
 </main>
 
-<dialog class="shop" id="shop" aria-labelledby="shop-title">
-  <div class="shop-head">
-    <h2 id="shop-title">The mod shop</h2>
-    <button type="button" class="cart" id="cart"></button>
-    <button type="button" class="close" id="close-shop" aria-label="Close the shop">&times;</button>
-  </div>
-  <div class="shop-body">
-    <div class="shop-bar">
-      <div class="device-pick" role="group" aria-labelledby="pick-label">
-        <span class="pick-label" id="pick-label">Select your device</span>
-        <span class="pick-buttons" id="device-buttons"></span>
-      </div>
-      <input type="search" id="shop-search" placeholder="Search the shop" aria-label="Search the shop" autocomplete="off">
-    </div>
-    <p class="device-note" id="device-note"></p>
-    <div class="cards" id="shop-cards"></div>
-    <p class="muted small">Every mod here comes from its author's release, checked against the
-      shop's list by its sha256. Add one and it joins your mods, ticked with the core it needs.</p>
-  </div>
+<nav class="tabbar" aria-label="Views">
+  <a class="tab" id="tab-library" href="#library">
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>Mods</a>
+  <a class="tab" id="tab-build" href="#build">
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg>Build<span class="badge" id="tab-count">0</span></a>
+  <button type="button" class="tab" id="tab-about">
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8v.01"/></svg>About</button>
+</nav>
+</div>
+
+<dialog class="sheet" id="mod-sheet" aria-labelledby="sheet-title">
+  <div class="sheet-h"><h2 id="sheet-title"></h2>
+    <button type="button" class="round" id="sheet-close" aria-label="Close">&times;</button></div>
+  <div class="sheet-body" id="sheet-body"></div>
 </dialog>
 
-<footer>
-  <p id="about"></p>
-  <p>GPL-2.0-or-later: <a href="LICENSE.txt">LICENSE</a> &middot; <a href="NOTICE.txt">NOTICE</a>
-    &middot; <a href="pyodide/NOTICE.txt">Pyodide and Python's licences</a></p>
-</footer>
+<dialog class="sheet" id="about-sheet" aria-labelledby="about-title">
+  <div class="sheet-h"><h2 id="about-title">About elekloader</h2>
+    <button type="button" class="round" id="about-close" aria-label="Close">&times;</button></div>
+  <div class="sheet-body">
+    <p><strong>Nothing is uploaded.</strong> Your stock OS file and your mods stay in this browser tab;
+      the build runs here, in Python compiled to WebAssembly. <strong>No firmware is hosted on this
+      site</strong>: you bring Elektron's file. elekloader is an independent project, not affiliated with,
+      endorsed by or supported by Elektron, and flashing custom firmware is at your own risk.</p>
+    <p><a href="https://github.com/irpina/elekloader#flash-it" rel="noreferrer">How to flash, and how to recover</a>
+      &middot; <a href="https://github.com/irpina/elekloader#readme" rel="noreferrer">README</a>
+      &middot; <a href="https://github.com/irpina/elekloader" rel="noreferrer">Source</a></p>
+    <p id="about" class="muted small"></p>
+    <p class="small">GPL-2.0-or-later: <a href="LICENSE.txt">LICENSE</a> &middot; <a href="NOTICE.txt">NOTICE</a>
+      &middot; <a href="pyodide/NOTICE.txt">Pyodide and Python's licences</a></p>
+  </div>
+</dialog>
 </body>
 </html>
