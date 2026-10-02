@@ -7,9 +7,22 @@ for the Octatrack, the `.bin`), with the build manifest. The build runs in
 the page. Nothing is uploaded, and the site hosts no firmware.
 
 The page is an app with two views:
-- **Mods** (`#library`): every mod as a card, on a shelf per kind (Sampling,
-  Performance, ...; your own files last). The sidebar's Kinds, the device
-  chips and the search filter it, and Sort orders it.
+- **Mods** (`#library`), where the page opens. Until a stock file is in, it
+  starts with **Get started**: what the page does, and three steps.
+  1. **Pick your device**: a tile per device, with its OS versions and how
+     many mods it has. It also filters the cards.
+  2. **Add its stock OS file**: a link to the device's page on Elektron's
+     site, for its newest OS, and a drop zone. A file that is not a stock OS
+     gets a message naming the files the page knows.
+  3. **Add mods, then build**, with a link to how to flash and how to go
+     back.
+
+  Once a stock file is in, the head shows the device and OS, and a strip of
+  what is done and what is next: **✓ Stock OS**, then **+ Add** a mod (or
+  **✓ n mods in your build**), then **Build your firmware**. Below are the
+  mods, every mod as a card on a shelf per kind (Sampling, Performance, ...;
+  your own files last). The sidebar's Kinds, the device chips and the search
+  filter them, and Sort orders them.
 - **Build** (`#build`): your stock OS file, your mods (the list, the profile,
   the details), the check, and Build firmware, then the downloads.
 
