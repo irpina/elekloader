@@ -137,6 +137,24 @@ const cmpVer = (a, b) => String(a).localeCompare(String(b), undefined, { numeric
 const shopItem = d => shop.items.find(e => e.available && e.sha256 === d.sha256);
 const owned = e => st.mods.find(d => !d.builtin && d.sha256 === e.sha256);
 
+// One card per mod: its files for each OS version of a device (a mod's ports)
+// are one card, oldest OS first.
+function shopGroups(items) {
+  const m = new Map();
+  for (const e of items) {
+    const k = [e.repo, e.id || e.title, e.version, e.device].join('|');
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(e);
+  }
+  return [...m.values()].map(g => g.sort((a, b) => cmpVer(a.os || '', b.os || '')));
+}
+
+// The file a card offers: the one for the stock file's OS, else its newest OS's.
+function shopPick(g) {
+  const sd = dev();
+  return (sd && g.find(e => e.device === sd.key && e.os === st.stock.os)) || g[g.length - 1];
+}
+
 async function loadShop() {
   try {
     const r = await fetch(new URL('shop/index.json', import.meta.url));
@@ -177,7 +195,7 @@ function renderShop() {
   const devs = pickable();
   const sd = dev();
   $('device-buttons').replaceChildren(...[{ key: null, name: 'All' }, ...devs].map(d => {
-    const n = shop.items.filter(e => !d.key || e.device === d.key).length;
+    const n = shopGroups(shop.items.filter(e => !d.key || e.device === d.key)).length;
     const on = shop.device === d.key;
     return el('button', { type: 'button', class: 'pick' + (on ? ' on' : ''), 'aria-pressed': String(on),
       onclick: () => pickDevice(d.key) },
@@ -195,8 +213,8 @@ function renderShop() {
   const n = st.enabled.size;
   $('cart').textContent = n ? `⚡ ${n} in your build: done` : 'Done';
   const q = shop.query.trim().toLowerCase();
-  const list = shop.items.filter(e => (!shop.device || e.device === shop.device)
-    && (!q || [e.title, e.id, e.summary, e.description, e.category, e.author].join(' ').toLowerCase().includes(q)));
+  const list = shopGroups(shop.items.filter(e => (!shop.device || e.device === shop.device)
+    && (!q || [e.title, e.id, e.summary, e.description, e.category, e.author].join(' ').toLowerCase().includes(q))));
   $('shop-cards').replaceChildren(...list.map(card));
   if (!list.length) {
     $('shop-cards').append(el('p', { class: 'empty muted' }, q ? 'Nothing in the shop matches that.'
@@ -205,19 +223,26 @@ function renderShop() {
   renderNeed();
 }
 
-function card(e) {
-  const have = owned(e);
+function card(g) {
+  const e = shopPick(g);
+  // with a stock file, the file for its OS; before one, every OS's (the window hides the others)
+  const files = dev() ? [e] : g.filter(x => x.available);
+  const haves = files.map(owned).filter(Boolean);
+  const have = files.length && haves.length === files.length ? haves : null;
   const otherOs = dev() && dev().key === e.device && e.os && e.os !== st.stock.os;
   const fitsStock = dev() && dev().key === e.device && !otherOs;
+  const oses = g.map(x => x.os).filter(Boolean);
   let action;
   if (!e.available) {
     action = el('button', { type: 'button', class: 'buy', disabled: true }, 'Not released yet');
   } else if (have) {
-    action = el('span', { class: 'have' }, st.enabled.has(have.path) ? '✓ In your build' : '✓ In your mods',
-      el('button', { type: 'button', class: 'linkish', disabled: st.busy, onclick: () => removeMod(have.path) }, 'Remove'));
+    action = el('span', { class: 'have' }, have.some(d => st.enabled.has(d.path)) ? '✓ In your build' : '✓ In your mods',
+      el('button', { type: 'button', class: 'linkish', disabled: st.busy,
+        onclick: () => removeMods(have.map(d => d.path)) }, 'Remove'));
   } else {
     action = el('button', { type: 'button', class: 'buy', disabled: !st.ready || st.busy,
-      onclick: ev => shopAdd(e, ev.currentTarget) }, fitsStock || !dev() ? 'Add to build' : 'Add to my mods');
+      onclick: ev => shopAdd(files.filter(x => !owned(x)), ev.currentTarget) },
+    fitsStock || !dev() ? 'Add to build' : 'Add to my mods');
   }
   const needs = (e.requires || []).map(r => (r === 'core' && e.needs_core ? `core ${e.needs_core} or newer` : r));
   const facts = e.available ? [`${e.sites} patch sites`, e.ram ? `${kb(e.ram)} of RAM` : '',
@@ -226,32 +251,43 @@ function card(e) {
   const device = e.device_name || (pickable().find(d => d.key === e.device) || {}).name || e.device;
   return el('article', { class: 'card' + (e.available ? '' : ' unavailable') + (have ? ' owned' : '') },
     el('div', { class: 'card-top' }, e.category ? el('span', { class: 'chip' }, e.category) : '',
-      el('span', { class: 'chip dev' }, device + (e.os ? ' · OS ' + e.os : ''))),
+      el('span', { class: 'chip dev' }, device + (oses.length ? ' · OS ' + oses.join(', ') : ''))),
     el('h3', {}, e.title, ' ', el('span', { class: 'ver' }, e.version || '')),
     el('p', { class: 'by' }, [e.author && 'by ' + e.author, e.license].filter(Boolean).join(' · ')),
     el('p', { class: 'summary' }, e.summary || e.description || ''),
     otherOs ? el('p', { class: 'muted small' }, `Made for OS ${e.os}; your stock file is OS ${st.stock.os}.`) : '',
     e.available ? el('details', { class: 'more' }, el('summary', {}, 'More'),
       el('p', { class: 'desc' }, e.description), el('p', { class: 'muted small' }, facts),
-      el('p', { class: 'muted small mono' }, `${e.file}\nsha256 ${e.sha256}`))
+      el('p', { class: 'muted small mono' }, g.filter(x => x.available)
+        .map(x => `${x.file}${g.length > 1 ? ` (OS ${x.os})` : ''}\nsha256 ${x.sha256}`).join('\n')))
       : el('p', { class: 'muted small' }, `Its release (${e.tag}) is not published yet.`),
     el('div', { class: 'card-foot' }, action,
       el('a', { href: e.available ? e.homepage : e.release_url, rel: 'noreferrer', class: 'src' }, 'Source')));
 }
 
-async function shopAdd(e, btn) {
+// a card's files (one, or before a stock file every OS's): added, and the one
+// that fits the stock file ticked
+async function shopAdd(files, btn) {
   btn.disabled = true;
   btn.textContent = 'Adding…';
+  const e = files[0];
   try {
-    const r0 = await fetch(new URL('shop/' + e.file, import.meta.url));
-    if (!r0.ok) throw new Error(`${e.file}: ${r0.status} ${r0.statusText}`);
-    const r = await addMod(e.file, await r0.arrayBuffer(), false, e.sha256);
-    if (!r.ok) throw new Error(r.error);
-    await refresh();
-    if (dev() && r.mod.fits) await tickWithCore(r.mod.path);
+    let ticked = false;
+    for (const x of files) {
+      const r0 = await fetch(new URL('shop/' + x.file, import.meta.url));
+      if (!r0.ok) throw new Error(`${x.file}: ${r0.status} ${r0.statusText}`);
+      const r = await addMod(x.file, await r0.arrayBuffer(), false, x.sha256);
+      if (!r.ok) throw new Error(r.error);
+      await refresh();
+      if (dev() && r.mod.fits) {
+        await tickWithCore(r.mod.path);
+        ticked = true;
+      }
+    }
     remember();
     changed();
-    toast(`${e.title} ${e.version} added` + (dev() && r.mod.fits ? ' and ticked.' : ' to your mods.'));
+    toast(`${e.title} ${e.version} added` + (ticked ? ' and ticked.' : files.length > 1
+      ? ` to your mods, for OS ${files.map(x => x.os).join(' and ')}.` : ' to your mods.'));
   } catch (err) {
     note('Not added: ' + err.message);
     renderShop();
@@ -415,14 +451,21 @@ async function addMods(files) {
 }
 
 async function removeMod(p) {
-  const d = desc(p);
-  if (!d || d.builtin) return;
-  if (!confirm(`Remove ${d.title} (${d.file})?`)) return;
-  await engine.call('remove_mod', { path: p });
-  st.modFiles.delete(d.file);
-  Files.del('mod:' + d.file).catch(() => {});
-  st.enabled.delete(p);
-  if (st.selected === p) st.selected = null;
+  return removeMods([p]);
+}
+
+// several files, one question (a shop card's files for each OS)
+async function removeMods(paths) {
+  const ds = paths.map(desc).filter(d => d && !d.builtin);
+  if (!ds.length) return;
+  if (!confirm(`Remove ${ds[0].title} (${ds.map(d => d.file).join(', ')})?`)) return;
+  for (const d of ds) {
+    await engine.call('remove_mod', { path: d.path });
+    st.modFiles.delete(d.file);
+    Files.del('mod:' + d.file).catch(() => {});
+    st.enabled.delete(d.path);
+    if (st.selected === d.path) st.selected = null;
+  }
   await refresh();
   remember();
   changed();

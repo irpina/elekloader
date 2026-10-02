@@ -50,6 +50,12 @@ title, version, author, licence and what it changes (from the mod file
 itself), with a one-line summary from the catalog. **Add to build** puts
 the mod in your mods and ticks it with what it requires.
 
+A mod built for several OS versions of a device (its files for 1.53 and
+1.54, say) is one card, which lists the OS versions it has. With a stock
+file dropped in, the card adds the file for that OS; before one, it adds
+every OS's file, and the list shows the one that fits once you drop in your
+stock file.
+
 - **The list** is `web/catalog.json`, committed and edited by hand. Each
   item names a file of a GitHub release (`repo`, `tag`, `file`), its
   `sha256`, its `device`, and optionally `needs_core` (the oldest core
@@ -70,7 +76,8 @@ the mod in your mods and ticks it with what it requires.
 To add a mod to the shop, publish its `.elemod` in a GitHub release, add an
 item to `web/catalog.json` with the asset's sha256 (the release page shows
 it, or `gh release view --json assets`), and merge: the next deploy takes
-it.
+it. A mod with a file for each OS version gets an item per file; the page
+shows them as one card (the same repository, mod, version and device).
 
 ## What stays private, and how
 
