@@ -322,27 +322,9 @@ def _locator(ob, image, dev):
     return where
 
 
-def load_remix(ob, name):
-    """octabam's remix `name` -> {'name', 'doc', 'modules' (keys), 'stock' (the stock
-    effects' keys), 'harvested' (stock effects with DSP code on neither FX menu)}."""
-    from remix import registry, stock     # octabam's tools/remix
-    try:
-        r = ob.call(registry.remix, name)
-    except (Exception, SystemExit) as e:    # its own code: report it as a refusal
-        raise Refused('no remix %s in the checkout (%s)' % (name, e))
-    allm = ob.call(registry.modules)
-    st = frozenset(k for k, m in allm.items() if getattr(m, 'is_stock', False))
-    listed = set(r.modules) | set(getattr(r, 'fx1', None) or ())
-    spans = ob.call(stock.p_spans, 'A')
-    return {'name': r.name, 'doc': r.doc, 'modules': tuple(r.modules), 'stock': st,
-            'harvested': sorted(k for k in st if k not in listed and k in spans)}
-
-
-def build_reference(ob, name, image):
-    """octabam's own build of remix `name` (tools/build/build_bus.py, in the checkout, which
-    writes its out/mainos_bus.bin) -> that main OS image. It needs the checkout's
-    out/raw/section_3_MAIN_OS.bin to be this stock OS (written if missing), its dsp_asm
-    (`make setup` builds it), and m68k-elf binutils on the PATH."""
+def stock_raw(ob, image):
+    """The checkout's out/raw/section_3_MAIN_OS.bin, the stock image octabam's tools read
+    (`make recon` writes it): written from this stock OS if missing, refused if it differs."""
     raw = os.path.join(ob.root, 'out', 'raw', 'section_3_MAIN_OS.bin')
     if os.path.exists(raw):
         with open(raw, 'rb') as fh:
@@ -353,6 +335,34 @@ def build_reference(ob, name, image):
         os.makedirs(os.path.dirname(raw), exist_ok=True)
         with open(raw, 'wb') as fh:
             fh.write(image)
+
+
+def load_remix(ob, name):
+    """octabam's remix `name` -> {'name', 'doc', 'modules' (keys), 'stock' (the stock
+    effects' keys), 'harvested' (stock effects with DSP code on neither FX menu)}. Its
+    stock tables read the checkout's stock image (stock_raw)."""
+    from remix import registry, stock     # octabam's tools/remix
+    try:                                    # its own code: report a failure as a refusal
+        r = ob.call(registry.remix, name)
+    except (Exception, SystemExit) as e:
+        raise Refused('no remix %s in the checkout (%s)' % (name, e))
+    try:
+        allm = ob.call(registry.modules)
+        spans = ob.call(stock.p_spans, 'A')
+    except (Exception, SystemExit) as e:
+        raise Refused('octabam\'s stock tables do not load (%s)' % e)
+    st = frozenset(k for k, m in allm.items() if getattr(m, 'is_stock', False))
+    listed = set(r.modules) | set(getattr(r, 'fx1', None) or ())
+    return {'name': r.name, 'doc': r.doc, 'modules': tuple(r.modules), 'stock': st,
+            'harvested': sorted(k for k in st if k not in listed and k in spans)}
+
+
+def build_reference(ob, name, image):
+    """octabam's own build of remix `name` (tools/build/build_bus.py, in the checkout, which
+    writes its out/mainos_bus.bin) -> that main OS image. It needs the checkout's
+    out/raw/section_3_MAIN_OS.bin to be this stock OS (stock_raw), its dsp_asm (`make
+    setup` builds it), and m68k-elf binutils on the PATH."""
+    stock_raw(ob, image)
     if not os.path.isfile(os.path.join(ob.root, 'vendor', 'dsp56300', 'build', 'source',
                                        'dsp_host', 'dsp_asm')):
         raise Refused('octabam\'s build needs its DSP assembler (vendor/dsp56300 .../dsp_asm: '
@@ -728,10 +738,11 @@ def convert(ob, name, image, dev, rx=None):
             notes.append('it leaves %s off both FX menus, as the remix does: octabam\'s build '
                          'gives their DSP code space to the remix\'s DSP code'
                          % ', '.join(rx['harvested']))
-        for n in names_:
+        for n in names_:                    # for the reader: the build placed these words
             if hooked_dsp(ob.modules[n]):
-                files['dsp/%s' % os.path.basename(ob.modules[n].dsp.asm)] = \
-                    open(os.path.join(ob.root, *ob.modules[n].dsp.asm.split('/')), 'rb').read()
+                asm = ob.modules[n].dsp.asm
+                with open(os.path.join(ob.root, *asm.split('/')), 'rb') as fh:
+                    files['dsp/%s' % os.path.basename(asm)] = fh.read()
     if names:
         notes.append('its claims are named resources, one per 16-byte block: a mod that '
                      'claims any of the same blocks is refused beside it')
@@ -1156,6 +1167,7 @@ def main(argv=None):
             continue
         try:
             if is_remix:
+                stock_raw(ob, image)
                 rx = load_remix(ob, n)
                 if a.reference:
                     with open(a.reference, 'rb') as fh:

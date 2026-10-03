@@ -574,6 +574,7 @@ def test_real_usb_io_remix_equals_octabams_build():
         raise Skip('the configured assembler is not bare metal (ELEKLOADER_CROSS=m68k-elf-)')
     name = 'usb-io-tracks-main-cue-ab'
     try:
+        octabam.stock_raw(ob, img)
         rx = octabam.load_remix(ob, name)
         rx['ref'] = octabam.build_reference(ob, name, img)
     except octabam.Refused as e:
