@@ -1,5 +1,5 @@
 {
-  "about": "The mod shop's curated list. The pages workflow takes each file from its author's GitHub release, checks it against the sha256 here, and puts it on the site; nothing here is committed but this list. Only mods whose licence allows passing them on. kind 'core': a core the listed mods need, added to the site's cores. needs_core: the oldest core version the mod links with. license: only for a file that names none (then the repository's licence).",
+  "about": "The mod shop's curated list. The pages workflow takes each file from its author's GitHub release, checks it against the sha256 here, and puts it on the site; nothing here is committed but this list. Only mods whose licence allows passing them on. kind 'core': a core the listed mods need, added to the site's cores. needs_core: the oldest core version the mod links with. on_unit: what has been checked on real hardware, shown in the details sheet. license: only for a file that names none (then the repository's licence).",
   "items": [
     {
       "repo": "irpina/digislicer", "tag": "v2.1", "file": "core-2.1.elemod", "kind": "core",
@@ -57,205 +57,239 @@
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-tuner-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "1e2447d88c953b09584bcd0b84a9b7733bb87264b6542169d0f2686f9762dff6",
-      "summary": "Boots on an MKII; untested in use. UP + TEMPO opens a tuner for the current audio track."
+      "summary": "UP + TEMPO opens a tuner for the current audio track.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-synth-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "6d5b9ff2a9f2d957fea17b556415e76d7b8ebbc39a2f8f720f4273e4eba72a43",
-      "summary": "Boots on an MKII; untested in use. A FLEX track with an FMSYNTH* sample plays a two-operator FM voice."
+      "summary": "A FLEX track with an FMSYNTH* sample plays a two-operator FM voice.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-quantizer-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "cabc7e126796ab3bd4574e78ab9c0ea69031128278f95a2f8b03e0d6e655f1b6",
-      "summary": "Boots on an MKII; untested in use. PTCH and CHROMATIC keys follow one of 24 scales, with root and glide."
+      "summary": "PTCH and CHROMATIC keys follow one of 24 scales, with root and glide.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-repitch-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "1d53f38f6b2bd0541c4dc2e6196859e68464f4f9339537c26a447e56b7f1ae33",
-      "summary": "Boots on an MKII; untested in use. TSTR REPITCH: follow the project tempo by playback speed, no grains."
+      "summary": "TSTR REPITCH: follow the project tempo by playback speed, no grains.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-direct-jump-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "53169664f2aa8073720c9e2422dfc58bcd6f472c56dff7e0b7193723b2dd9310",
-      "summary": "Boots on an MKII; untested in use. CHAIN AFTER DIRECT: a pattern change lands at the next step, as on Rytm."
+      "summary": "CHAIN AFTER DIRECT: a pattern change lands at the next step, as on Rytm.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-rlen-plen-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "a4af12dc94910a7e52bc94d63cb0a672f92c51aae3fdef582abab524d830f98d",
-      "summary": "Boots on an MKII; untested in use. RLEN PLEN: TRIG ONE + QREC PLEN records one pass of the pattern."
+      "summary": "RLEN PLEN: TRIG ONE + QREC PLEN records one pass of the pattern.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-midi-scenes-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "3d06bb5e9dfcc6789c2d39a5b78ddf9ec770e4c4d6a38fd30f7e4d14ae39e1e3",
-      "summary": "Boots on an MKII; untested in use. MIDI scene locks: hold, morph, save, reload, copy. Not with SCENES P2."
+      "summary": "MIDI scene locks: hold, morph, save, reload, copy. Not with SCENES P2.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-scenes-p2-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "5609e2eabb3ac09374e6c8bbb5a9577568f6e39dfbde589a83b89c7fd8157a27",
-      "summary": "Boots on an MKII; untested in use. Scene locks and the crossfader on FX1/FX2 page 2. Not with MIDI SCENES."
+      "summary": "Scene locks and the crossfader on FX1/FX2 page 2. Not with MIDI SCENES.",
+      "on_unit": "Boots on an Octatrack MKII (3 Oct 2026); its features are not yet tested on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-cc-map-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "a57eff6a7ca72bd2c20a002ee7073ee95a5365f9cf971b2aedb8e3ee9da0e2c3",
-      "summary": "Boots on an MKII; untested in use. MIDI CC 62-67 play FX2's page-2 knobs, 68-73 FX1's."
+      "summary": "MIDI CC 62-67 play FX2's page-2 knobs, 68-73 FX1's.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-cc-feedback-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "6d994b332c9d9844be6879e550b3024ce692a4f6812bf0892dabd3ee1e6dd476",
-      "summary": "Boots on an MKII; untested in use. Every knob change goes out as its MIDI CC, so controllers follow."
+      "summary": "Every knob change goes out as its MIDI CC, so controllers follow.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-recorder-hold-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "55dbd9ba0997cc7628b2ca0922b91b177cfadd52d56f310851d89b3e7d783c74",
-      "summary": "Boots on an MKII; untested in use. A FLEX voice past a recording's end holds its last sample, not zero."
+      "summary": "A FLEX voice past a recording's end holds its last sample, not zero.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-recorder-spacing-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "d9fe947770d36a36c37f37221eb32d6ef6728ba46300670624e865624a4b7849",
-      "summary": "Boots on an MKII; untested in use. A fixed-RLEN recording lasts exactly until the next arm."
+      "summary": "A fixed-RLEN recording lasts exactly until the next arm.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-flex-seekbind-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "fb995dcdac85c3492830ed23816d6afe16dc74127f23838b3ffdbed03ff79466",
-      "summary": "Boots on an MKII; untested in use. A FLEX re-bind of the same sample seeks in place, not a new note."
+      "summary": "A FLEX re-bind of the same sample seeks in place, not a new note.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-flex-seekbind-ctr-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "800f8fa478c11acc953fdbd211e72dcdd545a438f13904c7b648066fea796c40",
-      "summary": "Boots on an MKII; untested in use. With FLEX SEEK BIND: such a re-bind keeps the voice's bind counter."
+      "summary": "With FLEX SEEK BIND: such a re-bind keeps the voice's bind counter.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-lofi-amf-fix-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "c61de0bf9130ef31595a99bab6a907a2f67a8122d076535e119df015f3ff0b5a",
-      "summary": "Boots on an MKII; untested in use. Fixes the stock LO-FI effect's AMF knob."
+      "summary": "Fixes the stock LO-FI effect's AMF knob.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-midi-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "d21d871cccdc7be7da9f9823e68bc31fcc891f59418b941dbabe4d9f659faaa4",
-      "summary": "Boots on an MKII; untested in use. Class-compliant USB MIDI in and out, mirroring the DIN ports."
+      "summary": "Class-compliant USB MIDI in and out, mirroring the DIN ports.",
+      "on_unit": "Boots on an Octatrack MKII (3 Oct 2026); its features are not yet tested on a unit. The same octabam module (USB MIDI) is part of USB IO TRACKS MAIN CUE AB, which was tested."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-crossbar-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "36b522b41636046852fef89bfdf88eb8a20a86161553ba6125a51d6090b557c7",
-      "summary": "Boots on an MKII; untested in use. USB first on memory: no lost audio packets. Use with USB AUDIO OUT."
+      "summary": "USB first on memory: no lost audio packets. Use with USB AUDIO OUT.",
+      "on_unit": "Boots on an Octatrack MKII (3 Oct 2026); its features are not yet tested on a unit. The same octabam module (USB CROSSBAR) is part of USB IO TRACKS MAIN CUE AB, which was tested."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-audio-out-tracks-main-cue-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "a0d4ef2e0e998ea5d392e17a1139e9961987c80e1db4c6521f7d070d56d06d5a",
-      "summary": "Boots on an MKII; untested in use. USB audio to the computer: 20 ch (tracks, MAIN, CUE), with USB MIDI."
+      "summary": "USB audio to the computer: 20 ch (tracks, MAIN, CUE), with USB MIDI.",
+      "on_unit": "Boots on an Octatrack MKII (3 Oct 2026); its features are not yet tested on a unit. The same octabam module (USB AUDIO OUT TRACKS MAIN CUE) is part of USB IO TRACKS MAIN CUE AB, which was tested."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-audio-out-tracks-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "7d16d043886df801a8b9715f8c08dc240bcc83e40545188ff1a4e85dfcf84e42",
-      "summary": "Not yet run on a unit. USB audio to the computer: 16 ch (the tracks), with USB MIDI."
+      "summary": "USB audio to the computer: 16 ch (the tracks), with USB MIDI.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-audio-out-main-cue-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "4f9dd7330f3cffdfc49f55b0a9bcdb47026a2dd0a8852bee9b31dce13d3b2589",
-      "summary": "Not yet run on a unit. USB audio to the computer: 4 ch (MAIN, CUE), with USB MIDI."
+      "summary": "USB audio to the computer: 4 ch (MAIN, CUE), with USB MIDI.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-audio-out-main-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "cb71d3e8c99233f7a5a6cb712059ce17fa4a70ce96aa936559f4aac2e6942e6b",
-      "summary": "Not yet run on a unit. USB audio to the computer: 2 ch (MAIN), with USB MIDI."
+      "summary": "USB audio to the computer: 2 ch (MAIN), with USB MIDI.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-audio-out-master-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "98a8d12cbd002a25dc05da1ab6f54b244aeeaf94999489d319f5e22eadb14039",
-      "summary": "Not yet run on a unit. USB audio to the computer: 2 ch (track 8), with USB MIDI."
+      "summary": "USB audio to the computer: 2 ch (track 8), with USB MIDI.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-main-cue-ab-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "5dfa5a78318b33169cbd372d77cb0784179edd1bbfe5d08924b0a88be0452742",
-      "summary": "Boots on an MKII; untested in use. Removes SPATIALIZER. USB audio both ways: 20 ch (tracks, MAIN, CUE) out, A/B in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 20 ch (tracks, MAIN, CUE) out, A/B in.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-main-cue-cd-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "f0181a3420af9ca568da1fda71eadddb951ff1cc9039a4f0cb2072f4e35a8538",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 20 ch (tracks, MAIN, CUE) out, C/D in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 20 ch (tracks, MAIN, CUE) out, C/D in.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-main-cue-abcd-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "2032081ba13a9b85c5459fb679e8bb4716c818ea657468c326908ca1439ace3e",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 20 ch (tracks, MAIN, CUE) out, A-D in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 20 ch (tracks, MAIN, CUE) out, A-D in.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-ab-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "3672ec49d8cd550dd519e7e0c959733ebde13f73dada8354fdda223aae60492b",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 16 ch (the tracks) out, A/B in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 16 ch (the tracks) out, A/B in.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-cd-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "5d2b7291381ca0fc69b8ed0930343686e5d641dda57ddc8d4cf11ca11753a421",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 16 ch (the tracks) out, C/D in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 16 ch (the tracks) out, C/D in.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-abcd-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "2d20459aa62c226f73e1db54994434dbdc57b2656c58041976e38cd8de5e90a2",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 16 ch (the tracks) out, A-D in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 16 ch (the tracks) out, A-D in.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-cue-ab-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "f998c28a6b0441f58ee5a563b15be0fa6a92f3c34411b245809035b1cd49fe2c",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 4 ch (MAIN, CUE) out, A/B in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 4 ch (MAIN, CUE) out, A/B in.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-cue-cd-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "9b679ba37441e47f20f60c3ddf26df8d42cb98d9dd80ea35f4e992972fbdabec",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 4 ch (MAIN, CUE) out, C/D in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 4 ch (MAIN, CUE) out, C/D in.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-cue-abcd-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "598edd522c858f00bfc51fb965857df1fea043a45c5353f5cd1451f9fe96600c",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 4 ch (MAIN, CUE) out, A-D in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 4 ch (MAIN, CUE) out, A-D in.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-ab-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "c1e3729a13db0a4241faf78996e7a4f29b8851b27f2d0787e4d5b5c52ae94086",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 2 ch (MAIN) out, A/B in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 2 ch (MAIN) out, A/B in.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-cd-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "193c898bdac962f8a8896fcdcc068e57e670929f3f4b174c626e9b0cb7d8b2bd",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 2 ch (MAIN) out, C/D in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 2 ch (MAIN) out, C/D in.",
+      "on_unit": "Not yet run on a unit."
     },
     {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-abcd-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "2b9ccbb39fa757ac68ac56ee248d7f4d2cd0f087a894944adaba450bd0932ba3",
-      "summary": "Not yet run on a unit. Removes SPATIALIZER. USB audio both ways: 2 ch (MAIN) out, A-D in."
+      "summary": "Removes SPATIALIZER. USB audio both ways: 2 ch (MAIN) out, A-D in.",
+      "on_unit": "Not yet run on a unit."
     }
   ]
 }

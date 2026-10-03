@@ -89,9 +89,20 @@ yourself (the "Your files" shelf). Once you have dropped in a stock file, it
 opens on that file's device. A device you pick before that says which stock
 OS file it needs.
 
-Each card's cover is the mod's name over line art drawn for its kind (a
-sliced waveform for Sampling, a level under a ceiling for Performance), in
-its kind's colour. Below it are the mod's title, version, device and OS
+Each card's cover is the mod's name over line art, in its kind's colour.
+- **Keywords pick the art.** `MOTIFS` in `app.js` matches the mod's id and title,
+  and the first match wins:
+  - a tuner draws a needle; a synth, an FM wave; a quantizer, a line snapped
+    to steps; REPITCH, a record;
+  - a jump, steps and an arc; a recorder, a loop; scenes, a crossfader; CCs,
+    knobs;
+  - USB audio, one meter per channel (and the inputs, for USB IO); USB, the
+    trident; MIDI, a DIN socket.
+- **The motif also nudges the hue**, so one shelf still varies.
+- **No keyword:** the art is drawn for the mod's kind (a sliced waveform for
+  Sampling, a level under a ceiling for Performance).
+- **Variation:** each drawing is varied by the mod's id, so two mods with one
+  motif differ. Below it are the mod's title, version, device and OS
 versions, the summary from the catalog, and its patch sites. The cover and
 **Details** open a sheet with its author, kind and licence, what it changes,
 and the files with their sha256.
@@ -109,9 +120,12 @@ stock file.
 
 - **The list** is `web/catalog.json`, committed and edited by hand. Each
   item names a file of a GitHub release (`repo`, `tag`, `file`), its
-  `sha256`, its `device`, and optionally `needs_core` (the oldest core
-  version it links with), a `summary`, and a `license` when the file names
-  none. `"kind": "core"` marks a core the listed mods need: it joins the
+  `sha256`, its `device`, and optionally:
+  - `needs_core`: the oldest core version it links with;
+  - a `summary`;
+  - `on_unit`: what has been checked on real hardware. The details sheet shows
+    it under "On a unit"; the card does not.
+  - a `license`, when the file names none. `"kind": "core"` marks a core the listed mods need: it joins the
   site's cores.
 - **The files** are not committed. The pages workflow downloads each from
   its author's release, and `build_web.py` puts it on the site only if it
