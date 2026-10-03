@@ -405,7 +405,9 @@ function renderNext() {
 
 // ---- the library: the kinds in the sidebar, device chips, a shelf per kind ----
 
-const KIND_HUE = { Sampling: 196, Performance: 268, Framework: 24, 'Whole build': 140 };
+const KIND_HUE = { Sampling: 196, Performance: 268, Framework: 24, 'Whole build': 140,
+  // octabam's kinds (elekloader.sdk.octabam takes its CATEGORY_TITLE)
+  'Machines and the sequencer': 68, 'Parts, Kits and scenes': 104, 'MIDI and USB': 312, Fixes: 350 };
 
 // a kind in the sidebar: its colour, its name, how many
 function kindItem(label, n, on, onclick, swatch) {
