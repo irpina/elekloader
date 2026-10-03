@@ -160,31 +160,40 @@ def dn_core(tmp, drop=None):
 
 
 def test_digitone_core_builds_and_links():
-    """core-dn1 is core 2.0a: core.s alone, the hook bus without the
-    Digitakt's machine slots, so it is core 2.1 with machines.s left out."""
+    """core-dn1 2.1: core 2.1's core.s (the hook bus, without the Digitakt's
+    machine slots), voice.s (ev_voice_on), params.s (parameter slots, ids
+    182-184), pages.s (mod pages, 27-30) and projdata.s (mods' data saved
+    with the project), the last four Digitone only."""
     with tempfile.TemporaryDirectory() as tmp:
         path = dn_core(tmp)
         with open(path) as fh:
             dn = json.load(fh)
         with open(built_core()) as fh:
             dt = json.load(fh)
-        assert dn['target']['device'] == 'digitone-mk1' and len(dn['sites']) == 8
-        assert sorted(dn['collections']) == HOOK_BUS
-        # The same code, with the Digitone's addresses: core 2.1's core.s, and
+        # 8 hook bus sites, the voice note-on, the parameter slots' 63 (3
+        # table moves, 2 UI record lookups and 58 raised id bounds), the mod
+        # pages' 2 (the page record lookup and the views' builder) and the
+        # project data's 5 (the serializer, two loads, two new projects).
+        assert dn['target']['device'] == 'digitone-mk1' and len(dn['sites']) == 79
+        assert sorted(dn['collections']) == sorted(
+            HOOK_BUS + ['core_pages', 'core_params', 'core_projdata', 'ev_voice_on'])
+        # The same core.s as core 2.1's, with the Digitone's addresses, and
         # each of its labels where core 2.1 has it.
-        assert dn['build']['sources'] == {'core.s': dt['build']['sources']['core.s']}
+        assert sorted(dn['build']['sources']) == ['core.s', 'pages.s', 'params.s', 'projdata.s',
+                                                  'voice.s']
+        assert dn['build']['sources']['core.s'] == dt['build']['sources']['core.s']
         placed = {k: v for k, v in dn['symbols'].items() if v[0] != 'abs'}
-        assert placed == {k: dt['symbols'][k] for k in placed}
-        # core 2.1's sections go on with machines.s where core-dn1's end.
-        def sizes(d):
-            return {s: int(v.get('len', v.get('size'))) for s, v in d['sections'].items()}
-        machines = {}
-        for k, (sec, off) in dt['symbols'].items():
-            if sec != 'abs' and k not in placed:
-                machines[sec] = min(off, machines.get(sec, off))
-        assert machines and sizes(dn) == dict(sizes(dt), **machines)
+        shared = {k: v for k, v in placed.items() if k in dt['symbols']}
+        assert shared == {k: dt['symbols'][k] for k in shared}
+        assert {'core_voice_on', 'core_dn_boot', 'core_param_ui', 'core_page_rec',
+                'core_view_init', 'core_page_open', 'core_page_shown', 'core_proj_save',
+                'core_proj_load', 'core_proj_import', 'core_proj_new',
+                'core_proj_init'} <= set(placed) - set(shared)
+        # voice.s follows core.s's code in .run.
+        last = max(off for sec, off in shared.values() if sec == '.run')
+        assert placed['core_voice_on'][0] == '.run' and placed['core_voice_on'][1] > last
         rc, r = lint_json(path, '--stock', DN_STOCK)
-        assert rc == 0 and r['link']['order'] == ['core 2.0a']
+        assert rc == 0 and r['link']['order'] == ['core 2.1']
 
 
 def test_digitone_core_needs_every_constant():
@@ -254,6 +263,38 @@ def test_example_port_to_154_builds_and_links():
         assert path.endswith('hello-marker-1.0-os1.54.elemod') and 'hello_draw' in m.exports
         rc, r = lint_json(path, '--stock', st154, '--with', c)
         assert rc == 0 and 'hello_draw' in r['link']['addresses']
+
+
+DN_STOCK_144 = os.environ.get('ELEKLOADER_DN_SYX_144', '')
+
+
+def test_digitone_core_port_to_144_is_the_same_core():
+    """mods/core-dn1's 1.44 port: the same code and the same sites, at 1.44's
+    addresses; a 1.43 core-dn1 is refused on 1.44."""
+    if not DN_STOCK_144 or not os.path.exists(DN_STOCK_144):
+        raise Skip('missing ELEKLOADER_DN_SYX_144')
+    with tempfile.TemporaryDirectory() as tmp:
+        old_path = dn_core(tmp)
+        path, _m = build.build(os.path.join(ROOT, 'mods', 'core-dn1'), DN_STOCK_144, tmp)
+        assert os.path.basename(path) == 'core-2.1-os1.44.elemod'
+        with open(path) as fh:
+            new = json.load(fh)
+        with open(old_path) as fh:
+            old = json.load(fh)
+        assert new['target']['os'] == '1.44' and old['target']['os'] == '1.43'
+        for k in ('exports', 'collections', 'contribute', 'resources', 'build'):
+            assert new[k] == old[k], k
+        def sizes(d):
+            return {s: v.get('len', v.get('size')) for s, v in d['sections'].items()}
+        assert sizes(new) == sizes(old)
+
+        def what(d):                # each site's new bytes and targets, not where it is
+            return [(s['len'], s['kind'], s['new'], s.get('relocs')) for s in d['sites']]
+        assert len(new['sites']) == 79 and what(new) == what(old)
+        rc, r = lint_json(path, '--stock', DN_STOCK_144)
+        assert rc == 0, r['problems']
+        rc, r = lint_json(old_path, '--stock', DN_STOCK_144)
+        assert rc == 1 and any('1.43' in x and '1.44' in x for x in r['problems']), r['problems']
 
 
 if __name__ == '__main__':

@@ -96,20 +96,23 @@ event (lower first; the shipped mods use 10-90).
 |---|---|---|---|
 | `ev_tick` | 30 times a second, UI task | `void f(void *ctrl)` | set `*((unsigned char *)ctrl + 0x20) = 1` to redraw |
 | `ev_draw` | after each frame is drawn | `void f(void *bmp, void *ctrl)` | draw over the frame; y = 0 is the bottom row |
-| `ev_key` | each key event | `int f(void *brain, void *ev)` | return nonzero to take it: nothing later sees it. `ev+12` key id, `ev+16` flags (1 pressed, 8 repeat, 2 FUNC held) |
+| `ev_key` | each key event | `int f(void *brain, void *ev)` | return nonzero to take it: nothing later sees it. `ev+12` key id, `ev+16` flags (1 pressed, 8 repeat, 2 FUNC held; measured on the Digitone mk1: 8 comes once, about 0.4 s into a key held on its own, 4 marks a double press, 0x10 a release) |
 | `ev_enc` | each encoder turn | `int f(void *brain, void *ev)` | `ev+12` encoder 1-8 (A-H), `ev+16` delta |
 | `ev_settings` | the SETTINGS menu is built | `void f(void *menu)` | add a row with `core_additem(menu, row)`; `row` is four callbacks (label, select, draw, change) in the firmware's MenuItem conventions, which this guide does not document yet |
 | `ev_render_in` | audio render entry, 1500 times a second | `void f(void)` | interrupt level: keep it short |
 | `ev_render_out` | audio render exit | `void f(void)` | the same |
+| `ev_voice_on` | Digitone mk1 only (core-dn1 2.1): a voice starts a note, in the render | `void f(int voice, int track, void *event)` | interrupt level. The voice's pitch word (`0x41391f80` + 4 x voice, the note << 16) is already written and may be changed: the render reads it every block. The voice's sound and the step's locks load after this, so read the voice's parameters from `ev_render_out` |
 
 The events, their prototypes and their conventions are the same on both
-devices; only the sites differ. The sites core owns (do not patch them):
+devices; only the sites differ, and `ev_voice_on` exists on the Digitone
+only. The sites core owns (do not patch them):
 - Digitakt mk1 1.53 and 1.54: 0x40000538, 0x4000a770, 0x4000a7d6,
   0x4000b770, 0x4000b7ba, 0x40058800, 0x40077428, 0x400784c8;
 - Digitone mk1 1.43: 0x40000538, 0x4001900c, 0x40019072, 0x40019d9c,
-  0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c;
+  0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c, and from core-dn1 2.1
+  0x4009e928;
 - Digitone mk1 1.44: the same, but 0x40072a54, 0x4009d128 and 0x4009e53c
-  for the last three.
+  for the last three of the eight, and 0x4009e948.
 
 A firmware routine your mod calls has its own address on each device and
 each OS version: look it up for the release you target, and build one
@@ -146,6 +149,117 @@ page; to change it, hook the page layout `0x400657cc` as digineighbor
 does. `core_track_machine[t]` (8 bytes) is each track's own machine as the
 render last took it, for a mod whose machine renders as a stock one:
 `core_machine(id)` returns an added machine's descriptor, or 0.
+
+### Parameter slots (core-dn1 2.1, Digitone mk1)
+
+A Digitone mk1 parameter is an id (0-181) with a 60-byte record; the knob
+code, its pop-up, its value text, its p-locks, copy and paste all go through
+the id. From core-dn1 2.1 a mod can add ids 182, 183 and 184: core raises the
+firmware's id bounds (58 of them) and puts the records right after the stock
+ones, so the stock UI handles them as its own. The mod contributes to the
+table `core_params` a pointer to a descriptor:
+
+| offset | field | |
+|---|---|---|
+| +0 | id | 182, 183 or 184: claim it as the resource `param:<id>` |
+| +4 | group | the page group: 1 Amp, 2 Filter, ... (a sound page's, for a sound parameter) |
+| +8 | slot | the sound parameter it edits (0-78): a slot no stock parameter of that kind uses, e.g. 26 on a synth track |
+| +12, +16, +20 | min, max, default | 8.8 fixed point, as the slot holds them |
+| +24 | flags | 0 |
+| +28 | cc | MIDI CC (MSB << 16 \| LSB), or -1 for none |
+| +32, +36, +40 | | -1, -1, 0 |
+| +44, +48, +52 | name, group name, short name | the pop-up's `Name=value`, and the knob's label |
+| +56 | format | `void f(int value, char *buf)`: the value's text |
+| +60 | | the firmware's empty string, `0x401ddbcd` |
+| +64 | look | the stock parameter whose knob it borrows (graphic, how a turn moves the value, scale), or 0 for PTIM's (24): a plain knob in whole steps |
+
+To put it on a stock page, replace the instruction of the page's static
+constructor that writes that knob's id (or give it a page of its own: "Mod
+pages", below): a page's eight ids are written with
+immediates, not read from a table: AMP page 1's knob F, empty, is cleared
+by `clrl 0x4136b6d4` at `0x4016affe`, so a `jsr` there to a routine that
+writes 182 puts id 182 on it.
+
+Core-dn1 2.1 owns these sites too (`mods/core-dn1/mod.json`): the boot call
+at 0x40000538 now goes to `core_dn_boot`, which moves two small tables from
+0x4018fbac (and 0x4000820a, 0x4000821a and 0x4000b154 follow them) and
+installs the records; 0x400899c8 and 0x400899e6, the UI record lookups; and
+every `cmpi.l #182`, `cmpi.l #181` and `cmpa.l` id bound but the three loops
+over the stock records (0x400078c2, 0x40030f10, 0x40082d6e).
+
+### Mod pages (core-dn1 2.1, Digitone mk1)
+
+A Digitone mk1 parameter page (SYN1's two, AMP's two, ...) is a 44-byte
+record: a short and a long title (char pointers; the long one heads the
+screen), its eight knobs' parameter ids (0 is an empty box) and a kind (9 for
+a sound's page). The firmware has 26, indexed 1-26 and found through one
+routine (0x40089a2c); each page key's view keeps the indices of its pages in
+a list and steps through them when the key is pressed again. From core-dn1
+2.1 a mod can add pages 27-30: it contributes to the table `core_pages` a
+pointer to a descriptor, in writable data:
+
+| offset | field | |
+|---|---|---|
+| +0 | idx | 27-30: claim it as the resource `page:<idx>` |
+| +4 | after | the stock page it follows in its key's list: 9 (AMP's second page) makes it AMP's third |
+| +8, +12 | short title, title | the title heads the screen, with the page count ("Table (3/3)") |
+| +16 | ids | the eight knobs' parameter ids, A to H; 0 is an empty box. Stock ids or a mod's parameter slots |
+| +48 | kind | 9 |
+| +52 | view | 0: core writes the key's view here when the firmware builds it |
+| +56 | pos | core writes the page's place in that view's list |
+
+The stock UI then shows the page, with its key's other pages, and draws,
+turns and p-locks its knobs as its own. `int core_page_open(void *brain,
+void *event, int key, descriptor *page)`, called from an `ev_key` handler
+with its brain and event, opens it: it presses and releases the page's key
+(AMP is 24) through the stock key dispatcher until that key's view shows the
+page, and returns 0 if the view was never built. The macro mod opens its TBL
+page when a track key (T1-T4, keys 42-45) is held on its own: that key's
+event then comes with the flags 0x9, about 0.4 s in, which the stock OS does
+nothing with. `int core_page_shown(void *brain, descriptor *page)` is 1
+while the page is on screen with nothing (a menu, a browser) over it; the
+macro mod opens its table editor when the track key is held there.
+
+Core-dn1 2.1 owns two more sites, by jmp at their entries: 0x40089a2c, the
+page record lookup (`core_page_rec`), and 0x40044490, the routine each
+view's constructor gives its page list to (`core_view_init`).
+
+### Project data (core-dn1 2.1, Digitone mk1)
+
+A Digitone mk1 project is saved as one block, `projectStorage_v14_t` (2782212
+bytes): the OS serializes the project in RAM into a storage buffer and
+writes that buffer to the project's slot on the card, to the temp area, or
+keeps it as its working copy; a load reads a slot into a buffer and
+deserializes it. The block starts with a 32-byte header (0xBEEFBACE, version
+14, the name, ...) and its first record is at +0x200: the 480 bytes between
+are written and read with the rest, and the OS neither fills nor reads them.
+From core-dn1 2.1 mods keep data there. A mod contributes to the table
+`core_projdata` a pointer to a descriptor:
+
+| offset | field | |
+|---|---|---|
+| +0 | tag | four characters: claim it as the resource `projdata:<tag>` |
+| +4 | size | bytes, a multiple of 4 |
+| +8 | data | the mod's copy in RAM, which it reads and writes as it likes |
+| +12 | loaded | `void loaded(int found)`, or 0: called after a project's data is in RAM; `found` is 0 when the project has none for this tag (saved without the mod, or a new project), and data then holds zeros for the mod to fill with its defaults |
+
+Core puts every block in the gap each time the project is serialized, and
+takes them out when one is deserialized or a new one is made: the gap holds
+`ELKP`, then per block its tag, its size and its bytes, then a zero tag. A
+project saved this way loads on the stock OS, which ignores the gap, and the
+stock OS keeps a gap it loaded when it saves. The macro mod keeps its 16
+tables there (`TBL1`, 320 bytes).
+
+Core-dn1 2.1 owns five more sites: 0x4000eb10, the serializer's entry (by
+jmp: every save, to a slot, to the temp area or the working copy);
+0x400acc40, the deserialize in the load of a slot, and 0x40010cfa, the one in
+the load of a block already in RAM (at boot, and from SysEx), both by jsr;
+0x4001570e, the new project's builder (CREATE NEW, by jmp), and 0x400acbf4,
+the template copy of slot -1's load (by jsr).
+
+The addresses in these three sections are OS 1.43's. In 1.44 the same
+routines are there, unchanged but moved, and RAM is 0x1000 further on:
+`mods/core-dn1/mod.json`'s `ports` has every one of core-dn1's sites for it.
 
 Core 2.1 owns these sites too (`mods/core/mod.json` says what each is;
 in 1.54 they are at the same addresses, but 0x400a1706 is 0x400a1862):
