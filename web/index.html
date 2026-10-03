@@ -27,10 +27,10 @@
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>Mods</a>
     <a class="nav-link" id="nav-build" href="#build">
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg>Build<span class="badge" id="nav-count">0</span></a>
-    <h3 class="side-h">Kinds</h3>
+    <h3 class="side-h">Categories</h3>
     <ul class="side-list" id="nav-types"></ul>
-    <h3 class="side-h">Your setup
-      <button type="button" class="round" id="save-profile" title="Save the ticked mods as a new profile" aria-label="New profile">
+    <h3 class="side-h">Profiles
+      <button type="button" class="round" id="save-profile" title="New profile: a stock OS and its mods" aria-label="New profile">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></h3>
     <ul class="rows" id="side-rows"></ul>
   </nav>
@@ -100,7 +100,7 @@
         <option value="name">Name</option>
         <option value="device">Device</option>
       </select>
-      <button type="button" class="btn outline small" id="add-mods">+ Your .elemod</button>
+      <button type="button" class="btn outline small" id="add-mods">+ Add your own .elemod</button>
       <input type="file" id="mod-files" accept=".elemod,.dtmod" multiple hidden>
     </div>
     <p class="device-note" id="device-note"></p>
@@ -146,13 +146,22 @@
             <span class="grow"></span>
             <button type="button" class="btn outline small" id="enable-all">Enable all</button>
             <button type="button" class="btn outline small" id="disable-all">Disable all</button>
-            <a class="btn outline small" href="#library">+ More mods</a>
           </div>
           <table id="mod-table" class="tracks">
             <thead><tr><th class="on"><span class="sr">Enabled</span></th><th>Mod</th><th>Version</th>
               <th>Status</th><th class="num">RAM</th><th class="num">Order</th><th class="x"><span class="sr">Remove</span></th></tr></thead>
             <tbody id="mod-rows"></tbody>
           </table>
+          <!-- the two ways to add a mod: the library's, or a file of your own -->
+          <div class="add-mods">
+            <a class="add-way" href="#library">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+              <span><strong>Add from the library</strong><small>The mods listed on this site</small></span></a>
+            <div class="add-way drop" id="mods-drop" tabindex="0" role="button" aria-describedby="mods-drop-hint">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+              <span><strong>Add your own <code>.elemod</code></strong><small id="mods-drop-hint">A mod file you were sent or built: drop it
+                here, or <span class="like-link">choose it</span></small></span></div>
+          </div>
           <label class="remember"><input type="checkbox" id="show-other"> Show mods for other firmware</label>
           <aside class="details" id="details" aria-live="polite"></aside>
         </section>
@@ -207,6 +216,29 @@
   <div class="sheet-h"><h2 id="sheet-title"></h2>
     <button type="button" class="round" id="sheet-close" aria-label="Close">&times;</button></div>
   <div class="sheet-body" id="sheet-body"></div>
+</dialog>
+
+<dialog class="sheet narrow" id="profile-sheet" aria-labelledby="ps-title">
+  <div class="sheet-h"><h2 id="ps-title">New profile</h2>
+    <button type="button" class="round" id="ps-close" aria-label="Close">&times;</button></div>
+  <div class="sheet-body">
+    <p class="muted small">A profile is one stock OS and the mods you tick for it. Switch profiles to switch
+      both.</p>
+    <label class="field">Name <input id="ps-name" maxlength="40" autocomplete="off" spellcheck="false"></label>
+    <fieldset class="field">
+      <legend>Stock OS</legend>
+      <label class="choice" id="ps-same-row"><input type="radio" name="ps-os" id="ps-same">
+        <span>The one in now: <strong id="ps-same-label"></strong></span></label>
+      <label class="choice"><input type="radio" name="ps-os" id="ps-other">
+        <span>Another stock OS file: you drop it in next</span></label>
+    </fieldset>
+    <label class="remember" id="ps-copy-row"><input type="checkbox" id="ps-copy"> Start with the mods ticked now</label>
+    <p class="bad small" id="ps-error" hidden></p>
+    <div class="sheet-acts end">
+      <button type="button" class="btn outline" id="ps-cancel">Cancel</button>
+      <button type="button" class="btn primary" id="ps-create">Create profile</button>
+    </div>
+  </div>
 </dialog>
 
 <dialog class="sheet" id="about-sheet" aria-labelledby="about-title">

@@ -21,20 +21,31 @@ The page is an app with two views:
   what is done and what is next: **✓ Stock OS**, then **+ Add** a mod (or
   **✓ n mods in your build**), then **Build your firmware**. Below are the
   mods, every mod as a card on a shelf per kind (Sampling, Performance, ...;
-  your own files last). The sidebar's Kinds, the device chips and the search
+  your own files last). The sidebar's Categories, the device chips and the search
   filter them, and Sort orders them.
 - **Build** (`#build`): your stock OS file, your mods (the list, the profile,
-  the details), the check, and Build firmware, then the downloads.
+  the details), the check, and Build firmware, then the downloads. Under the
+  list are the two ways to add a mod: **Add from the library**, and **Add
+  your own `.elemod`**, a drop zone that also opens a file chooser. (A
+  `.elemod` dropped anywhere on the page is added too.)
 
 Around them:
-- **The sidebar**: the two views, the kinds of mod with their counts, and
-  Your setup.
-- **Your setup**: your stock file, then this device's
-  profiles (the sets of mods you tick, as in the desktop window). **+** saves
-  the ticked mods as a new profile.
+- **The sidebar**: the two views, the categories of mod with their counts,
+  and your profiles.
+- **Profiles**: a profile is one stock OS (its device, OS version and file)
+  and the mods you tick for it. Each shows its stock OS under its name and
+  how many mods it has ticked. Picking one switches both: its stock file
+  comes back from this visit or from this browser (if you keep files here),
+  or the page asks for it by name. **+** makes a new profile: a name, then
+  the stock OS that is in now (empty, or with the mods ticked now) or
+  another file you drop in next. Your first stock file makes the first
+  profile, "Default". A stock file for another OS goes to the profile that
+  has it, or makes a new one: each profile keeps its own. The Build view's
+  Profile menu switches too, and Delete deletes the profile in use (its mods
+  stay added).
 - **Its foot** shows the build engine, and opens About (licences, how to
   recover).
-- **On a phone** the page is one column (Your setup at its end), and a tab
+- **On a phone** the page is one column (the profiles at its end), and a tab
   bar switches between Mods, Build and About.
 
 ## How it works
@@ -139,11 +150,14 @@ shows them as one card (the same repository, mod, version and device).
   with `indexURL` and `packageBaseUrl` both set to `./pyodide/`, so it has no
   CDN to fall back on. Nothing asks it for a package, and only Pyodide's core
   files are on the site.
-- **Kept in this browser:** your profiles, the last version field per
-  device, and your display choices are kept in `localStorage`. Only if you
-  tick "Keep my stock file and mods in this browser" are the stock file and
-  the mods you added kept, in IndexedDB. "Forget them" deletes them. Neither
-  leaves the browser.
+- **Kept in this browser:** your profiles (each one's name, stock OS by
+  sha256, and mod file names), the last version field per device, and your
+  display choices are kept in `localStorage`. Only if you tick "Keep my stock
+  file and mods in this browser" are the stock files (one per profile's OS)
+  and the mods you added kept, in IndexedDB. "Forget them" deletes them.
+  Neither leaves the browser. Profiles from before (sets of mods per device,
+  with no stock OS) become profiles that take the next stock file for their
+  device.
 
 ## What is on the site
 

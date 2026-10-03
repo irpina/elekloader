@@ -68,10 +68,20 @@ class Engine {
 // ---- what is kept in this browser ------------------------------------------------------
 
 const KEY = 'elekloader.settings';
-// profiles: {device key: {name: [file names]}}; profile: {device key: name};
-// versions: {device key: the last version field}
-const S = Object.assign({ profiles: {}, profile: {}, versions: {}, remember: false, showOther: false },
+// profiles: [{id, name, device, os, sha, file, mods}], each with one stock OS (its device key,
+// OS version, sha256 and file name; null until it has one) and the mod files ticked for it;
+// current: the id of the one in use; versions: {device key: the last version field}
+const S = Object.assign({ profiles: [], current: null, versions: {}, remember: false, showOther: false },
   (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })());
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+if (!Array.isArray(S.profiles)) {      // before: {device key: {name: [file names]}}, none with a stock OS
+  S.profiles = Object.entries(S.profiles || {}).flatMap(([device, sets]) => Object.entries(sets)
+    .map(([name, mods]) => ({ id: newId(), name, device, os: null, sha: null, file: null, mods })));
+  const was = Object.entries(S.profile || {}).map(([d, n]) => S.profiles.find(p => p.device === d && p.name === n))
+    .find(Boolean);
+  S.current = (was || S.profiles[0] || {}).id || null;
+  delete S.profile;
+}
 
 function saveSettings() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* storage off: fine */ }
@@ -101,6 +111,7 @@ const Files = {
     });
   },
   put(key, value) { return this.run('readwrite', s => s.put(value, key)); },
+  get(key) { return this.run('readonly', s => s.get(key)); },
   del(key) { return this.run('readwrite', s => s.delete(key)); },
   clear() { return this.run('readwrite', s => s.clear()); },
   async all() {
@@ -116,7 +127,7 @@ const engine = new Engine();
 const st = {
   ready: false, info: null, build: null,
   stock: null,            // set_stock's answer
-  stockFile: null,        // {name, data}: the page's copy, for IndexedDB
+  stockFiles: new Map(),  // sha256 -> {name, data}: the stock files given this visit (a profile each)
   modFiles: new Map(),    // file name -> data: the mods the user added, for IndexedDB
   mods: [],               // describe() of every listed mod
   enabled: new Set(),     // paths in the worker
@@ -134,7 +145,8 @@ const desc = p => st.mods.find(d => d.path === p);
 // as one collection of cards, one per mod.
 
 const shop = { items: [] };
-const lib = { device: S.libDevice || null, type: S.libType || null, sort: S.libSort || 'collection', query: '' };
+const lib = { device: S.libDevice || (S.profiles.find(p => p.id === S.current) || {}).device || null,
+  type: S.libType || null, sort: S.libSort || 'collection', query: '' };
 const OWN = '\u0000own';                         // the "Your files" kind
 const cmpVer = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
 const shopItem = d => shop.items.find(e => e.available && e.sha256 === d.sha256);
@@ -356,8 +368,12 @@ function renderStart(all) {
   }));
   const d = devs.find(x => x.key === lib.device);
   const dl = d && DOWNLOADS[d.key];
+  const want = cur() && cur().sha ? cur() : null;  // a profile waiting for its stock file
   $('g-device').classList.toggle('done', !!d);
-  $('g-stock-text').replaceChildren(...(d
+  $('g-stock-text').replaceChildren(...(want
+    ? [`Your profile "${want.name}" uses `, el('strong', {}, osLabel(want)), ': drop ', el('code', {}, want.file),
+      ' here', ...(dl ? [' (it is on ', el('a', { href: dl.url, rel: 'noreferrer', target: '_blank' }, 'Elektron\'s site'), ')'] : []), '.']
+    : d
     ? ['Download ', el('strong', {}, `OS ${d.latest}`), ` for the ${dl ? dl.label : d.name} from `,
       dl ? el('a', { href: dl.url, rel: 'noreferrer', target: '_blank' }, 'Elektron\'s site') : 'Elektron\'s site',
       '. Then drop the .syx here, or the .zip just as you downloaded it.']
@@ -376,7 +392,8 @@ function renderStart(all) {
 function renderNext() {
   const sd = dev();
   const n = [...st.enabled].map(desc).filter(d => d && !d.builtin).length;
-  $('lib-eyebrow').textContent = `Your ${sd.name} · OS ${st.stock.os}`;
+  const p = cur();
+  $('lib-eyebrow').textContent = `${p ? p.name + ' · ' : ''}${sd.name} · OS ${st.stock.os}`;
   const sep = () => el('span', { class: 'next-sep', 'aria-hidden': 'true' }, '→');
   $('next').replaceChildren(
     el('span', { class: 'next-step done' }, `✓ Stock OS ${st.stock.os}`), sep(),
@@ -448,7 +465,7 @@ function renderLibrary() {
     el('h2', {}, name, el('span', { class: 'n' }, String(ens.length))), el('div', { class: 'cards' }, ...ens.map(card)))));
   if (!list.length) {
     $('lib-cards').append(el('p', { class: 'empty' }, lib.query.trim() ? 'No mod matches that.'
-      : `No mods ${chosen ? 'for the ' + chosen.name + ' ' : ''}here yet. Add your own with + Your .elemod.`));
+      : `No mods ${chosen ? 'for the ' + chosen.name + ' ' : ''}here yet. Add your own with + Add your own .elemod.`));
   }
   renderNeed();
 }
@@ -582,9 +599,11 @@ async function untick(paths) {
 
 // the base firmware's hint: which stock file the device you picked needs
 function renderNeed() {
+  const p = !dev() && cur();
   const d = !dev() && pickable().find(x => x.key === lib.device);
-  $('stock-need').hidden = !d;
-  if (d) $('stock-need').textContent = `For the ${d.name}: Elektron's OS ${d.os} file.`;
+  $('stock-need').hidden = !((p && p.sha) || d);
+  if (p && p.sha) $('stock-need').textContent = `Profile "${p.name}" uses ${osLabel(p)}: ${p.file}.`;
+  else if (d) $('stock-need').textContent = `For the ${d.name}: Elektron's OS ${d.os} file.`;
 }
 
 function toast(text) {
@@ -609,10 +628,13 @@ function route() {
 }
 
 // a row in Your setup: a square, a title, a line under it
-function setupRow({ thumb, title, sub, on, current, href, onclick }) {
-  return el('li', {}, el(href ? 'a' : 'button', { class: ['row', on ? 'on' : '', current ? 'current' : ''].join(' '),
+function setupRow({ thumb, title, sub, n = null, on, current, need, label, href, onclick }) {
+  return el('li', {}, el(href ? 'a' : 'button', {
+    class: ['row', on ? 'on' : '', current ? 'current' : '', need ? 'need' : ''].join(' '), 'aria-label': label,
+    title: need ? 'Drop its stock OS file in to use this profile' : null,
     ...(href ? { href } : { type: 'button', onclick }) },
-  thumb, el('span', { class: 'row-text' }, el('strong', {}, title), el('span', {}, sub))));
+  thumb, el('span', { class: 'row-text' }, el('strong', {}, title), el('span', {}, sub)),
+  n != null ? el('span', { class: 'n', title: 'Mods ticked' }, String(n)) : ''));
 }
 
 function renderChrome() {
@@ -628,51 +650,110 @@ function renderChrome() {
     if (on) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current');
   }
   $('cfg-btn').hidden = build;
-  const prof = sd && S.profile[sd.key];
-  $('build-eyebrow').textContent = prof ? 'Profile' : 'Build';
-  $('build-title').textContent = prof || 'Your firmware';
+  const p = cur();
+  $('build-eyebrow').textContent = p ? 'Profile' : 'Build';
+  $('build-title').textContent = p ? p.name : 'Your firmware';
   $('build-sub').textContent = sd
     ? `${sd.name} · OS ${s.os} · ${n} mod${n === 1 ? '' : 's'} ticked · changes save in this browser`
-    : 'Drop in your stock OS file, check the mods you ticked, and build.';
-  // your setup: the stock file, then this device's profiles
-  const rows = [sd
-    ? setupRow({ thumb: el('span', { class: 'thumb stock-ok' }, icon(BOLT, '')), title: `${sd.name} · OS ${s.os}`,
-      sub: 'Stock OS · ' + s.file, href: '#build' })
-    : s && !s.ok
-      ? setupRow({ thumb: el('span', { class: 'thumb stock-bad' }, '!'), title: 'Not a stock OS elekloader knows',
-        sub: s.file, href: '#build' })
-      : setupRow({ thumb: el('span', { class: 'thumb' }, icon(PLUS, 'ico')), title: 'Your stock OS file',
-        sub: 'Not added yet: see Get started', href: '#library' })];
-  if (sd) {
-    const k = sd.key;
-    for (const name of Object.keys(profiles()).sort()) {
-      const th = el('span', { class: 'thumb profile' }, name.slice(0, 1).toUpperCase());
-      th.style.setProperty('--h', String(Math.round(360 * seeded(name)())));
-      const m = (profiles()[name] || []).length;
-      rows.push(setupRow({ thumb: th, title: name, sub: `Profile · ${m} mod${m === 1 ? '' : 's'}`,
-        on: build && S.profile[k] === name, current: S.profile[k] === name,
-        onclick: () => { loadProfile(name); location.hash = '#build'; } }));
-    }
-  } else {
-    rows.push(el('li', { class: 'side-empty' }, 'Your profiles show here once your stock file is in.'));
-  }
+    : p && p.sha ? `${osLabel(p)}: drop its stock OS file in to use this profile.`
+      : 'Drop in your stock OS file, check the mods you ticked, and build.';
+  // the profiles, each with its stock OS under its name
+  const rows = S.profiles.map(x => {
+    const here = inUse(x);
+    const th = el('span', { class: 'thumb profile' }, x.name.slice(0, 1).toUpperCase());
+    th.style.setProperty('--h', String(Math.round(360 * seeded(x.id)())));
+    const m = userMods(x).length;
+    return setupRow({ thumb: th, title: x.name, n: x.sha ? m : null,
+      sub: x.sha ? osLabel(x) : 'No stock OS yet',
+      on: build && x.id === S.current, current: x.id === S.current, need: x.id === S.current && !here,
+      label: `${x.name}: ${x.sha ? `${osLabel(x)}, ${m} mod${m === 1 ? '' : 's'}` : 'no stock OS yet'}`
+        + (x.id === S.current && x.sha && !here ? ', its stock OS file is needed' : ''),
+      onclick: () => { switchProfile(x.id); location.hash = '#build'; } });
+  });
+  if (!rows.length) rows.push(el('li', { class: 'side-empty' }, 'Your first stock OS file makes your first profile. + makes another.'));
   $('side-rows').replaceChildren(...rows);
-  $('save-profile').disabled = !sd || st.busy;
+  $('save-profile').disabled = st.busy;
 }
 
-function profiles() {
-  const k = dev().key;
-  S.profiles[k] = S.profiles[k] || {};
-  return S.profiles[k];
+// ---- profiles: a name, one stock OS, and the mods ticked for it ----
+
+const cur = () => S.profiles.find(p => p.id === S.current) || null;
+const inUse = p => !!(p.sha && st.stock && st.stock.ok && st.stock.sha256 === p.sha);
+const osLabel = p => (p.device ? deviceName(p.device) + (p.os ? ' · OS ' + p.os : '') : 'No stock OS yet');
+const userMods = p => (p.mods || []).filter(f => !f.startsWith('core-'));   // the core comes with them
+
+function uniqueName(base) {
+  let name = base;
+  for (let i = 2; S.profiles.some(p => p.name === name); i++) name = `${base} ${i}`;
+  return name;
 }
 
-// the window's _remember: the ticked mods are the current profile
+// a new profile, with the stock OS given (set_stock's answer) or none yet
+function makeProfile(name, stock = null) {
+  const p = { id: newId(), name, device: stock ? stock.dev.key : null, os: stock ? stock.os : null,
+    sha: stock ? stock.sha256 : null, file: stock ? stock.file : null, mods: [] };
+  S.profiles.push(p);
+  return p;
+}
+
+// the window's _remember: the ticked mods are the current profile's
 function remember() {
-  if (!dev()) return;
-  const k = dev().key;
-  S.profile[k] = S.profile[k] || 'Default';
-  profiles()[S.profile[k]] = [...st.enabled].map(base).sort();
+  const p = cur();
+  if (!p || !inUse(p)) return;
+  const away = p.mods.filter(f => !st.mods.some(d => d.file === f));   // named, not added here
+  p.mods = [...new Set([...st.enabled].map(base).concat(away))].sort();
   saveSettings();
+}
+
+// a profile's mods ticked: the ones that are here and fit
+function tickProfile(p, warn) {
+  st.enabled = new Set(st.mods.filter(d => d.fits && p.mods.includes(d.file)).map(d => d.path));
+  const missing = p.mods.filter(f => !st.mods.some(d => d.file === f));
+  if (warn && missing.length) note('This profile also names mods that are not added here: ' + missing.join(', '));
+}
+
+// a profile's first ticks: the newest core, and (unless it starts empty) the mods you added that fit
+async function freshTicks(withMods) {
+  const fits = st.mods.filter(d => d.fits);
+  const cores = fits.filter(d => d.id === 'core').sort((a, b) => a.file.localeCompare(b.file));
+  let on = cores.length ? [cores[cores.length - 1].path] : [];
+  if (withMods) {
+    for (const d of fits.filter(x => !x.builtin && x.format === 2 && x.id !== 'core')) {
+      on = await engine.call('tick', { enabled: on, path: d.path });
+    }
+  }
+  return new Set(on);
+}
+
+// another profile: its stock OS in (from this visit or this browser), then its mods;
+// without its file here, the page asks for it
+async function switchProfile(id) {
+  const p = S.profiles.find(x => x.id === id);
+  if (!p || st.busy) return;
+  S.current = p.id;
+  saveSettings();
+  if (inUse(p)) {
+    tickProfile(p, true);
+    renderProfiles();
+    changed();
+    return;
+  }
+  let f = p.sha && st.stockFiles.get(p.sha);
+  if (!f && p.sha && S.remember) {
+    try { f = await Files.get('stock:' + p.sha); } catch { /* not kept */ }
+  }
+  if (f) {
+    await setStock(f.name, f.data);
+    return;
+  }
+  st.stock = null;
+  st.enabled.clear();
+  if (p.device) lib.device = p.device;
+  renderStock();
+  renderLibrary();
+  renderCheck(null);
+  renderProfiles();
+  changed();
 }
 
 // ---- actions ----------------------------------------------------------------------------
@@ -708,8 +789,12 @@ async function boot() {
     try {
       const kept = await Files.all();
       for (const [k, v] of kept) if (k.startsWith('mod:')) await addMod(v.name, v.data, false);
-      const s = kept.find(([k]) => k === 'stock');
-      if (s) await setStock(s[1].name, s[1].data);
+      const p = cur();
+      const s = (p && p.sha && kept.find(([k]) => k === 'stock:' + p.sha)) || kept.find(([k]) => k === 'stock');
+      if (s) {
+        if (s[0] === 'stock') Files.del('stock').catch(() => {});   // kept as stock:<sha256> from now on
+        await setStock(s[1].name, s[1].data);
+      }
     } catch (e) {
       note('Your kept files could not be read from this browser: ' + e.message);
     }
@@ -722,26 +807,38 @@ async function setStock(name, data) {
   $('stock').replaceChildren(el('p', { class: 'muted' }, `Reading ${name}…`));
   const r = await engine.call('set_stock', { name }, data);
   st.stock = r;
-  st.stockFile = r.ok ? { name, data } : st.stockFile;
-  if (r.ok && S.remember) Files.put('stock', { name, data }).catch(() => {});
+  if (r.ok) {
+    st.stockFiles.set(r.sha256, { name, data });
+    if (S.remember) Files.put('stock:' + r.sha256, { name, data }).catch(() => {});
+  }
   await refresh();
   if (r.ok) {
     const k = r.dev.key;
-    const fits = st.mods.filter(d => d.fits);
-    const prof = S.profile[k] && profiles()[S.profile[k]];
-    if (prof) {
-      st.enabled = new Set(fits.filter(d => prof.includes(d.file)).map(d => d.path));
+    // one stock OS per profile: the current one takes this file if it has none yet; another
+    // file goes to the profile that has it, or to a new one
+    let p = cur();
+    let fresh = false;
+    if (p && !p.sha && (!p.device || p.device === k)) {
+      Object.assign(p, { device: k, os: r.os, sha: r.sha256, file: r.file });
+      fresh = !p.mods.length;
+      if (fresh) st.enabled = await freshTicks(!p.empty); else tickProfile(p, false);
+      delete p.empty;
+    } else if (p && p.sha === r.sha256) {
+      tickProfile(p, false);
     } else {
-      // the first time for this device: its core ticked, and the separate mods
-      // you added for it (as the window's first run ticks them)
-      const cores = fits.filter(d => d.id === 'core').sort((a, b) => a.file.localeCompare(b.file));
-      let on = cores.length ? [cores[cores.length - 1].path] : [];
-      for (const d of fits.filter(x => !x.builtin && x.format === 2 && x.id !== 'core')) {
-        on = await engine.call('tick', { enabled: on, path: d.path });
+      const had = p;
+      p = S.profiles.find(x => x.sha === r.sha256);
+      if (p) {
+        tickProfile(p, false);
+      } else {
+        p = makeProfile(uniqueName(had ? `${r.dev.name} ${r.os}` : 'Default'), r);
+        st.enabled = await freshTicks(true);
+        fresh = true;
       }
-      st.enabled = new Set(on);
-      remember();
+      if (had) toast(`Profile "${p.name}": ${osLabel(p)}. Each profile keeps its own stock OS.`);
     }
+    S.current = p.id;
+    if (fresh) remember(); else saveSettings();
     $('version').value = S.versions[k] || r.dev.default_version;
     st.nameEdited = false;
     lib.device = k;                    // the library follows the stock file
@@ -813,6 +910,7 @@ async function removeMods(paths) {
   if (!confirm(`Remove ${ds[0].title} (${ds.map(d => d.file).join(', ')})?`)) return;
   for (const d of ds) {
     await engine.call('remove_mod', { path: d.path });
+    for (const p of S.profiles) p.mods = p.mods.filter(f => f !== d.file);
     st.modFiles.delete(d.file);
     Files.del('mod:' + d.file).catch(() => {});
     st.enabled.delete(d.path);
@@ -1039,8 +1137,8 @@ function renderMods() {
   }));
   if (!shown.length) {
     rows.append(el('tr', {}, el('td', { colspan: 7, class: 'empty' },
-      dev() ? 'No mods for this firmware yet. Add one from the library, or drop an .elemod file anywhere on this page.'
-        : 'Add mods from the library, or drop .elemod files anywhere on this page.')));
+      dev() ? 'No mods for this firmware yet: add one from the library, or your own .elemod file, below.'
+        : 'Add mods from the library, or your own .elemod files, below.')));
   }
   const n = shown.filter(d => st.enabled.has(d.path)).length;
   $('mod-count').textContent = `${n} of ${shown.length} mods enabled`
@@ -1146,32 +1244,18 @@ function renderBuildButton() {
   $('build').disabled = !(st.ready && d && st.check && st.check.ok && st.versionOk && !st.busy
     && st.checkedFor === [...st.enabled].sort().join('\n'));
   $('build').textContent = st.busy ? 'Building…' : 'Build firmware';
-  for (const id of ['version', 'out-name', 'add-mods', 'save-profile', 'delete-profile', 'profile']) {
-    $(id).disabled = st.busy || (id !== 'add-mods' && !d);
-  }
+  for (const id of ['version', 'out-name']) $(id).disabled = st.busy || !d;
+  for (const id of ['add-mods', 'save-profile', 'profile']) $(id).disabled = st.busy;
+  $('delete-profile').disabled = st.busy || !cur();
 }
 
 function renderProfiles() {
   const sel = $('profile');
-  if (!dev()) { sel.replaceChildren(); renderChrome(); return; }
-  const k = dev().key;
-  const names = Object.keys(profiles()).sort();
-  sel.replaceChildren(...names.map(n => el('option', { value: n }, n)));
-  sel.value = S.profile[k] || names[0] || '';
+  sel.replaceChildren(...S.profiles.map(p => el('option', { value: p.id }, `${p.name} (${osLabel(p)})`)));
+  sel.value = S.current || '';
   renderChrome();
 }
 
-// a configuration (the window's profile): its mods ticked, those that are here
-function loadProfile(name) {
-  S.profile[dev().key] = name;
-  const names = profiles()[name] || [];
-  st.enabled = new Set(st.mods.filter(d => d.fits && names.includes(d.file)).map(d => d.path));
-  const missing = names.filter(n => !st.mods.some(d => d.file === n));
-  saveSettings();
-  renderProfiles();
-  changed();
-  if (missing.length) note('This configuration also names mods that are not added here: ' + missing.join(', '));
-}
 
 function renderResult(r, ms) {
   $('step-result').hidden = false;
@@ -1238,6 +1322,50 @@ function renderResult(r, ms) {
   box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ---- New profile: a name, and the stock OS in now or another file ----
+
+function openNewProfile() {
+  const sd = dev();
+  $('ps-name').value = uniqueName(S.profiles.length ? 'Profile' : 'Default');
+  $('ps-same-row').hidden = !sd;
+  $('ps-same-label').textContent = sd ? `${sd.name} · OS ${st.stock.os}` : '';
+  $(sd ? 'ps-same' : 'ps-other').checked = true;
+  $('ps-error').hidden = true;
+  renderNewProfile();
+  $('profile-sheet').showModal();
+  $('ps-name').select();
+}
+
+function renderNewProfile() {
+  $('ps-copy-row').hidden = !(dev() && $('ps-same').checked);
+}
+
+async function createProfile() {
+  const name = $('ps-name').value.trim();
+  const clash = S.profiles.some(p => p.name === name);
+  $('ps-error').hidden = !!name && !clash;
+  $('ps-error').textContent = !name ? 'Give it a name.' : 'There is a profile with that name already.';
+  if (!name || clash) return;
+  const same = dev() && $('ps-same').checked;
+  const copy = $('ps-copy').checked;
+  $('profile-sheet').close();
+  if (same) {
+    const p = makeProfile(name, st.stock);
+    S.current = p.id;
+    if (!copy) st.enabled = await freshTicks(false);
+    remember();
+    renderProfiles();
+    changed();
+    toast(`Profile "${name}": ${osLabel(p)}.`);
+  } else {
+    const p = makeProfile(name);
+    p.empty = true;                    // its stock file ticks the core only
+    await switchProfile(p.id);
+    location.hash = '#build';
+    toast(`Profile "${name}" made. Now drop in its stock OS file.`);
+  }
+}
+
 // ---- wiring ---------------------------------------------------------------------------------
 
 const STOCK_MAX = 64 << 20, MOD_MAX = 16 << 20;
@@ -1259,9 +1387,10 @@ async function takeFiles(list) {
 }
 
 function wire() {
-  for (const drop of [$('stock-drop'), $('start-drop')]) {
-    drop.addEventListener('click', () => $('stock-file').click());
-    drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('stock-file').click(); } });
+  // a drop zone opens its file chooser on a click or Enter (a drop anywhere is taken below)
+  for (const [drop, input] of [['stock-drop', 'stock-file'], ['start-drop', 'stock-file'], ['mods-drop', 'mod-files']]) {
+    $(drop).addEventListener('click', () => $(input).click());
+    $(drop).addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $(input).click(); } });
   }
   $('stock-file').addEventListener('change', e => { takeFiles(e.target.files); e.target.value = ''; });
   $('add-mods').addEventListener('click', () => $('mod-files').click());
@@ -1282,25 +1411,24 @@ function wire() {
   $('disable-all').addEventListener('click', () => { st.enabled.clear(); remember(); changed(); });
   $('show-other').checked = S.showOther;
   $('show-other').addEventListener('change', e => { S.showOther = e.target.checked; saveSettings(); renderMods(); });
-  $('profile').addEventListener('change', e => loadProfile(e.target.value));
-  $('save-profile').addEventListener('click', () => {
-    const name = (prompt('Name the configuration (the mods ticked now):') || '').trim();
-    if (!name) return;
-    S.profile[dev().key] = name;
-    remember();
-    renderProfiles();
-  });
-  $('delete-profile').addEventListener('click', () => {
-    const k = dev().key;
-    const name = S.profile[k];
-    if (!name || !confirm(`Delete the configuration "${name}"? (The mods stay.)`)) return;
-    delete profiles()[name];
-    const next = Object.keys(profiles()).sort()[0];
+  $('profile').addEventListener('change', e => switchProfile(e.target.value));
+  $('save-profile').addEventListener('click', openNewProfile);
+  $('ps-create').addEventListener('click', createProfile);
+  $('ps-cancel').addEventListener('click', () => $('profile-sheet').close());
+  $('ps-name').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); createProfile(); } });
+  for (const id of ['ps-same', 'ps-other']) $(id).addEventListener('change', renderNewProfile);
+  $('delete-profile').addEventListener('click', async () => {
+    const p = cur();
+    if (!p || !confirm(`Delete the profile "${p.name}"? (Its mods stay added.)`)) return;
+    S.profiles = S.profiles.filter(x => x !== p);
+    if (p.sha && !S.profiles.some(x => x.sha === p.sha)) Files.del('stock:' + p.sha).catch(() => {});
+    const next = S.profiles.find(inUse) || S.profiles[0];
     if (next) {
-      loadProfile(next);
-    } else {                                 // none left: the ticked mods become Default
-      S.profile[k] = 'Default';
+      await switchProfile(next.id);
+    } else {                                 // none left: the stock file in makes a Default
+      S.current = dev() ? makeProfile('Default', st.stock).id : null;
       remember();
+      saveSettings();
       renderProfiles();
     }
   });
@@ -1314,7 +1442,7 @@ function wire() {
     $('forget').hidden = !S.remember;
     try {
       if (S.remember) {
-        if (st.stockFile) await Files.put('stock', st.stockFile);
+        for (const [sha, f] of st.stockFiles) await Files.put('stock:' + sha, f);
         for (const [name, data] of st.modFiles) await Files.put('mod:' + name, { name, data });
       } else {
         await Files.clear();
@@ -1337,7 +1465,7 @@ function wire() {
   });
   $('f-sort').addEventListener('change', e => setFilter('sort', e.target.value || 'collection'));
   // the sheets: their close buttons, and a click on the backdrop
-  for (const [sheet, close] of [['mod-sheet', 'sheet-close'], ['about-sheet', 'about-close']]) {
+  for (const [sheet, close] of [['mod-sheet', 'sheet-close'], ['about-sheet', 'about-close'], ['profile-sheet', 'ps-close']]) {
     $(close).addEventListener('click', () => $(sheet).close());
     $(sheet).addEventListener('click', e => { if (e.target === $(sheet)) $(sheet).close(); });
   }
