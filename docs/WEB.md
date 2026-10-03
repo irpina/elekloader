@@ -92,8 +92,9 @@ OS file it needs.
 Each card's cover is the mod's name over line art, in its kind's colour.
 - **Keywords pick the art.** `MOTIFS` in `app.js` matches the mod's id and title,
   and the first match wins:
-  - a tuner draws a needle; a synth, an FM wave; a quantizer, a line snapped
-    to steps; REPITCH, a record;
+  - a tuner draws a needle; metallic percussion, a struck metal's spectrum;
+    a synth, an FM wave; a quantizer, a line snapped to steps; REPITCH, a
+    record;
   - a jump, steps and an arc; a recorder, a loop; scenes, a crossfader; CCs,
     knobs;
   - USB audio, one meter per channel (and the inputs, for USB IO); USB, the

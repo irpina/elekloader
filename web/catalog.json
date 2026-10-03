@@ -54,6 +54,13 @@
       "summary": "A NEIGHBOR machine like the Octatrack's: a track plays another track's audio through its own chain. A prototype."
     },
     {
+      "repo": "soejrd/digisophie", "tag": "v1.1.13", "file": "digisophie-1.1.13.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "6eadc29d581b24ff84fe3fe32399b998a91375ee06182631ab499109b4a003a5",
+      "summary": "A metallic percussion machine with four models: FUSE, BOOM, PIPE and SHARD.",
+      "on_unit": "Tested on a Digitakt mk1 by its author (release v1.1.13): one Sophie track runs without FAST AUDIO, two ran with it on; eight tracks are not claimed."
+    },
+    {
       "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-tuner-363861e.elemod",
       "device": "octatrack", "needs_core": "0.1",
       "sha256": "1e2447d88c953b09584bcd0b84a9b7733bb87264b6542169d0f2686f9762dff6",

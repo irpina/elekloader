@@ -299,6 +299,7 @@ function seeded(s) {                               // a small deterministic gene
 // shelf of one kind still varies.
 const MOTIFS = [
   { re: /tuner/, motif: 'needle', hue: -20 },
+  { re: /sophie|percussion|metal/, motif: 'metal', hue: 0 },
   { re: /synth|\bfm\b/, motif: 'fm', hue: 10 },
   { re: /quantiz|scale/, motif: 'steps', hue: 28 },
   { re: /repitch|turntable/, motif: 'record', hue: -36 },
@@ -400,6 +401,16 @@ function drawMotif(motif, en, { add, rnd, line, faint, dot, pt }) {
     const [nx, ny] = pt(cx, cy, r - 4, 270 + (rnd() - 0.5) * 40);
     add('line', { ...line, x1: cx, y1: cy, x2: nx, y2: ny });
     dot(cx, cy - 2, 4);
+    return true;
+  }
+  case 'metal': {                                  // a struck metal's spectrum: its partials miss the harmonics (ticks)
+    const u = 17 + 3 * rnd(), x0 = 10 + 4 * rnd(), pts = [];
+    const peaks = [1, 2.76, 5.4, 8.93].map((r, i) => [x0 + r * u, (54 - 11 * i) * (0.8 + 0.2 * rnd())]);
+    for (let k = 1; x0 + k * u <= 196; k++) add('line', { ...faint, 'stroke-dasharray': 'none', x1: x0 + k * u, y1: 94, x2: x0 + k * u, y2: 99 });
+    for (let x = 4; x <= 196; x += 0.5) {
+      pts.push([x, 92 - peaks.reduce((s, [px, h]) => s + h / (1 + ((x - px) / 1.8) ** 2), 0)]);
+    }
+    poly(pts);
     return true;
   }
   case 'fm': {                                     // a carrier bent by its modulator
@@ -621,7 +632,7 @@ function renderNext() {
 
 // ---- the library: the kinds in the sidebar, device chips, a shelf per kind ----
 
-const KIND_HUE = { Sampling: 196, Performance: 268, Framework: 24, 'Whole build': 140,
+const KIND_HUE = { Sampling: 196, Performance: 268, Framework: 24, 'Whole build': 140, Synthesis: 232,
   // octabam's kinds (elekloader.sdk.octabam takes its CATEGORY_TITLE)
   'Machines and the sequencer': 68, 'Parts, Kits and scenes': 104, 'MIDI and USB': 312, Fixes: 350 };
 
