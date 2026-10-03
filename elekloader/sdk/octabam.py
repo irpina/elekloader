@@ -2,7 +2,8 @@
 """sambanks/octabam's ColdFire modules -> linkable Octatrack mods (format 2).
 
     python -m elekloader.sdk.octabam --octabam PATH --stock OCTATRACK_OS1.40C.syx
-                                     [--module NAME ...] [--out DIR] [--core CORE.elemod]
+                                     [--module NAME ...] [--remix NAME ...] [--reference IMAGE]
+                                     --out DIR [--core CORE.elemod]
 
 octabam (MIT) declares each module in modules/<name>/manifest.py, in the
 vocabulary of its tools/remix/schema.py. This reads the manifests of a
@@ -48,6 +49,18 @@ Anything else refuses the module, with the reason:
   runtime's writes;
 - needing (requires, or bridging) a module that does not convert;
 - serving DSP modules only (SERVES_DSP: MODE DEFAULTS, RIG HOSTS, TEMPO BUS).
+
+**Remixes** (`--remix`). An octabam remix converts as one mod: its modules (not the stock
+effects it lists), each converted as above, with the generated includes built for all of
+them. A module whose DSP code is reached only by its hooks into stock DSP code (no FX menu
+entry, no knobs: USB AUDIO IN's RX inject) converts here, though not alone. Everything else
+the remix's build writes in the OS image comes from octabam's own build of it
+(tools/build/build_bus.py, run in the checkout, or `--reference`): every byte it changes
+outside this mod's sites and the core's becomes a data site. For USB AUDIO IN that is the
+inject in a stock effect's DSP code, its hook, the effect's dispatch pointed at the null
+stub, and the FX1/FX2 choosers without the effect. The check then requires the linked OS
+image to equal that build in every byte, but for the address operands of our placed code and
+data served from a copy.
 
 A unit's generated `include` is built for the modules this mod carries.
 Where it would change with another module that converts, the mod conflicts
@@ -177,15 +190,24 @@ SERVES_DSP = {
 }
 
 
-def refusal(ob, name, _seen=()):
-    """Why module `name` does not convert, or None."""
+def hooked_dsp(m):
+    """Is the module's DSP code reached only by its hooks into stock DSP code (USB AUDIO IN's
+    RX inject), with no FX menu entry and no knobs? A remix carries such code (below)."""
+    return (m.dsp is not None and m.menu is None and not m.params
+            and bool(getattr(m.dsp, 'hooks', ())))
+
+
+def refusal(ob, name, _seen=(), hooks=False):
+    """Why module `name` does not convert, or None. With `hooks`, as part of a remix:
+    DSP code reached only by its hooks converts too (the remix's build places it)."""
     m = ob.modules[name]
     if name in SERVES_DSP:
         return ('it serves DSP modules, which do not convert: it %s' % SERVES_DSP[name])
-    if m.dsp is not None or m.menu is not None or m.params:
+    dsp_ok = hooks and hooked_dsp(m)
+    if not dsp_ok and (m.dsp is not None or m.menu is not None or m.params):
         return 'it has DSP code or an FX menu entry (only ColdFire-only modules convert)'
     for _dp, _dns, fns in os.walk(os.path.join(ob.root, 'modules', name)):
-        if any(f.endswith('.asm') for f in fns):
+        if not dsp_ok and any(f.endswith('.asm') for f in fns):
             return ('it carries DSP56300 code (.asm), which its build uploads (only '
                     'ColdFire-only modules convert)')
     if m.runtime is not None:
@@ -208,7 +230,7 @@ def refusal(ob, name, _seen=()):
             return 'it needs %s, which this checkout does not have' % k
         if n in _seen or n == name:
             continue
-        why = refusal(ob, n, _seen + (name,))
+        why = refusal(ob, n, _seen + (name,), hooks)
         if why:
             return 'it needs %s, which does not convert: %s' % (k, why)
     return None
@@ -250,6 +272,116 @@ def _relocatable(dev, addr, n):
     return None
 
 
+def _changed(a, b):
+    """The offsets where a and b differ, over a's length."""
+    out = []
+    for o in range(0, len(a), 4096):
+        x, y = a[o:o + 4096], b[o:o + 4096]
+        if x != y:
+            out += [o + i for i in range(len(x)) if x[i] != y[i]]
+    return out
+
+
+_CORE = []
+
+
+def _core_spans():
+    """The Octatrack core's sites (mods/core-ot): [(lo, hi)]."""
+    if not _CORE:
+        with open(os.path.join(CORE_DIR, 'mod.json')) as fh:
+            for s in json.load(fh)['sites']:
+                a = int(s['addr'], 16)
+                _CORE.append((a, a + len(s['stock']) // 2))
+    return list(_CORE)
+
+
+def _locator(ob, image, dev):
+    """-> where(lo, hi): what a span of the OS image is, for the notes: a DSP payload's
+    words (octabam's tools/build/dsp_modmap reads their load map), a free run, or code."""
+    tb = os.path.join(ob.root, 'tools', 'build')
+    if tb not in sys.path:
+        sys.path.insert(0, tb)
+    try:
+        import dsp_modmap
+        recs = [(tag, sp, addr, cnt, va + off)
+                for tag, va, ln in dsp_modmap.PAYLOADS
+                for sp, addr, cnt, off in dsp_modmap.modules(image, va, ln)[0]]
+    except Exception:                       # the notes only: say less, not fail
+        recs = []
+
+    def where(lo, hi):
+        for tag, sp, addr, cnt, d in recs:
+            if d <= lo < d + cnt * 3:
+                w0, w1 = (lo - d) // 3, (min(hi, d + cnt * 3) - 1 - d) // 3
+                sp_ = 'PXY?'[sp] if sp < 4 else '?'
+                return ('DSP payload %s %s:0x%05x' % (tag, sp_, addr + w0)
+                        + ('-0x%05x' % (addr + w1) if w1 > w0 else ''))
+        if any(a <= lo < b for a, b in dev.image_free):
+            return 'the image\'s free run'
+        return 'the OS'
+    return where
+
+
+def stock_raw(ob, image):
+    """The checkout's out/raw/section_3_MAIN_OS.bin, the stock image octabam's tools read
+    (`make recon` writes it): written from this stock OS if missing, refused if it differs."""
+    raw = os.path.join(ob.root, 'out', 'raw', 'section_3_MAIN_OS.bin')
+    if os.path.exists(raw):
+        with open(raw, 'rb') as fh:
+            if fh.read() != image:
+                raise Refused('the checkout\'s out/raw/section_3_MAIN_OS.bin is not this '
+                              'stock OS')
+    else:
+        os.makedirs(os.path.dirname(raw), exist_ok=True)
+        with open(raw, 'wb') as fh:
+            fh.write(image)
+
+
+def load_remix(ob, name):
+    """octabam's remix `name` -> {'name', 'doc', 'modules' (keys), 'stock' (the stock
+    effects' keys), 'harvested' (stock effects with DSP code on neither FX menu)}. Its
+    stock tables read the checkout's stock image (stock_raw)."""
+    from remix import registry, stock     # octabam's tools/remix
+    try:                                    # its own code: report a failure as a refusal
+        r = ob.call(registry.remix, name)
+    except (Exception, SystemExit) as e:
+        raise Refused('no remix %s in the checkout (%s)' % (name, e))
+    try:
+        allm = ob.call(registry.modules)
+        spans = ob.call(stock.p_spans, 'A')
+    except (Exception, SystemExit) as e:
+        raise Refused('octabam\'s stock tables do not load (%s)' % e)
+    st = frozenset(k for k, m in allm.items() if getattr(m, 'is_stock', False))
+    listed = set(r.modules) | set(getattr(r, 'fx1', None) or ())
+    return {'name': r.name, 'doc': r.doc, 'modules': tuple(r.modules), 'stock': st,
+            'harvested': sorted(k for k in st if k not in listed and k in spans)}
+
+
+def build_reference(ob, name, image):
+    """octabam's own build of remix `name` (tools/build/build_bus.py, in the checkout, which
+    writes its out/mainos_bus.bin) -> that main OS image. It needs the checkout's
+    out/raw/section_3_MAIN_OS.bin to be this stock OS (stock_raw), its dsp_asm (`make
+    setup` builds it), and m68k-elf binutils on the PATH."""
+    stock_raw(ob, image)
+    if not os.path.isfile(os.path.join(ob.root, 'vendor', 'dsp56300', 'build', 'source',
+                                       'dsp_host', 'dsp_asm')):
+        raise Refused('octabam\'s build needs its DSP assembler (vendor/dsp56300 .../dsp_asm: '
+                      '`make setup` in the checkout)')
+    if not shutil.which('m68k-elf-as'):
+        raise Refused('octabam\'s build needs the m68k-elf binutils on the PATH')
+    out = os.path.join(ob.root, 'out', 'mainos_bus.bin')
+    if os.path.exists(out):
+        os.remove(out)
+    env = {k: os.environ[k] for k in ('PATH', 'HOME', 'LANG', 'SYSTEMROOT') if k in os.environ}
+    env['REMIX'] = name                     # and none of build_bus's other switches
+    r = subprocess.run([sys.executable, os.path.join('tools', 'build', 'build_bus.py')],
+                       cwd=ob.root, env=env, capture_output=True, text=True)
+    if r.returncode or not os.path.exists(out):
+        raise Refused('octabam\'s build of %s failed:\n%s' % (name, (r.stdout + r.stderr)[-2000:]))
+    with open(out, 'rb') as fh:
+        return fh.read()
+
+
 INCLUDE = re.compile(rb'^\s*\.include\s+"([^"]+)"', re.M)
 
 
@@ -275,13 +407,32 @@ def _collect(ob, rel, files, pool, seen):
     return out
 
 
-def convert(ob, name, image, dev):
+def convert(ob, name, image, dev, rx=None):
     """-> a plan: {'id', 'name', 'members', 'json' (mod.json), 'files' ({relpath: bytes}),
-    'caves', 'tables', 'skip', 'notes'}. Raises Refused."""
-    why = refusal(ob, name)
-    if why:
-        raise Refused(why)
-    mid, names_ = mod_id(name), members(ob, name)
+    'caves', 'tables', 'skip', 'notes', 'relocs', 'remix'}. Raises Refused.
+
+    With `rx` (load_remix's dict, with 'ref', octabam's own build of the remix): one mod
+    for the remix `name`, carrying its modules, and as data sites every other byte that
+    build writes in the OS image (remix_sites)."""
+    if rx is None:
+        why = refusal(ob, name)
+        if why:
+            raise Refused(why)
+        mid, names_ = mod_id(name), members(ob, name)
+    else:
+        mid, names_ = mod_id(name), []
+        for k in rx['modules']:
+            if k in rx['stock']:
+                continue
+            n = ob.by_key.get(k)
+            if n is None:
+                raise Refused('it needs %s, which this checkout does not have' % k)
+            why = refusal(ob, n, hooks=True)
+            if why:
+                raise Refused('%s: %s' % (n, why))
+            names_ += [x for x in members(ob, n) if x not in names_]
+        if not names_:
+            raise Refused('it carries no module of octabam\'s, only stock effects')
     mods = [ob.modules[n] for n in names_]
     remix = {mm.key: mm for mm in mods}
     skip = {(o.site, o.module) for mm in mods for o in mm.overrides}     # detours stood in for
@@ -289,8 +440,11 @@ def convert(ob, name, image, dev):
     notes, sites, sources, files = [], [], [], {}
     defsym, caves, tables, names, fixed = {}, [], [], [], []
     relocs = {}                             # relocatable data's address -> its served copy
-    conflicts, requires = [mod_id(n) for n in names_[1:]], ['core']
-    if names_[1:]:
+    conflicts = [mod_id(n) for n in (names_[1:] if rx is None else names_)]
+    requires = ['core']
+    if rx is not None:
+        notes.append('it carries the remix\'s modules: %s' % ', '.join(names_))
+    elif names_[1:]:
         notes.append('it carries %s, whose hooks it stands in for (octabam\'s bridge), so '
                      'it takes their place' % ', '.join(n for n in names_[1:]))
 
@@ -540,6 +694,55 @@ def convert(ob, name, image, dev):
                      'protects: the mod serves its own copy of it (%s), with them applied, '
                      'through %s, and leaves the protected bytes stock'
                      % (at, what, sym, ', '.join('0x%08x' % a for a in refs)))
+
+    # a remix: every other byte octabam's build of it writes in the OS image, as data
+    remix_sites = []
+    if rx is not None:
+        ref, base = rx['ref'], dev.main_load
+        if len(ref) < len(image):
+            raise Refused('octabam\'s build of %s is shorter than the stock OS' % name)
+        taken = [(int(s['addr'], 16), int(s['addr'], 16) + len(s['stock']) // 2)
+                 for s in sites] + _core_spans()
+        moved = {a + i for r in relocs.values() for a, w in r['pokes'] for i in range(len(w))}
+
+        def ours(a):
+            return any(lo <= a < hi for lo, hi in taken)
+
+        def guarded(a):
+            return any(lo <= a < hi for lo, hi, _w in dev.protected)
+
+        runs = []
+        for i in _changed(image, ref):
+            a = base + i
+            if ours(a):
+                continue                    # a site of ours or the core's: the check compares it
+            if guarded(a):
+                if a in moved:
+                    continue                # served from a copy (above)
+                raise Refused('octabam\'s build of %s writes 0x%08x, inside a range elekloader '
+                              'protects' % (name, a))
+            if runs and a - runs[-1][1] <= 3 and not any(
+                    ours(x) or guarded(x) for x in range(runs[-1][1], a)):
+                runs[-1][1] = a + 1
+            else:
+                runs.append([a, a + 1])
+        where = _locator(ob, image, dev)
+        for lo, hi in runs:
+            site(lo, _stock(image, dev, lo, hi - lo), op='bytes',
+                 new=ref[lo - base:hi - base].hex())
+            remix_sites.append((lo, hi, where(lo, hi)))
+        notes.append('octabam\'s build of %s also writes these, carried as data: %s'
+                     % (name, '; '.join('%s (0x%08x, %d bytes)' % (w, lo, hi - lo)
+                                        for lo, hi, w in remix_sites) or 'nothing'))
+        if rx['harvested']:
+            notes.append('it leaves %s off both FX menus, as the remix does: octabam\'s build '
+                         'gives their DSP code space to the remix\'s DSP code'
+                         % ', '.join(rx['harvested']))
+        for n in names_:                    # for the reader: the build placed these words
+            if hooked_dsp(ob.modules[n]):
+                asm = ob.modules[n].dsp.asm
+                with open(os.path.join(ob.root, *asm.split('/')), 'rb') as fh:
+                    files['dsp/%s' % os.path.basename(asm)] = fh.read()
     if names:
         notes.append('its claims are named resources, one per 16-byte block: a mod that '
                      'claims any of the same blocks is refused beside it')
@@ -547,11 +750,22 @@ def convert(ob, name, image, dev):
     m = mods[0]
     cat = getattr(m.category, 'value', '') if m.category is not None else ''
     carried = [mm.key for mm in mods[1:]]
+    if rx is None:
+        text = m.doc
+        title = m.key + (' (with %s)' % ', '.join(carried) if carried else '')
+        desc = '%s (octabam module %s%s, converted from %s)' % (
+            m.doc, name, ''.join(', with ' + n for n in names_[1:]), ob.commit)
+    else:
+        text = rx['doc']
+        title = 'octabam remix %s: %s' % (name, ', '.join(mm.key for mm in mods))
+        desc = '%s (octabam remix %s, converted from %s)%s' % (
+            rx['doc'], name, ob.commit,
+            ' It takes %s off both FX menus.' % ', '.join(rx['harvested'])
+            if rx['harvested'] else '')
     doc = {
         'id': mid, 'version': ob.commit,
-        'title': m.key + (' (with %s)' % ', '.join(carried) if carried else ''),
-        'description': '%s (octabam module %s%s, converted from %s)'
-                       % (m.doc, name, ''.join(', with ' + n for n in names_[1:]), ob.commit),
+        'title': title,
+        'description': desc,
         'category': cat,
         'author': ', '.join(dict.fromkeys(mm.author for mm in mods if mm.author)),
         'license': 'MIT', 'device': DEVICE, 'os': '1.40C',
@@ -568,10 +782,11 @@ def convert(ob, name, image, dev):
     if conflicts:
         doc['conflicts'] = conflicts
     return {'id': mid, 'name': name, 'members': names_, 'json': doc, 'files': files,
-            'caves': caves, 'tables': tables, 'skip': skip, 'notes': notes,
+            'caves': caves, 'tables': tables, 'skip': skip, 'notes': notes, 'doc': text,
             'relocs': [{'sym': 'ob_%s_copy_%08x' % (_slug(name), lo), 'data': r['data'],
                         'bytes': bytes(r['bytes']), 'pokes': r['pokes']}
-                       for lo, r in sorted(relocs.items())]}
+                       for lo, r in sorted(relocs.items())],
+            'remix': rx, 'remix_sites': remix_sites}
 
 
 def write(ob, plan, out):
@@ -595,7 +810,7 @@ def write(ob, plan, out):
     with open(os.path.join(d, 'README.md'), 'w', newline='\n') as fh:
         fh.write('# %s\n\n%s\n\nConverted by elekloader.sdk.octabam from sambanks/octabam %s, '
                  '%s (MIT, LICENSE.octabam). The sources are octabam\'s%s; glue/ is '
-                 'generated.\n' % (plan['json']['title'], mods[0].doc, ob.commit,
+                 'generated.\n' % (plan['json']['title'], plan.get('doc', mods[0].doc), ob.commit,
                                    ', '.join('modules/' + n for n in plan['members']),
                                    ', with the arena-base literal named `arena_base`'
                                    if any(c.pool_base_literals for m in mods
@@ -805,6 +1020,29 @@ def check(ob, plan, mod_path, core_path, stock_path, work):
                      % (what, a, ', '.join('0x%08x' % p for p, _w in r['pokes']),
                         ', '.join('0x%08x' % x for x in refs)))
 
+    # a remix: the linked OS image is octabam's build of it, byte for byte, except where our
+    # code's addresses go (the operands our relocations fill) and the descriptor it serves
+    # from a copy instead of poking
+    if plan.get('remix'):
+        ref, base = plan['remix']['ref'], dev.main_load
+        ours = set()
+        for s in mod.sites:
+            for o, _t, _tgt, _a in s.get('relocs', []):
+                ours.update(range(s['addr'] + o, s['addr'] + o + 4))
+        moved = {a + i for r in plan['relocs'] for a, w in r['pokes'] for i in range(len(w))}
+        diff = [base + i for i in _changed(ln.image[:len(image)], ref)]
+        bad = [a for a in diff if a not in ours and a not in moved]
+        if bad:
+            raise CheckError('the linked image differs from octabam\'s build of %s at %d bytes '
+                             'that are not our code\'s addresses, the first at 0x%08x'
+                             % (plan['name'], len(bad), bad[0]))
+        wrote = _changed(image, ref)
+        lines.append('the OS image equals octabam\'s build of %s: all %d bytes it changes, '
+                     'but for %d address bytes of our placed code and %d of the descriptor '
+                     'served from a copy' % (plan['name'], len(wrote),
+                                             sum(a in ours for a in diff),
+                                             sum(a in moved for a in diff)))
+
     # the whole of the mod's RAM and fixed code against GNU ld's link of the same object
     obj = os.path.join(os.path.dirname(mod_path), plan['id'] + '.work', plan['id'] + '.o')
     lay = ln.layout['sections']
@@ -874,7 +1112,14 @@ def main(argv=None):
     ap.add_argument('--octabam', required=True, help='an octabam checkout')
     ap.add_argument('--stock', default=os.environ.get('ELEKLOADER_OT_SYX'),
                     help='the stock OCTATRACK_OS1.40C.syx (default: $ELEKLOADER_OT_SYX)')
-    ap.add_argument('--module', action='append', help='a module directory name (default: all)')
+    ap.add_argument('--module', action='append', help='a module directory name (default: all, '
+                    'unless --remix is given)')
+    ap.add_argument('--remix', action='append',
+                    help='an octabam remix to convert as one mod (e.g. usb-io-tracks-main-cue-ab): '
+                         'its modules, and every other byte octabam\'s own build of it writes')
+    ap.add_argument('--reference',
+                    help='with one --remix: that build\'s out/mainos_bus.bin, instead of running '
+                         'octabam\'s build here')
     ap.add_argument('--out', required=True,
                     help='where the folders and .elemod go: outside the elekloader checkout, '
                          'since they carry octabam\'s sources')
@@ -893,7 +1138,9 @@ def main(argv=None):
         os.environ['ELEKLOADER_CROSS'] = 'm68k-elf-'      # octabam's own toolchain
     image = formats.main_image(st, dev)
     ob = Octabam(a.octabam)
-    names = a.module or sorted(set(ob.modules) | set(ob.broken))
+    if a.reference and len(a.remix or ()) != 1:
+        ap.error('--reference goes with exactly one --remix')
+    names = a.module or ([] if a.remix else sorted(set(ob.modules) | set(ob.broken)))
     for n in names:
         if n not in ob.modules and n not in ob.broken:
             ap.error('no module %s in %s' % (n, ob.root))
@@ -914,12 +1161,22 @@ def main(argv=None):
               'whose author pinned its bytes (USB MIDI) fails its check. Install m68k-elf '
               'binutils (it is used when found), or set ELEKLOADER_CROSS=m68k-elf-.')
     failed = 0
-    for n in names:
+    for n, is_remix in [(n, False) for n in names] + [(r, True) for r in a.remix or ()]:
         if n in ob.broken:
             print('REFUSED   %-30s its manifest does not load (%s)' % (n, ob.broken[n]))
             continue
         try:
-            plan = convert(ob, n, image, dev)
+            if is_remix:
+                stock_raw(ob, image)
+                rx = load_remix(ob, n)
+                if a.reference:
+                    with open(a.reference, 'rb') as fh:
+                        rx['ref'] = fh.read()
+                else:
+                    rx['ref'] = build_reference(ob, n, image)
+                plan = convert(ob, n, image, dev, rx)
+            else:
+                plan = convert(ob, n, image, dev)
         except Refused as e:
             print('REFUSED   %-30s %s' % (n, e))
             continue
