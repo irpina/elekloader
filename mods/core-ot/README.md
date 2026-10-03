@@ -42,4 +42,6 @@ string in `.run`:
 - `boot` runs once, called from the boot site;
 - after boot, the marker is at 0x40a955e0, where stock has zeros.
 
-Not yet run on a unit.
+On a unit (an Octatrack MKII, 3 Oct 2026): core alone, and core with 19 of
+the converted octabam mods in seven groups, flashed from the card. Every
+build booted with its own version. Not yet run on an MKI.
