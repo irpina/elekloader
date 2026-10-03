@@ -50,13 +50,47 @@
 </header>
 
 <main class="content" id="content">
-  <section class="view" id="view-library" aria-labelledby="lib-title">
-    <header class="page-head">
-      <p class="eyebrow">Library</p>
+  <section class="view" id="view-library" aria-label="Mods">
+    <!-- the first visit: what this is, and the three steps (until a stock file is in) -->
+    <section class="welcome" id="welcome" aria-labelledby="welcome-title">
+      <p class="eyebrow">Get started</p>
+      <h1 id="welcome-title">Custom firmware for your Elektron box</h1>
+      <p class="sub">New machines and features for the Digitakt, Digitone and Octatrack, built here in your
+        browser from Elektron's own OS file. You flash the result like any OS update.</p>
+      <ul class="trust">
+        <li>Nothing is uploaded: it all happens in this tab</li>
+        <li>Only the main OS changes, so the stock OS always takes it back</li>
+        <li>Free and open source</li>
+      </ul>
+      <ol class="guide">
+        <li class="gstep" id="g-device">
+          <h2><span class="gnum">1</span>Pick your device</h2>
+          <div class="dev-tiles" id="dev-tiles" role="group" aria-label="Your device"></div>
+        </li>
+        <li class="gstep" id="g-stock">
+          <h2><span class="gnum">2</span>Add its stock OS file</h2>
+          <p class="gtext" id="g-stock-text"></p>
+          <div class="drop mini" id="start-drop" tabindex="0" role="button">
+            <svg class="drop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+            <span id="start-drop-text"></span>
+          </div>
+          <p class="bad small" id="start-error" hidden></p>
+        </li>
+        <li class="gstep" id="g-mods">
+          <h2><span class="gnum">3</span>Add mods, then build</h2>
+          <p class="gtext">Press <strong>+ Add</strong> on the mods you want, below. Then <strong>Build</strong>
+            makes your custom OS: a <code>.syx</code> you send with Elektron Transfer, like any update.
+            <a href="https://github.com/irpina/elekloader#flash-it" rel="noreferrer" target="_blank">How to flash, and how to go back</a></p>
+        </li>
+      </ol>
+    </section>
+    <!-- with a stock file in: where you are, and what's next -->
+    <header class="page-head" id="lib-head" hidden>
+      <p class="eyebrow" id="lib-eyebrow">Library</p>
       <h1 id="lib-title">Mods</h1>
-      <p class="sub">New tricks for your Elektron box. Pick the mods, bring your own stock OS file, and the
-        firmware is built right here: nothing leaves this tab.</p>
+      <div class="next" id="next"></div>
     </header>
+    <h2 class="list-h" id="list-title">Browse the mods</h2>
     <div class="filters">
       <span class="chips" id="device-buttons" role="group" aria-label="Device"></span>
       <span class="grow"></span>

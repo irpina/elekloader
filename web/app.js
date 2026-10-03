@@ -218,12 +218,19 @@ async function loadShop() {
 
 // the devices to pick from: the engine's, or (before it loads) the shop's
 function pickable() {
-  if (st.info) return st.info.devices.map(d => ({ key: d.key, name: d.name, os: d.releases.join(' or ') }));
-  const seen = new Map();
-  for (const e of shop.items) {
-    if (!seen.has(e.device)) seen.set(e.device, { key: e.device, name: e.device_name || e.device, os: e.os || '' });
+  if (st.info) {
+    return st.info.devices.map(d => ({ key: d.key, name: d.name, os: d.releases.join(' or '),
+      latest: d.releases[d.releases.length - 1] }));
   }
-  return [...seen.values()];
+  const seen = new Map();                         // before the engine: the shop's devices and OS versions
+  for (const e of shop.items) {
+    if (!seen.has(e.device)) seen.set(e.device, { key: e.device, name: e.device_name || e.device, oses: new Set() });
+    if (e.os) seen.get(e.device).oses.add(e.os);
+  }
+  return [...seen.values()].map(({ oses, ...d }) => {
+    const v = [...oses].sort(cmpVer);
+    return { ...d, os: v.join(' or '), latest: v[v.length - 1] || '' };
+  });
 }
 const deviceName = key => (pickable().find(d => d.key === key) || {}).name || key;
 
@@ -323,6 +330,62 @@ function trace(en) {
   return svg;
 }
 
+// ---- the first visit: the three steps; then, with a stock file in, what's next ----
+
+// where Elektron publishes each device's stock OS (README, "You also need")
+const DOWNLOADS = {
+  'digitakt-mk1': { label: 'Digitakt', url: 'https://www.elektron.se/support-downloads/digitakt' },
+  'digitone-mk1': { label: 'Digitone and Digitone Keys', url: 'https://www.elektron.se/support-downloads/digitone' },
+  octatrack: { label: 'Octatrack (MKI and MKII use the same file)', url: 'https://www.elektron.se/support-downloads/octatrack-mkii' },
+};
+
+function renderStart(all) {
+  const s = st.stock, sd = dev();
+  $('welcome').hidden = !!sd;
+  $('lib-head').hidden = !sd;
+  $('list-title').hidden = !!sd;
+  if (sd) { renderNext(); return; }
+  const devs = pickable();
+  $('dev-tiles').replaceChildren(...devs.map(d => {
+    const n = all.filter(en => en.device === d.key).length;
+    const on = lib.device === d.key;
+    return el('button', { type: 'button', class: 'dev-tile' + (on ? ' on' : ''), 'aria-pressed': String(on),
+      onclick: () => setFilter('device', on ? null : d.key) },
+    el('strong', {}, d.name), el('span', { class: 'os' }, 'OS ' + d.os),
+    el('span', { class: 'n' }, n ? `${n} mod${n === 1 ? '' : 's'}` : 'your own mods'));
+  }));
+  const d = devs.find(x => x.key === lib.device);
+  const dl = d && DOWNLOADS[d.key];
+  $('g-device').classList.toggle('done', !!d);
+  $('g-stock-text').replaceChildren(...(d
+    ? ['Download ', el('strong', {}, `OS ${d.latest}`), ` for the ${dl ? dl.label : d.name} from `,
+      dl ? el('a', { href: dl.url, rel: 'noreferrer', target: '_blank' }, 'Elektron\'s site') : 'Elektron\'s site',
+      '. Then drop the .syx here, or the .zip just as you downloaded it.']
+    : ['Elektron publishes it for each device. Pick yours first and its download link shows here.']));
+  $('start-drop').classList.toggle('waiting', !st.ready);
+  $('start-drop-text').replaceChildren(...(st.ready
+    ? ['Drop the file here, or ', el('span', { class: 'like-link' }, 'choose it')]
+    : ['Starting the build engine: a few seconds, the first time only…']));
+  $('start-error').hidden = !(s && !s.ok);
+  if (s && !s.ok) {
+    $('start-error').textContent = `${s.file} is not one of Elektron's stock OS files. It needs the file just as `
+      + `Elektron publishes it` + (st.info ? `: ${st.info.supported}.` : '.');
+  }
+}
+
+function renderNext() {
+  const sd = dev();
+  const n = [...st.enabled].map(desc).filter(d => d && !d.builtin).length;
+  $('lib-eyebrow').textContent = `Your ${sd.name} · OS ${st.stock.os}`;
+  const sep = () => el('span', { class: 'next-sep', 'aria-hidden': 'true' }, '→');
+  $('next').replaceChildren(
+    el('span', { class: 'next-step done' }, `✓ Stock OS ${st.stock.os}`), sep(),
+    n ? el('span', { class: 'next-step done' }, `✓ ${n} mod${n === 1 ? '' : 's'} in your build`)
+      : el('span', { class: 'next-step now' }, 'Now: + Add the mods you want, below'), sep(),
+    n ? el('a', { class: 'btn primary', href: '#build' }, 'Build your firmware →')
+      : el('span', { class: 'next-step' }, 'Then: build'));
+}
+
 // ---- the library: the kinds in the sidebar, device chips, a shelf per kind ----
 
 const KIND_HUE = { Sampling: 196, Performance: 268, Framework: 24, 'Whole build': 140 };
@@ -344,6 +407,7 @@ function renderLibrary() {
   const sd = dev();
   const devs = pickable();
   const inLib = location.hash !== '#build';
+  renderStart(all);
   const forDev = lib.device ? all.filter(en => en.device === lib.device) : all;
   const kinds = [...new Set(all.filter(en => !en.own).map(en => en.category).filter(Boolean))];
   const ownN = forDev.filter(en => en.own).length;
@@ -353,7 +417,9 @@ function renderLibrary() {
       () => setFilter('type', k), swatchFor(k))),
     ownN || lib.type === OWN ? kindItem('Your files', ownN, inLib && lib.type === OWN, () => setFilter('type', OWN),
       el('span', { class: 'swatch own' })) : '');
-  $('device-buttons').replaceChildren(...[{ key: null, name: 'All' }, ...devs].map(d => {
+  // the devices with mods (or the one picked): a device without any would only be an empty list
+  const withMods = devs.filter(d => d.key === lib.device || all.some(en => en.device === d.key));
+  $('device-buttons').replaceChildren(...[{ key: null, name: 'All' }, ...withMods].map(d => {
     const on = lib.device === d.key;
     return el('button', { type: 'button', class: 'chip' + (on ? ' on' : ''), 'aria-pressed': String(on),
       onclick: () => setFilter('device', d.key) },
@@ -551,7 +617,7 @@ function setupRow({ thumb, title, sub, on, current, href, onclick }) {
 
 function renderChrome() {
   const s = st.stock, sd = dev();
-  const n = st.enabled.size;
+  const n = [...st.enabled].map(desc).filter(d => d && !d.builtin).length;   // your mods; the core comes with them
   const build = location.hash === '#build';
   for (const id of ['cfg-count', 'nav-count', 'tab-count']) {
     $(id).textContent = String(n);
@@ -576,7 +642,7 @@ function renderChrome() {
       ? setupRow({ thumb: el('span', { class: 'thumb stock-bad' }, '!'), title: 'Not a stock OS elekloader knows',
         sub: s.file, href: '#build' })
       : setupRow({ thumb: el('span', { class: 'thumb' }, icon(PLUS, 'ico')), title: 'Your stock OS file',
-        sub: 'Drop it in on Build', href: '#build' })];
+        sub: 'Not added yet: see Get started', href: '#library' })];
   if (sd) {
     const k = sd.key;
     for (const name of Object.keys(profiles()).sort()) {
@@ -1193,9 +1259,10 @@ async function takeFiles(list) {
 }
 
 function wire() {
-  const drop = $('stock-drop');
-  drop.addEventListener('click', () => $('stock-file').click());
-  drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('stock-file').click(); } });
+  for (const drop of [$('stock-drop'), $('start-drop')]) {
+    drop.addEventListener('click', () => $('stock-file').click());
+    drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('stock-file').click(); } });
+  }
   $('stock-file').addEventListener('change', e => { takeFiles(e.target.files); e.target.value = ''; });
   $('add-mods').addEventListener('click', () => $('mod-files').click());
   $('mod-files').addEventListener('change', e => { takeFiles(e.target.files); e.target.value = ''; });
