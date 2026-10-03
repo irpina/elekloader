@@ -5,7 +5,8 @@ Needs files named by environment variables; a test whose inputs are missing
 is skipped, not passed:
   ELEKLOADER_OT_SYX    OCTATRACK_OS1.40C.syx
   ELEKLOADER_OCTABAM   optional: a sambanks/octabam checkout; without one, only
-                       the synthetic module below is converted
+                       the synthetic module below is converted. The remix test
+                       also runs octabam's own build there (its dsp_asm, m68k-elf).
 Building and checking also needs the cross binutils (m68k-linux-gnu-as, -ld,
 -objcopy).
 """
@@ -186,9 +187,36 @@ punit_entry:
 '''
 
 
+# DSP code reached only by a hook into stock DSP code (USB AUDIO IN's shape), with a ColdFire
+# detour of its own: it converts only as part of a remix.
+HOOKMOD = '''
+from types import SimpleNamespace as NS
+UNIT = NS(label="hunit", source="modules/hookmod/hunit.s", cave_addr=None, cpu="54455",
+          reference=None, dram=True, include=None)
+MODULE = NS(name="hookmod", key="HOOKMOD", doc="a hook", menu=None, params=(),
+            dsp=NS(asm="modules/hookmod/inject.asm", hooks=(NS(site=0x88),)),
+            runtime=None, arena=None, overrides=(), cf_patches=(), linked=(UNIT,),
+            detours=(NS(site=0x4001de6e, expect=bytes.fromhex("23c0fc0b01c0"), unit="hunit",
+                        symbol="hook_entry", note="", kind="jmp", target=None, pad_to=None,
+                        subst_return=False),),
+            symbol_refs=(), tables=(), pokes=(), requires=(), claims=None, category=None,
+            author="test")
+'''
+
+HUNIT_S = '''
+        .text
+        .globl  hook_entry
+hook_entry:
+        rts
+'''
+
+
 def fake_checkout(tmp):
     root = os.path.join(tmp, 'octabam')
     for rel, text in (('tools/remix/schema.py', ''), ('modules/fake/manifest.py', MANIFEST),
+                      ('modules/hookmod/manifest.py', HOOKMOD),
+                      ('modules/hookmod/hunit.s', HUNIT_S),
+                      ('modules/hookmod/inject.asm', '; DSP56300\n'),
                       ('modules/fake/cave.s', CAVE_S), ('modules/fake/unit.s', UNIT_S),
                       ('modules/bridge/manifest.py', BRIDGE), ('modules/bridge/bunit.s', BUNIT_S),
                       ('modules/incmod/manifest.py', INCMOD), ('modules/incmod/iunit.s', IUNIT_S),
@@ -329,6 +357,79 @@ def test_a_poke_into_relocatable_data_is_served_from_a_copy():
         img[lo - DEV.main_load:hi - DEV.main_load]
 
 
+def fake_remix(img, ref=None):
+    """A remix of FAKE and HOOKMOD on a stock effect; its build (ref) writes, besides their
+    sites, 8 bytes in the image's free run and a 2-byte list reference."""
+    if ref is None:
+        ref = bytearray(img)
+        o = 0x400d7bbc - DEV.main_load
+        ref[o:o + 8] = bytes(range(1, 9))
+        o = 0x400375f6 - DEV.main_load
+        ref[o:o + 2] = bytes([img[o] ^ 0x10, img[o + 1] ^ 0x01])
+    return {'name': 'rx-test', 'doc': 'a test remix', 'modules': ('FAKE', 'HOOKMOD', 'FILTER'),
+            'stock': frozenset({'FILTER', 'SPATIALIZER'}), 'harvested': ['SPATIALIZER'],
+            'ref': bytes(ref)}
+
+
+def test_a_remix_carries_its_modules_and_the_rest_of_its_build():
+    """A remix converts as one mod: its modules (a hook-only DSP module among them, which
+    alone refuses), and as data sites every other byte its build writes."""
+    img = stock()
+    with tempfile.TemporaryDirectory() as tmp:
+        ob = fake_checkout(tmp)
+        assert 'DSP' in octabam.refusal(ob, 'hookmod')
+        assert octabam.refusal(ob, 'hookmod', hooks=True) is None
+        assert 'DSP' in octabam.refusal(ob, 'dspmod', hooks=True)    # no hooks: still refused
+        plan = octabam.convert(ob, 'rx-test', img, DEV, fake_remix(img))
+        j = plan['json']
+        assert plan['members'] == ['fake', 'hookmod'] and plan['id'] == 'octabam-rx-test'
+        assert j['conflicts'] == ['octabam-fake', 'octabam-hookmod']
+        by = {s['addr']: s for s in j['sites']}
+        assert by['0x400d7bbc'] == {'addr': '0x400d7bbc', 'stock': '00' * 8, 'op': 'bytes',
+                                    'new': '0102030405060708'}
+        assert by['0x400375f6']['op'] == 'bytes' and len(by['0x400375f6']['stock']) == 4
+        assert by['0x4001de6e']['op'] == 'jmp'      # HOOKMOD's own detour, not a data site
+        assert 'SPATIALIZER' in j['description']
+        assert 'dsp/inject.asm' in plan['files']
+        # a build that writes into the protected range refuses (outside a served copy)
+        bad = bytearray(fake_remix(img)['ref'])
+        bad[0x400e18f1 - DEV.main_load] ^= 1
+        try:
+            octabam.convert(ob, 'rx-test', img, DEV, fake_remix(img, bad))
+        except octabam.Refused as e:
+            assert 'protects' in str(e), str(e)
+        else:
+            raise AssertionError('not refused')
+
+
+def test_a_remix_is_checked_against_its_build_byte_for_byte():
+    """The linked OS image must equal the remix's build in every byte, but for the address
+    operands of our placed code: a build whose detour is a jsr where ours is a jmp fails."""
+    img = stock()
+    tools()
+    with tempfile.TemporaryDirectory() as tmp:
+        ob = fake_checkout(tmp)
+        plan = octabam.convert(ob, 'rx-test', img, DEV, fake_remix(img))
+        path, mod = build.build(octabam.write(ob, plan, tmp), SYX, tmp)
+        ln = link.link([elemod.load_any(core(tmp)), elemod.load_any(path)], img)
+        ref = bytearray(ln.image[:len(img)])
+        for s in mod.sites:                         # octabam's units sit elsewhere
+            for o, _t, _tgt, _a in s['relocs']:
+                a = s['addr'] + o - DEV.main_load
+                ref[a:a + 4] = (int.from_bytes(ref[a:a + 4], 'big') + 0x40).to_bytes(4, 'big')
+        plan = octabam.convert(ob, 'rx-test', img, DEV, fake_remix(img, ref))
+        lines = octabam.check(ob, plan, path, core(tmp), SYX, os.path.join(tmp, 'c1'))
+        assert any('equals octabam\'s build of rx-test' in x for x in lines), lines
+        ref[0x4001de6e - DEV.main_load + 1] = 0xb9  # jsr, where ours is jmp
+        plan = octabam.convert(ob, 'rx-test', img, DEV, fake_remix(img, ref))
+        try:
+            octabam.check(ob, plan, path, core(tmp), SYX, os.path.join(tmp, 'c2'))
+        except octabam.CheckError as e:
+            assert '0x4001de6f' in str(e), str(e)
+        else:
+            raise AssertionError('the check passed a different detour')
+
+
 def test_converted_mods_stay_out_of_the_checkout():
     assert octabam.inside_checkout(os.path.join(ROOT, 'octabam-mods')) == \
         os.path.exists(os.path.join(ROOT, '.git'))
@@ -461,6 +562,32 @@ def test_real_usb_audio_out_serves_its_device_descriptor():
     for pair in ((names[0], names[1]), (names[0], 'usb-midi')):
         probs = link.check([core_mod] + [done[n] for n in pair], img)
         assert probs, pair
+
+
+def test_real_usb_io_remix_equals_octabams_build():
+    """USB AUDIO IN converts as part of its remix: usb-io-tracks-main-cue-ab, built by
+    octabam's own build_bus in the checkout, is one mod whose linked OS image equals that
+    build but for our code's addresses and the descriptor served from a copy."""
+    ob, img = real(), stock()
+    tools()
+    if not octabam.bare_metal(DEV):
+        raise Skip('the configured assembler is not bare metal (ELEKLOADER_CROSS=m68k-elf-)')
+    name = 'usb-io-tracks-main-cue-ab'
+    try:
+        rx = octabam.load_remix(ob, name)
+        rx['ref'] = octabam.build_reference(ob, name, img)
+    except octabam.Refused as e:
+        raise Skip(str(e).splitlines()[0])
+    plan = octabam.convert(ob, name, img, DEV, rx)
+    assert plan['members'] == ['usb-midi', 'usb-audio-out-tracks-main-cue', 'usb-crossbar',
+                               'usb-audio-in-ab']
+    assert rx['harvested'] == ['SPATIALIZER']
+    at = {s['addr'] for s in plan['json']['sites']}
+    assert '0x400ef758' in at                       # payload A, P:0x88: the inject's hook
+    out = tempfile.mkdtemp()
+    path, mod = build.build(octabam.write(ob, plan, out), SYX, out)
+    lines = octabam.check(ob, plan, path, core(out), SYX, os.path.join(out, 'check'))
+    assert any('equals octabam\'s build of %s' % name in x for x in lines), lines
 
 
 def test_real_overlapping_claims_do_not_combine():

@@ -398,8 +398,38 @@ converts as one mod that carries both.
 - The includes are generated for the pair.
 - The bridge conflicts with the other module alone.
 
+**Remixes** (`--remix NAME`): an octabam remix converts as one mod. Use it
+for USB AUDIO IN, which only converts this way:
+
+```bash
+python -m elekloader.sdk.octabam --octabam octabam --stock OCTATRACK_OS1.40C.syx \
+    --remix usb-io-tracks-main-cue-ab --out ~/octabam-mods
+```
+
+- The mod carries the remix's own modules (not the stock effects it
+  lists), converted as above, with the includes generated for all of them.
+- A module whose DSP code is reached only by its hooks into stock DSP code
+  (no FX menu entry, no knobs) converts here: USB AUDIO IN's RX inject.
+- Everything else the remix writes in the OS image comes from octabam's own
+  build of it. The converter runs `tools/build/build_bus.py` in the checkout
+  (it needs the checkout's `dsp_asm` from `make setup`, and `m68k-elf` on the
+  PATH; it rewrites the checkout's `out/mainos_bus.bin`), or takes that file
+  from `--reference`. Each byte it changes outside this mod's sites and the
+  core's becomes a data site. For the 12 `usb-io-*` remixes that is:
+  - the RX inject in SPATIALIZER's DSP code on payload A, and its hook at
+    `P:0x88`;
+  - SPATIALIZER's dispatch on payload A pointed at the null stub;
+  - the FX1 and FX2 choosers without SPATIALIZER, and their row tables.
+  So these mods take SPATIALIZER off both FX menus, as the remixes do.
+- **The check** links the mod with the core and requires the OS image to
+  equal octabam's build in every byte. The only exceptions are the address
+  operands of our placed code and the descriptor served from a copy. On top
+  of that, each module gets the usual checks above.
+- Like a bridge, a remix mod conflicts with each of its modules alone.
+
 What does not convert, and why:
-- **DSP code.** Modules with DSP code or an FX menu entry are out of scope.
+- **DSP code.** Modules with DSP code or an FX menu entry are out of scope,
+  but for hook-only DSP code in a remix (above).
 - **Code pinned outside the device's free image areas.**
 - **Formatter registrations.** They draw a DSP module's knob.
 - **Runtimes.** This covers Octakit's runtime, arena reservations, and
