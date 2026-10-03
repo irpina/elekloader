@@ -404,10 +404,10 @@ What does not convert, and why:
 - **Formatter registrations.** They draw a DSP module's knob.
 - **Runtimes.** This covers Octakit's runtime, arena reservations, and
   bridges over a runtime's writes (KITS RELOAD, SCENES KITS, SCENES P2 KITS).
-- **Writes into the protected bootloader copy.** The USB AUDIO OUT modules
-  set the device class in the USB descriptor at `0x400e2004`. That lies
-  inside the 16 KB elekloader keeps stock below `0x400e21e0`, which octabam
-  also places the bootstrap copy in (`~0x400de7dc`).
+- **Writes into the protected bootloader copy**, other than a poke wholly
+  inside data the device marks `relocatable` (below). The 16 KB below
+  `0x400e21e0` stay stock; octabam also places the bootstrap copy there
+  (`~0x400de7dc`).
 - **Modules that serve DSP modules only.** These are MODE DEFAULTS, RIG
   HOSTS and TEMPO BUS (`SERVES_DSP` in the converter, with the reasons).
   Converted alone, they would be inert, or they would point parts at
@@ -428,6 +428,15 @@ Some differences from an octabam build, by design:
   as octabam's ledger does for MIDI SCENES and SCENES P2.
 - **A `jmp` detour** whose six bytes end inside an instruction is
   nop-padded to that instruction's end.
+- **A poke into relocatable data** (the device profile's `relocatable`) is
+  served from a copy. The USB AUDIO OUT modules set the class of the USB
+  device descriptor (`0x400e2004`, inside the protected bootloader copy).
+  Converted, each carries a copy of the 18-byte descriptor in `.run` with
+  that poke applied, and points the descriptor's one reference
+  (`0x4001d82e`, the `pea` that GET_DESCRIPTOR sends from) at it.
+  - The host reads the same bytes as from octabam's build.
+  - The protected range stays stock. The check proves the copy, the
+    reference and the untouched original.
 - **The assembler.** octabam builds with the bare-metal `m68k-elf` binutils.
   Ubuntu's `m68k-linux-gnu-as` is for a Linux target: it leaves every
   reference to a global label to the linker (a shared library may preempt a

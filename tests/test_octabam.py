@@ -296,6 +296,39 @@ def test_pinned_code_stays_where_it_is_pinned():
     assert any('the same bytes for 5407 as for the chip' in x for x in lines), lines
 
 
+def test_a_poke_into_relocatable_data_is_served_from_a_copy():
+    """USB AUDIO OUT's poke of the device descriptor's class (0x400e2004, inside the
+    protected bootloader copy): the mod serves its own copy through the descriptor's one
+    reference, and the protected bytes stay stock."""
+    from types import SimpleNamespace as NS
+    img = stock()
+    poke = NS(addr=0x400e2004, expect=bytes(3), write=bytes.fromhex('ef0201'), note='')
+    with tempfile.TemporaryDirectory() as tmp:
+        ob = fake_checkout(tmp)
+        m = ob.modules['fake']
+        ob.modules['fake'] = m.__class__(**dict(vars(m), pokes=(poke,)))
+        plan = octabam.convert(ob, 'fake', img, DEV)
+        sym = 'ob_fake_copy_400e2000'
+        by = {s['addr']: s for s in plan['json']['sites']}
+        assert '0x400e2004' not in by
+        assert by['0x4001d82e'] == {'addr': '0x4001d82e', 'stock': '400e2000', 'op': 'ptr',
+                                    'target': sym}
+        want = bytearray(img[0x400e2000 - DEV.main_load:][:18])
+        want[4:7] = poke.write
+        assert plan['relocs'][0]['bytes'] == bytes(want)
+        glue = plan['files']['glue/%s.s' % sym].decode()
+        assert '.balign 32' in glue and ', '.join('0x%02x' % b for b in want) in glue
+        tools()
+        d = octabam.write(ob, plan, tmp)
+        path, mod = build.build(d, SYX, tmp)
+        lines = octabam.check(ob, plan, path, core(tmp), SYX, os.path.join(tmp, 'check'))
+        ln = link.link([elemod.load_any(core(tmp)), elemod.load_any(path)], img)
+    assert any('served from' in x and 'protected original is stock' in x for x in lines), lines
+    lo, hi, _w = DEV.protected[0]
+    assert ln.image[lo - DEV.main_load:hi - DEV.main_load] == \
+        img[lo - DEV.main_load:hi - DEV.main_load]
+
+
 def test_converted_mods_stay_out_of_the_checkout():
     assert octabam.inside_checkout(os.path.join(ROOT, 'octabam-mods')) == \
         os.path.exists(os.path.join(ROOT, '.git'))
@@ -315,8 +348,16 @@ def test_refusals():
              'needs NOTHING'),
             ({'overrides': (NS(site=0x4000f834, module='BRIDGE', write='w', defsym=None),)},
              'runtime write w'),
+            # the device qualifier's class, beside the relocatable device descriptor
+            ({'pokes': (NS(addr=0x400e2016, expect=img[0x400e2016 - DEV.main_load:][:3],
+                           write=bytes.fromhex('ef0201'), note=''),)}, 'protects'),
+            # the descriptor's last two bytes and the next two: not wholly inside it
+            ({'pokes': (NS(addr=0x400e2010, expect=img[0x400e2010 - DEV.main_load:][:4],
+                           write=bytes(4), note=''),)}, 'protects'),
             ({'pokes': (NS(addr=0x400e2004, expect=bytes(3), write=bytes.fromhex('ef0201'),
-                           note=''),)}, 'protects'),
+                           note=''),
+                        NS(addr=0x400e2006, expect=bytes(1), write=b'\x02', note=''))},
+             'two pokes write the USB device descriptor'),
             ({'cf_patches': (m.cf_patches[0].__class__(**dict(vars(m.cf_patches[0]),
                                                                 cave_addr=0x400d2000)),)},
              'pinned'),
@@ -392,15 +433,34 @@ def test_real_refusals():
                      ('mode-defaults', 'serves DSP')):
         if n in ob.modules:
             assert words in (octabam.refusal(ob, n) or ''), (n, octabam.refusal(ob, n))
-    # USB AUDIO OUT sets the class of the USB device descriptor at 0x400e2004, inside the
-    # bootloader copy elekloader protects
-    if 'usb-audio-out-main' in ob.modules:
-        try:
-            octabam.convert(ob, 'usb-audio-out-main', stock(), DEV)
-        except octabam.Refused as e:
-            assert 'protects' in str(e) and '0x400e2004' in str(e), str(e)
-        else:
-            raise AssertionError('usb-audio-out-main converted')
+
+
+def test_real_usb_audio_out_serves_its_device_descriptor():
+    """USB AUDIO OUT's five layouts convert: each carries USB MIDI (the bridge), serves the
+    device descriptor with the composite class from .run, and leaves the bootloader copy
+    stock. Any two of them, or one with USB MIDI alone, are refused together."""
+    ob = real()
+    if not octabam.bare_metal(DEV):
+        raise Skip('the configured assembler is not bare metal (ELEKLOADER_CROSS=m68k-elf-)')
+    names = [n for n in ('usb-audio-out-main', 'usb-audio-out-main-cue', 'usb-audio-out-master',
+                         'usb-audio-out-tracks', 'usb-audio-out-tracks-main-cue')
+             if n in ob.modules]
+    done = convert_all(names + ['usb-midi'])
+    img = stock()
+    core_mod = elemod.load_any(_c['core'])
+    lo, hi, _w = DEV.protected[0]
+    for n in names:
+        mod = done[n]
+        assert {s['addr'] for s in mod.sites} >= {0x4001d82e}
+        ln = link.link([core_mod, mod], img)
+        a = int.from_bytes(ln.image[0x4001d82e - DEV.main_load:][:4], 'big')
+        o = ln.layout['run_load'] - DEV.main_load + a - ln.layout['ddr'][0]
+        assert ln.image[o:o + 18][4:7] == bytes.fromhex('ef0201'), n
+        assert ln.image[lo - DEV.main_load:hi - DEV.main_load] == \
+            img[lo - DEV.main_load:hi - DEV.main_load]
+    for pair in ((names[0], names[1]), (names[0], 'usb-midi')):
+        probs = link.check([core_mod] + [done[n] for n in pair], img)
+        assert probs, pair
 
 
 def test_real_overlapping_claims_do_not_combine():
