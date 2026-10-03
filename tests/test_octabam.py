@@ -513,6 +513,9 @@ def test_real_modules_convert_and_check():
     assert done['synth'].symbols['ob_synth_synth_page'] == ('abs', 0x400d24d0)
     assert {s['addr'] for s in done['quantizer'].sites} >= {0x400d2ca8, 0x400d2cb0}
     assert not done['lofi-amf-fix'].size('.run') and len(done['lofi-amf-fix'].sites) == 2
+    # the category as octabam titles it for people, not its enum value
+    assert done['tuner'].doc['category'] == 'Machines and the sequencer'
+    assert done['lofi-amf-fix'].doc['category'] == 'Fixes'
 
 
 def test_real_usb_midi_with_a_bare_metal_assembler():

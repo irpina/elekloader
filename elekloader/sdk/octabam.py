@@ -37,6 +37,7 @@ these:
 | Poke inside data the device marks `relocatable` (in a protected range) | a copy of that data in .run with the poke applied; a ptr site at each of the device's references to it, so the protected bytes stay stock |
 | Override (a bridge) | one mod that carries the modules it bridges; their detours it stands in for are left out, and it conflicts with them alone |
 | requires | requires, by the converted ids |
+| category | the mod's category, as octabam titles it (CATEGORY_TITLE: "MIDI and USB", ...) |
 | Claims (part window, SRAM) | named resources, one per 16-byte block, so mods whose claims overlap are refused together |
 
 Anything else refuses the module, with the reason:
@@ -246,6 +247,19 @@ def members(ob, name):
             if k not in out:
                 out.append(k)
     return out
+
+
+def category(m):
+    """The module's category as octabam titles it for people (schema.CATEGORY_TITLE:
+    "MIDI and USB", "Fixes", ...), or its value where the checkout has no titles."""
+    if m.category is None:
+        return ''
+    v = getattr(m.category, 'value', '')
+    try:
+        from remix.schema import CATEGORY_TITLE
+    except ImportError:
+        return v
+    return {getattr(k, 'value', k): t for k, t in CATEGORY_TITLE.items()}.get(v, v)
 
 
 def _boundary(image, addr, n, dev):
@@ -748,7 +762,7 @@ def convert(ob, name, image, dev, rx=None):
                      'claims any of the same blocks is refused beside it')
 
     m = mods[0]
-    cat = getattr(m.category, 'value', '') if m.category is not None else ''
+    cat = category(m)
     carried = [mm.key for mm in mods[1:]]
     if rx is None:
         text = m.doc
@@ -757,9 +771,9 @@ def convert(ob, name, image, dev, rx=None):
             m.doc, name, ''.join(', with ' + n for n in names_[1:]), ob.commit)
     else:
         text = rx['doc']
-        title = 'octabam remix %s: %s' % (name, ', '.join(mm.key for mm in mods))
-        desc = '%s (octabam remix %s, converted from %s)%s' % (
-            rx['doc'], name, ob.commit,
+        title = name.replace('-', ' ').upper()      # as octabam names its modules: USB IO ...
+        desc = '%s (octabam remix %s: %s; converted from %s)%s' % (
+            rx['doc'], name, ', '.join(mm.key for mm in mods), ob.commit,
             ' It takes %s off both FX menus.' % ', '.join(rx['harvested'])
             if rx['harvested'] else '')
     doc = {
