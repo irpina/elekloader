@@ -157,7 +157,8 @@ def shop(path, folder):
         base = {'file': f, 'sha256': it['sha256'], 'device': it['device'], 'repo': it['repo'],
                 'tag': it['tag'], 'homepage': 'https://github.com/' + it['repo'],
                 'release_url': 'https://github.com/%s/releases/tag/%s' % (it['repo'], it['tag']),
-                'summary': it.get('summary', ''), 'needs_core': it.get('needs_core')}
+                'summary': it.get('summary', ''), 'needs_core': it.get('needs_core'),
+                'on_unit': it.get('on_unit', '')}
         p = os.path.join(folder, f) if folder else ''
         if not p or not os.path.exists(p):
             print('WARNING: %s (%s %s) is not there: the shop lists it as not available'

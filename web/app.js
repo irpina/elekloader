@@ -179,7 +179,7 @@ function libEntries() {
     out.push({ shop: g, title: e.title || e.id, id: e.id || e.title, version: e.version || '',
       device: e.device, category: e.category || '', author: e.author || '', license: e.license || '',
       summary: e.summary || e.description || '', oses: g.map(x => x.os).filter(Boolean),
-      available: g.some(x => x.available) });
+      available: g.some(x => x.available), onUnit: e.on_unit || '' });
   }
   const own = new Map();
   for (const d of st.mods) {
@@ -293,7 +293,40 @@ function seeded(s) {                               // a small deterministic gene
   return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296;
 }
 
-// a cover's line: drawn from the mod's kind, varied by its name
+// A cover's motif, from keywords in the mod's id and title: what the mod is
+// about (a tuner draws a needle, USB audio its channels). First match wins;
+// a mod with none is drawn from its kind. `hue` nudges the kind's colour, so a
+// shelf of one kind still varies.
+const MOTIFS = [
+  { re: /tuner/, motif: 'needle', hue: -20 },
+  { re: /synth|\bfm\b/, motif: 'fm', hue: 10 },
+  { re: /quantiz|scale/, motif: 'steps', hue: 28 },
+  { re: /repitch|turntable/, motif: 'record', hue: -36 },
+  { re: /jump|chain/, motif: 'jump', hue: 40 },
+  { re: /recorder|rlen|loop/, motif: 'loop', hue: -8 },
+  { re: /seek/, motif: 'seek', hue: 18 },
+  { re: /lofi|lo-fi|crush/, motif: 'crush', hue: -24 },
+  { re: /scene|crossfade/, motif: 'fader', hue: 0 },
+  { re: /(^|[-\s])cc[-\s]/, motif: 'knobs', hue: 22 },
+  { re: /usb-audio|usb-io|usb audio|usb io/, motif: 'meters', hue: -16 },
+  { re: /crossbar/, motif: 'grid', hue: 34 },
+  { re: /usb/, motif: 'usb', hue: -34 },
+  { re: /midi/, motif: 'din', hue: 12 },
+];
+
+function motifOf(en) {
+  const words = `${en.id || ''} ${en.title || ''}`.toLowerCase();
+  return MOTIFS.find(m => m.re.test(words)) || null;
+}
+
+// a USB audio mod's channel counts, from its id: [out, in]
+function channelsOf(id) {
+  const out = /tracks-main-cue/.test(id) ? 20 : /tracks/.test(id) ? 16 : /main-cue/.test(id) ? 4 : 2;
+  const inn = !/usb-io/.test(id) ? 0 : /abcd/.test(id) ? 4 : 2;
+  return [out, inn];
+}
+
+// a cover's line: drawn from the mod's motif or kind, varied by its name
 function trace(en) {
   const svg = document.createElementNS(SVG, 'svg');
   svg.setAttribute('viewBox', '0 0 200 100');
@@ -302,11 +335,16 @@ function trace(en) {
     const e = document.createElementNS(SVG, tag);
     for (const [k, v] of Object.entries(a)) e.setAttribute(k, String(v));
     svg.append(e);
+    return e;
   };
   const rnd = seeded(en.id + en.device);
   const line = { fill: 'none', stroke: 'currentColor', 'stroke-width': 2.4, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
   const faint = { stroke: 'currentColor', 'stroke-opacity': 0.4, 'stroke-width': 1.5, 'stroke-dasharray': '3 5' };
+  const dot = (cx, cy, r) => add('circle', { cx, cy, r, fill: 'currentColor' });
+  const pt = (cx, cy, r, deg) => [cx + r * Math.cos(deg * Math.PI / 180), cy + r * Math.sin(deg * Math.PI / 180)];
   const pts = [];
+  const m = motifOf(en);
+  if (m && drawMotif(m.motif, en, { add, rnd, line, faint, dot, pt })) return svg;
   if (en.category === 'Sampling') {                // a hit that decays, cut into slices
     for (let x = 0; x <= 200; x += 2) {
       const t = x / 200, env = Math.min(1, t * 14) * Math.exp(-3.2 * t);
@@ -340,6 +378,184 @@ function trace(en) {
     add('polyline', { ...line, points: pts.join(' ') });
   }
   return svg;
+}
+
+// The motifs, in the cover's 200 x 100 box below its name (y 34..96). Each is
+// varied by the mod's own generator, so two mods with one motif differ.
+function drawMotif(motif, en, { add, rnd, line, faint, dot, pt }) {
+  const poly = (pts, extra = {}) => add('polyline', { ...line, ...extra, points: pts.map(p => p.join(',')).join(' ') });
+  const arc = (cx, cy, r, a0, a1, extra = {}) => {
+    const [x0, y0] = pt(cx, cy, r, a0), [x1, y1] = pt(cx, cy, r, a1);
+    add('path', { ...line, ...extra, d: `M${x0},${y0} A${r},${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1},${y1}` });
+  };
+  const arrowHead = (x, y, deg, s = 7) => poly([pt(x, y, s, deg + 150), [x, y], pt(x, y, s, deg - 150)]);
+  switch (motif) {
+  case 'needle': {                                 // a tuner: a scale, its ticks, the needle
+    const cx = 100, cy = 98, r = 58;
+    arc(cx, cy, r, 205, 335);
+    for (let a = 210; a <= 330; a += 10) {
+      const [x0, y0] = pt(cx, cy, r - (a % 30 === 0 ? 10 : 6), a), [x1, y1] = pt(cx, cy, r, a);
+      add('line', { ...line, 'stroke-width': a === 270 ? 2.4 : 1.4, x1: x0, y1: y0, x2: x1, y2: y1 });
+    }
+    const [nx, ny] = pt(cx, cy, r - 4, 270 + (rnd() - 0.5) * 40);
+    add('line', { ...line, x1: cx, y1: cy, x2: nx, y2: ny });
+    dot(cx, cy - 2, 4);
+    return true;
+  }
+  case 'fm': {                                     // a carrier bent by its modulator
+    const f = 3 + 2 * rnd(), mod = 1 + rnd(), idx = 1.5 + 2 * rnd(), pts = [];
+    for (let x = 0; x <= 200; x += 2) {
+      const t = x / 200;
+      pts.push([x, 66 - 24 * Math.sin(2 * Math.PI * f * t + idx * Math.sin(2 * Math.PI * mod * f * t))]);
+    }
+    poly(pts);
+    return true;
+  }
+  case 'steps': {                                  // a pitch line snapped to a scale's degrees
+    const ph = 6 * rnd(), smooth = [], snapped = [];
+    for (let x = 0; x <= 200; x += 2) smooth.push([x, 65 - 26 * Math.sin(x / 32 + ph)]);
+    add('polyline', { ...faint, fill: 'none', points: smooth.map(p => p.join(',')).join(' ') });
+    for (let x = 0; x <= 200; x += 14) {
+      const y = 65 + 9 * Math.round(-26 * Math.sin((x + 7) / 32 + ph) / 9);
+      snapped.push([x, y], [Math.min(200, x + 14), y]);
+    }
+    poly(snapped);
+    return true;
+  }
+  case 'record': {                                 // a turntable: the record, its grooves, the arm
+    const cx = 74 + 10 * rnd(), cy = 66;
+    add('circle', { ...line, cx, cy, r: 30 });
+    for (const r of [24, 18]) add('circle', { ...faint, fill: 'none', cx, cy, r });
+    dot(cx, cy, 3.5);
+    const px = 160, py = 36;
+    dot(px, py, 4);
+    poly([[px, py], [px - 6, py + 34], [cx + 16, cy + 6]]);
+    arc(cx, cy, 38, 300 + 20 * rnd(), 350 + 20 * rnd());
+    return true;
+  }
+  case 'jump': {                                   // steps, and a jump from one to a later one
+    const n = 8, w = 16, gap = 6, x0 = 100 - (n * w + (n - 1) * gap) / 2, y = 74;
+    const from = 1 + Math.floor(rnd() * 3), to = from + 3 + Math.floor(rnd() * 2);
+    for (let i = 0; i < n; i++) {
+      add('rect', { ...line, 'stroke-width': 1.6, x: x0 + i * (w + gap), y, width: w, height: 14, rx: 2,
+        fill: i === from || i === to ? 'currentColor' : 'none', 'fill-opacity': 0.35 });
+    }
+    const xa = x0 + from * (w + gap) + w / 2, xb = x0 + to * (w + gap) + w / 2;
+    add('path', { ...line, d: `M${xa},${y - 4} Q${(xa + xb) / 2},${y - 50} ${xb},${y - 6}` });
+    arrowHead(xb, y - 6, 70);
+    return true;
+  }
+  case 'loop': {                                   // a recording that comes round again
+    const cx = 100, cy = 64, r = 26, a0 = 20 + 60 * rnd();
+    arc(cx, cy, r, a0, a0 + 300);
+    const [hx, hy] = pt(cx, cy, r, a0 + 300);
+    arrowHead(hx, hy, a0 + 300 + 90);
+    dot(cx, cy, 7);
+    const pts = [];
+    for (let x = 0; x <= 200; x += 4) if (x < 62 || x > 138) pts.push([x, 64 - 10 * Math.sin(x / 6 + 5 * rnd())]);
+    poly(pts.filter(p => p[0] < 62), { 'stroke-width': 1.6 });
+    poly(pts.filter(p => p[0] > 138), { 'stroke-width': 1.6 });
+    return true;
+  }
+  case 'seek': {                                   // a playhead that seeks back instead of restarting
+    const pts = [];
+    for (let x = 0; x <= 200; x += 2) pts.push([x, 68 - 18 * Math.sin(x / 9) * (0.6 + 0.4 * Math.sin(x / 41 + 3 * rnd()))]);
+    poly(pts, { 'stroke-width': 1.8 });
+    const xh = 110 + 50 * rnd();
+    add('line', { ...line, x1: xh, y1: 36, x2: xh, y2: 96 });
+    add('path', { ...line, d: `M${xh - 4},40 Q${xh - 30},30 ${xh - 52},40` });
+    arrowHead(xh - 52, 40, 200);
+    return true;
+  }
+  case 'crush': {                                  // a wave, sampled and held
+    const hold = 8 + Math.floor(6 * rnd()), pts = [];
+    for (let x = 0; x <= 200; x += hold) {
+      const y = 66 + 10 * Math.round(-2.6 * Math.sin(x / 18));
+      pts.push([x, y], [x + hold, y]);
+    }
+    poly(pts);
+    return true;
+  }
+  case 'fader': {                                  // the crossfader, and its two scenes
+    add('line', { ...line, 'stroke-width': 3, x1: 36, y1: 74, x2: 164, y2: 74 });
+    for (const [x, s] of [[24, 'A'], [176, 'B']]) {
+      add('circle', { ...line, 'stroke-width': 1.8, cx: x, cy: 74, r: 9 });
+      add('text', { x, y: 78, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: 'currentColor' }).textContent = s;
+    }
+    const fx = 60 + 80 * rnd();
+    add('rect', { x: fx - 7, y: 62, width: 14, height: 24, rx: 3, fill: 'currentColor' });
+    if (/midi/.test(en.id || '')) {                // driven over MIDI: a small socket above
+      add('circle', { ...line, 'stroke-width': 1.8, cx: 100, cy: 44, r: 10 });
+      for (const a of [180, 225, 270, 315, 0]) { const [x, y] = pt(100, 44, 5.5, a); dot(x, y, 1.4); }
+    } else if (/p2/.test(en.id || '')) {           // page 2: a second row of the same
+      add('line', { ...line, 'stroke-width': 2, 'stroke-opacity': 0.6, x1: 36, y1: 44, x2: 164, y2: 44 });
+      add('rect', { x: 200 - fx - 6, y: 36, width: 12, height: 16, rx: 3, fill: 'currentColor', 'fill-opacity': 0.6 });
+    } else {
+      add('path', { ...faint, fill: 'none', d: `M36,50 C${fx},${36} ${fx},${60} 164,44` });
+    }
+    return true;
+  }
+  case 'knobs': {                                  // a row of knobs, each at its value
+    for (let i = 0; i < 4; i++) {
+      const cx = 34 + i * 44, cy = 66, a = 135 + 270 * rnd();
+      arc(cx, cy, 15, 135, 405, { 'stroke-width': 1.4, 'stroke-opacity': 0.5 });
+      add('circle', { ...line, cx, cy, r: 10 });
+      const [x, y] = pt(cx, cy, 10, a);
+      add('line', { ...line, x1: cx, y1: cy, x2: x, y2: y });
+    }
+    if (/feedback/.test(en.id || '')) {            // the values going back out
+      add('path', { ...line, 'stroke-width': 1.8, d: 'M166,44 Q100,22 36,42' });
+      arrowHead(36, 42, 170, 6);
+    }
+    return true;
+  }
+  case 'meters': {                                 // its channels as meters; with an input, both ways
+    const [out, inn] = channelsOf(en.id || '');
+    const right = inn ? 140 : 196, w = Math.min(22, (right - 8) / out), bw = Math.max(2, Math.min(14, w * 0.64));
+    const x0 = 8 + ((right - 8) - out * w) / 2;     // a few channels sit centred, at a meter's width
+    for (let i = 0; i < out; i++) {
+      const h = 12 + 38 * rnd(), x = x0 + i * w + (w - bw) / 2;
+      add('rect', { x, y: 94 - h, width: bw, height: h, rx: 1, fill: 'currentColor', 'fill-opacity': 0.85 });
+    }
+    if (inn) {
+      poly([[146, 50], [160, 50]]); arrowHead(146, 50, 180, 6);
+      poly([[146, 70], [160, 70]]); arrowHead(160, 70, 0, 6);
+      const wi = 30 / inn;
+      for (let i = 0; i < inn; i++) {
+        const h = 14 + 30 * rnd();
+        add('rect', { ...line, 'stroke-width': 1.4, x: 166 + i * wi + 1, y: 94 - h, width: wi - 3, height: h, rx: 1 });
+      }
+    }
+    return true;
+  }
+  case 'grid': {                                   // a crossbar: lines, and the points that connect
+    for (let i = 0; i < 4; i++) {
+      add('line', { ...line, 'stroke-width': 1.4, x1: 40, y1: 44 + i * 15, x2: 160, y2: 44 + i * 15 });
+      add('line', { ...line, 'stroke-width': 1.4, x1: 55 + i * 30, y1: 36, x2: 55 + i * 30, y2: 96 });
+    }
+    for (let i = 0; i < 4; i++) dot(55 + Math.floor(rnd() * 4) * 30, 44 + i * 15, 4.5);
+    return true;
+  }
+  case 'usb': {                                    // the USB trident
+    const y = 66;
+    dot(40, y, 7);
+    poly([[40, y], [158, y]]);
+    poly([[150, y - 8], [164, y], [150, y + 8], [150, y - 8]], { fill: 'currentColor' });
+    poly([[70, y], [86, y - 22], [110, y - 22]]);
+    add('circle', { ...line, cx: 116, cy: y - 22, r: 6 });
+    poly([[88, y], [104, y + 20], [124, y + 20]]);
+    add('rect', { x: 124, y: y + 15, width: 11, height: 11, fill: 'currentColor' });
+    return true;
+  }
+  case 'din': {                                    // a MIDI DIN socket
+    const cx = 100, cy = 66;
+    add('circle', { ...line, cx, cy, r: 27 });
+    for (const a of [180, 225, 270, 315, 0]) { const [x, y] = pt(cx, cy, 15, a); dot(x, y, 3.2); }
+    add('rect', { x: cx - 5, y: cy + 21, width: 10, height: 7, fill: 'currentColor' });
+    return true;
+  }
+  }
+  return false;
 }
 
 // ---- the first visit: the three steps; then, with a stock file in, what's next ----
@@ -497,7 +713,9 @@ function card(en) {
   const open = () => openSheet(en);
   const cover = el('button', { type: 'button', class: 'cover', onclick: open, 'aria-label': `About ${en.title}` },
     trace(en), el('span', { class: 'name' }, en.title));
-  cover.style.setProperty('--h', String(Math.round((KIND_HUE[en.category] ?? 330) + 36 * seeded(en.id)() - 18)));
+  const m = motifOf(en);
+  cover.style.setProperty('--h', String(Math.round((KIND_HUE[en.category] ?? 330) + (m ? m.hue : 0)
+    + (m ? 16 : 36) * seeded(en.id)() - (m ? 8 : 18))));
   const button = act
     ? el('button', { type: 'button', class: 'add' + (act.kind === 'in' ? ' in' : ''), disabled: act.disabled,
       title: act.label, onclick: act.run }, act.kind === 'in' ? '✓ In build' : '+ Add')
@@ -549,6 +767,11 @@ function openSheet(en) {
         .map(x => `${x.file}${en.shop.length > 1 ? ` (OS ${x.os})` : ''}\nsha256 ${x.sha256}`).join('\n')
         || `Its release (${e.tag}) is not published yet.`),
     ];
+  }
+  // what has been checked on real hardware (the catalog's on_unit), under the description
+  if (en.onUnit) {
+    const i = parts.findIndex(p => p && p.classList && p.classList.contains('desc'));
+    parts.splice(i < 0 ? parts.length : i + 1, 0, el('h4', {}, 'On a unit'), el('p', { class: 'muted' }, en.onUnit));
   }
   // what you can do with it: the card's action, Remove, its source
   const act = action(en, s);
