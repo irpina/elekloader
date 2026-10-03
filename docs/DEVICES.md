@@ -107,8 +107,13 @@ of its own that is only a boot copier.
     everything above `0x400d8000` (the PROJECT subsystem's RAM).
 - **Checked in an emulator** (octabam's `ot_emu`): with core and a mod that
   puts a marker in `.run`, the boot reaches the RTOS handoff as stock does,
-  `.boot` runs once, and the marker is in the reserve after boot. Not yet
-  run on a unit.
+  `.boot` runs once, and the marker is in the reserve after boot.
+- **On a unit** (an MKII, 3 Oct 2026): eight builds flashed from the card
+  booted, each showing its own version.
+  - The builds were core alone, then core with 19 of the converted octabam
+    mods (irpina/octabam2elemod v1.0) in seven groups, the last with all 19.
+  - Not yet run on an MKI. The mods' features have not yet been tested on a
+    unit, only that each build boots.
 
 ## What a new device needs besides its profile
 
