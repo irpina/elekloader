@@ -167,6 +167,24 @@ def test_refuses_the_protected_bootloader_copy():
     expect(lambda: formats.verify(outputs, st, bytes(bad), DEV, 'x'), 'not stock')
 
 
+def test_relocatable_data_is_reached_only_through_its_references():
+    """The profile's `relocatable` facts, against the stock image: the data lies in a
+    protected range, each reference holds its address, and no other four bytes outside
+    the protected ranges point into it, at any alignment."""
+    st, img = stock()
+    base = DEV.main_load
+    assert DEV.relocatable
+    for lo, n, refs, what in DEV.relocatable:
+        assert any(plo <= lo and lo + n <= phi for plo, phi, _w in DEV.protected), what
+        found = []
+        for o in range(len(img) - 3):
+            a = base + o
+            if lo <= int.from_bytes(img[o:o + 4], 'big') < lo + n \
+                    and not any(plo <= a < phi for plo, phi, _w in DEV.protected):
+                found.append(a)
+        assert found == list(refs), (what, [hex(a) for a in found])
+
+
 def test_version_field():
     st, img = stock()
     stored = st.stored[3]

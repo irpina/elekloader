@@ -25,6 +25,17 @@ Facts taken from sambanks/octabam (MIT) and not re-derived here are marked
   - Its exact start is not known, so the whole 16 KB below 0x400e21e0 (the
     most a 0x4000-byte bootloader can be) is protected: no mod may change a
     byte of it.
+  - The OS's USB descriptor tables are in the top 480 bytes of that range,
+    from 0x400e2000. The device descriptor there (18 bytes, idProduct
+    0x0002) is reached through one operand only: `pea 0x400e2000` at
+    0x4001d82c, the GET_DESCRIPTOR(DEVICE) reply, the only long in the image
+    outside the range that points into those 18 bytes (tests/
+    test_octatrack.py checks this against the stock file). Nothing writes
+    them: the stores at 0x4001d572-0x4001d5cf set the configuration
+    descriptors' endpoint sizes, from 0x400e201e on. So a mod may serve
+    its own copy through that operand (`relocatable`), and the protected
+    bytes stay stock. octabam's USB AUDIO OUT pokes the class bytes
+    (0x400e2004) in place; converted, it serves a copy (sdk.octabam).
 - **The OS in flash.** It is programmed from 0x4000, and the OS's sector
   table spans 0x4000-0x1fffff (octabam, marked inferred there). That is the
   container budget used here.
@@ -81,6 +92,7 @@ DEVICE = Device(
     version_len=10,
     protected=((0x400de1e0, 0x400e21e0,
                 'the copy of the bootloader the OS can re-flash it from'),),
+    relocatable=((0x400e2000, 18, (0x4001d82e,), 'the USB device descriptor'),),
     blob_max=None,
     areas={
         'ddr': (0x40A955E0, 0x41495DE0),          # the arena's bottom 1,707 pages (core-ot)

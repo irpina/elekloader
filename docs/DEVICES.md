@@ -21,6 +21,7 @@ of its own that is only a boot copier.
 | `recovery` | how to get back to stock, shown to the user | FUNC at power-on |
 | `container`, `version_len` | the file family (`'ele3'`, `'elek'`) and the version field's length | the container header |
 | `protected` | main OS ranges no mod may change, with the reason | none on the mk1 |
+| `relocatable` | data inside a protected range that the OS reaches only through the listed 4-byte operands and never writes, so a mod may serve its own copy through them (sdk.octabam does, for a poke there) | none on the mk1 |
 | `blob_max` | a cap on the appended blob, if the DDR areas do not give one | none on the mk1 |
 | `image_free` | zero runs inside the main OS that `fixed` code may take (sdk.build) | none on the mk1 |
 | `toolchain` | the compiler, assembler and flags the SDK uses | the CFW's build |
@@ -71,6 +72,12 @@ of its own that is only a boot copier.
   both stock files byte for byte from their own main OS stream.
 - **Protected.** `0x400de1e0-0x400e21e0` holds the copy of the bootloader
   that the OS can re-flash. No site, blob or verified output may change it.
+  - The OS's USB descriptor tables are its top 480 bytes, from
+    `0x400e2000`. The device descriptor (18 bytes) is `relocatable`: the
+    only pointer to it is the operand of `pea 0x400e2000` at `0x4001d82c`
+    (GET_DESCRIPTOR), and nothing writes it. A mod may point that operand
+    at its own copy. tests/test_octatrack.py checks, against the stock
+    file, that no other four bytes outside the range point into it.
 - **Flash.** The container sits at `0x4000` and must end below `0x200000`.
 - **Not known yet.** Where the bootloader stages the image (`stage` is
   `None`), so the in-place unpack is not simulated.
