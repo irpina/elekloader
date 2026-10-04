@@ -25,7 +25,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 |---|---|
 | `elekloader/devices/` | everything device-specific: one profile per product, releases by hash |
 | `elekloader/formats.py` | one interface over the OS file families (`Device.container`); `load` also takes Elektron's zip |
-| `elekloader/syx.py` | the Digitakt mk1's and Digitone mk1's family (ELE3, SysEx): parse, write (only the main OS changes), verify |
+| `elekloader/syx.py` | the Digitakt mk1's, Digitone mk1's and Digitakt II's family (ELE3, SysEx; the II's sealed with an HMAC): parse, write (only the main OS changes), verify |
 | `elekloader/elek.py` | the Octatrack's family (ELEK, legacy SysEx, the ELUP card file): the same |
 | `elekloader/elemod.py` | the mod format: shared validation, format 1, the instruction check, `summarize` |
 | `elekloader/link.py` | format 2: the linker and its checks |
@@ -48,6 +48,7 @@ ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=... ELEKLOADER_CTOOL_SYX=... python tests
 ELEKLOADER_OT_SYX=... ELEKLOADER_OT_BIN=... python tests/test_octatrack.py
 ELEKLOADER_OT_SYX=... ELEKLOADER_OCTABAM=... python tests/test_octabam.py
 ELEKLOADER_DN_SYX=... python tests/test_digitone.py
+ELEKLOADER_DT2_SYX=... python tests/test_digitakt2.py
 ELEKLOADER_RELEASES=<folder of stock files> python tests/test_releases.py   # every known release, and the cores for it
 ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
 python packaging/build_web.py --pyodide pyodide-core-<v>.tar.bz2 --core core-*.elemod --out build/site

@@ -15,6 +15,7 @@ of its own that is only a boot copier.
 | `stage` | where the bootloader stages the main OS before unpacking it in place | the bootstrap's loader (`0x800005fe`: read to `0x40200000`, unpack to `0x40000400`) |
 | `flash_at`, `flash_limit` | where the container sits in flash and must end | the bootstrap (`0x80000` .. `0x380000`) |
 | `trailer` | how the file is sealed: `None`, or `'hmac'` | mk1 has none |
+| `hmac_key_from` | for `'hmac'`: the section and seed string the key is derived from (never the key itself) | none on the mk1 |
 | `isa` | the main CPU's instruction decoder, for the boundary checks | ColdFire (`isa/coldfire.py`) |
 | `areas` | memory that is free at run time: where a mod's regions may lie | the research on what the OS never touches |
 | `ddr`, `sram_code`, `fast_table` | where the linker puts mods' code and data, fast code, and the table that copies it | the areas above |
@@ -25,6 +26,58 @@ of its own that is only a boot copier.
 | `blob_max` | a cap on the appended blob, if the DDR areas do not give one | none on the mk1 |
 | `image_free` | zero runs inside the main OS that `fixed` code may take (sdk.build) | none on the mk1 |
 | `toolchain` | the compiler, assembler and flags the SDK uses | the CFW's build |
+
+## The Digitakt II (1.17)
+
+Experimental: whole builds only, and nothing has been run on a unit or in an
+emulator yet. digikit (https://github.com/m-dwyer/digikit,
+docs/findings/01-container-and-patching.md) mapped 1.15C and 1.16. Each fact
+below was found again in 1.17.
+
+- **Files.** The Digitakt mk1's family (ELE3, the same SysEx transport),
+  device byte `0x14`. It has six sections: 5, 2 (the bootstrap, run at
+  `0x80000400`; its `dest` is a version, `0x0201`), 3 (MAIN OS), 4 (the
+  updater), 7 (the SHARC DSP's program) and 8.
+- **Sealed.** After the last section's 16-byte padding comes a 32-byte
+  HMAC-SHA256 of everything before it, inside the preamble's length.
+  - The bootstrap checks it, and the content checksum, before it flashes;
+    the OS checks it on an upgrade. A file that fails is refused with
+    `Checksum failed` or `UPGRADE ABORTED`, and nothing is written.
+  - The key: in section 2, the seed `"Master Overdrive"`, a NUL and a
+    32-byte constant C; the key is C ^ sha256(seed) ^ sha256(reversed seed).
+    `syx.seal_key` reads it from the user's stock file, so it is never
+    stored here.
+  - From its own main OS stream, the writer reproduces the stock file byte
+    for byte, seal included.
+- **Staging.** The bootstrap (`0x800005be`) reads section 3 from flash, at
+  its container offset + `0x80000`, to `0x40400000`, and unpacks it from
+  there to `0x40000400`. The mk1 stages at `0x40200000`; this image, 3.27 MB
+  depacked, runs past that. Stock's in-place gap is 2,065,240 bytes.
+- **Flash.** The container starts at `0x80000`: the bootstrap's read above,
+  and digikit's map of the OS's own reads. The OS keeps a store at
+  `0x380000`-`0x400000`, with the mk1's code at its own addresses: it reads
+  a 0x14-byte header at `0x380000`, and erases the sectors at `0x380000` and
+  `0x3c0000` (26 and 12 call sites, from `0x400ca504`). So `flash_limit` is
+  `0x380000`: 3 MB for the container, of which stock takes 1.48 MB. The
+  bootstrap's receive path has no size check of its own, so this limit is
+  elekloader's alone.
+- **Recovery.** The startup menu (FUNC at power-on), TRIG 4 for OS UPGRADE,
+  over MIDI only (Elektron's readme). It is in the bootstrap, which no build
+  changes, and checks only the content checksum and the seal.
+- **At reset** (`0x400004e8`), the OS:
+  - copies `0x40312000-0x40318e80` to SRAM at `0x80000000` and
+    `0x40318e80-0x4031ff60` to `0x80008000`, and zeroes the rest of each
+    32 KB half;
+  - clears DDR `0x40312000-0x47E28470`;
+  - runs its stack down from `0x48000000`.
+  The mk1's reset code, with the II's addresses.
+- **Not known yet: free memory at run time.** No `areas`, `ddr`,
+  `sram_code` or `fast_table` are given until they are measured, so
+  linkable mods are refused. The mk1's areas are not the II's. Its SRAM
+  halves are fuller, and its clear runs to `0x47E28470`, past the mk1's
+  DDR area. Measuring needs digikit's emulator (`emu.run`, a cold boot and
+  a settled session) and the steps the Digitone took: what is cleared, no
+  operand into the candidate, and no page mapped there in a run.
 
 ## The Digitone mk1 and Digitone Keys (1.43)
 
@@ -128,13 +181,10 @@ of its own that is only a boot copier.
 
 ## What a new device needs besides its profile
 
-- **Sealed files.** The Digitakt II and Digitone II seal the container with
-  an HMAC-SHA256 trailer. digikit computes it (`dt2/authcode.py`).
-  - `syx.write` refuses any device whose `trailer` is not `None` until that
-    is ported and verified against the stock files.
-  - The trailer's layout, and the preamble's length rule, must be checked
-    against real files first, as the mk1's were against
-    elektron-firmware-tool's output.
+- **Sealed files.** `trailer='hmac'` with `hmac_key_from` (the Digitakt
+  II, above). Another sealed device needs its seed found in its bootstrap
+  (the Digitone II's is `"Multiplier"`, digikit), and the writer checked to
+  reproduce its stock file, seal included.
 - **The packing format.** The loader repacks with the same codec
   (`codec/`). Check that the device's own depacker accepts it: every
   section must round-trip through `codec/elz.py`, and the in-place

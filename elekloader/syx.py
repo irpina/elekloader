@@ -15,16 +15,24 @@ final 101-byte chunk is padded with zeros. Given that tool's section-3
 stream, write() reproduces its .syx byte for byte (tests/test_patcher.py);
 given a stock file's own stream, it reproduces that file.
 
+A sealed device (trailer 'hmac': the Digitakt II) is the same, with a 32-byte
+HMAC-SHA256 after the last section's padding, inside the preamble's length:
+the digest of everything before it. Its bootstrap checks it, and so does the
+running OS on an upgrade. The key is derived from the stock file's own
+bootstrap (seal_key), as the device derives it (digikit, dt2/authcode.py).
+
 verify() re-reads an output file with the decoder, not the writer. It
 refuses the file unless every other section is stock and the main OS
 depacks, in place as the bootloader does it, to the expected image.
 """
 import hashlib
+import hmac
 import struct
 
 from .codec import aplib, elz, transport
 
 COUNT_OFF, TABLE_OFF, ENTRY_SZ = 0x1C, 0x20, 16
+DIGEST = 32                       # the HMAC-SHA256 trailer of a sealed device
 CHUNK = transport.CHUNK_SIZE      # decoded bytes per data message (101)
 FIRST_COUNTER = transport.FIRST_COUNTER
 
@@ -144,12 +152,36 @@ def pack_main(image):
     return aplib.pack_section(bytes(image))
 
 
+def seal_key(stock, dev):
+    """-> the HMAC key of a sealed device's files, derived from `stock` (a Syx)
+    as its bootstrap derives it: in the section dev.hmac_key_from names, the
+    seed string, a NUL and a 32-byte constant C; the key is
+    C ^ sha256(seed) ^ sha256(reversed seed)."""
+    sid, seed = dev.hmac_key_from
+    sec = stock.section(sid)
+    i = sec.find(seed + b'\0')
+    if i < 0 or sec.find(seed + b'\0', i + 1) >= 0:
+        raise SyxError('section %d does not hold the seal seed once' % sid)
+    const = sec[i + len(seed) + 1:i + len(seed) + 1 + DIGEST]
+    if len(const) != DIGEST:
+        raise SyxError('section %d ends inside the seal constant' % sid)
+    a, b = hashlib.sha256(seed).digest(), hashlib.sha256(seed[::-1]).digest()
+    return bytes(x ^ y ^ z for x, y, z in zip(const, a, b))
+
+
+def _digest(key, data):
+    return hmac.new(key, data, hashlib.sha256).digest()
+
+
 def write(stock, stored_main, dev, version=None):
     """-> .syx bytes: `stock` (a Syx) with the main OS section's stored bytes
     replaced by `stored_main` and, if given, the ELE3 version field set."""
-    if dev.trailer is not None:
-        raise SyxError('%s files are sealed (%s); elekloader cannot write them yet'
+    if dev.trailer not in (None, 'hmac'):
+        raise SyxError('%s files are sealed (%s); elekloader cannot write them'
                        % (dev.name, dev.trailer))
+    key = seal_key(stock, dev) if dev.trailer == 'hmac' else None
+    if key is not None and _digest(key, stock.container[:-DIGEST]) != stock.container[-DIGEST:]:
+        raise SyxError('the stock file\'s seal does not verify with the key its bootstrap gives')
     header = bytearray(stock.header)
     if version is not None:
         v = version.encode('ascii')
@@ -163,6 +195,8 @@ def write(stock, stored_main, dev, version=None):
         struct.pack_into('>IIII', cont, TABLE_OFF + ENTRY_SZ * i, sid, len(cont), len(data), dest)
         cont += data
         cont += bytes(-len(cont) % 16)
+    if key is not None:
+        cont += _digest(key, bytes(cont))
     stream = struct.pack('>II', len(cont), transport.content_checksum(bytes(cont))) + bytes(cont)
     return transport.encode_syx(stream, stock.device_id, stock.framing[0], stock.framing[1])
 
@@ -244,7 +278,13 @@ def verify(out, stock, want_main, dev, version=None):
         if off != at:
             raise SyxError('section %d at 0x%x, not 0x%x' % (sid, off, at))
         at = off + clen + (-(off + clen) % 16)
-    if o.total != at:
+    if dev.trailer == 'hmac':
+        if o.total != at + DIGEST:
+            raise SyxError('container length %d is not the 16-aligned end %d and the seal'
+                           % (o.total, at))
+        if _digest(seal_key(stock, dev), o.container[:-DIGEST]) != o.container[-DIGEST:]:
+            raise SyxError('the HMAC trailer does not verify')
+    elif o.total != at:
         raise SyxError('container length %d is not the 16-aligned end %d' % (o.total, at))
     if dev.flash_at + o.total > dev.flash_limit:
         raise SyxError('the container ends at flash 0x%x > 0x%x'

@@ -19,6 +19,7 @@ file on your own machine, and you flash it the way you flash any OS update.
 | Device | OS | Status |
 |---|---|---|
 | Digitakt (mk1) | 1.53, 1.54 | supported |
+| Digitakt II | 1.17 | experimental: whole builds (format-1 mods), sealed as the unit checks them; not yet run on a unit or in an emulator; no linkable mods yet |
 | Digitone (mk1) and Digitone Keys | 1.43, 1.44 | supported |
 | Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); linkable mods with its own core: boots on an MKII, not yet run on an MKI |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
@@ -79,6 +80,7 @@ You also need the **stock OS file** for your device, exactly as Elektron
 publishes it:
 - Digitakt mk1: `Digitakt_OS1.54.syx` or `Digitakt_OS1.53.syx`, from
   [Elektron's Digitakt downloads](https://www.elektron.se/support-downloads/digitakt);
+- Digitakt II: `Digitakt_II_OS1.17.syx`, from Elektron's Digitakt II downloads;
 - Digitone mk1 or Digitone Keys: `Digitone_and_Digitone_Keys_OS1.44.syx` or
   `..._OS1.43.syx` (one file serves both), from Elektron's Digitone downloads;
 - Octatrack MKI or MKII: `OCTATRACK_OS1.40C.syx` or `OCTATRACK_OS1.40C.bin`
@@ -117,7 +119,7 @@ file you chose last are kept in `%APPDATA%\elekloader` (Windows) or
 
 Send the `.syx` to the unit the way Elektron describes for OS updates
 ([How to update your device](https://support.elektron.se/support/solutions/articles/43000662890-how-to-update-your-device)).
-For the Digitakt mk1 and the Digitone mk1:
+For the Digitakt mk1, the Digitakt II and the Digitone mk1:
 1. Connect it over USB and open Elektron Transfer.
 2. Select the unit and **Connect**.
 3. Drag the `.syx` onto **Drop files here**.
@@ -133,10 +135,11 @@ For the Octatrack, from the card (back it up first):
 4. When it restarts, power-cycle it once more before judging anything.
 
 **Recovery:** the bootloader is never changed, so the stock OS file always
-restores the unit. If a custom OS will not start on a Digitakt mk1 or a
-Digitone mk1, hold **FUNC** while powering on for the startup menu, and
-press **TRIG 4** for OS UPGRADE.
-Then send the stock `.syx` with Transfer's legacy OS upgrade mode. On the
+restores the unit. If a custom OS will not start on a Digitakt mk1, a
+Digitakt II or a Digitone mk1, hold **FUNC** while powering on for the
+startup menu, and press **TRIG 4** for OS UPGRADE.
+Then send the stock `.syx` with Transfer's legacy OS upgrade mode (on the
+Digitakt II, over its MIDI ports: not USB). On the
 Octatrack: hold **FUNC** while powering on, press **TRIG 3** for MIDI
 UPGRADE, and send the stock `.syx` over 5-pin DIN MIDI (USB MIDI does not
 work for this).
@@ -158,6 +161,12 @@ For the Digitakt mk1, the writer produces the same bytes as
 elektron-firmware-tool when given the same main OS stream. For the Digitone
 mk1 (the same file family, with seven sections), it reproduces the stock
 file from its own main OS stream.
+
+The Digitakt II's files are sealed: the container ends in an HMAC-SHA256 of
+the rest, which its bootstrap checks before it flashes anything. elekloader
+derives the key from your stock file's bootstrap, as the unit does, seals
+the output, and checks the seal again. From its own main OS stream, the
+writer reproduces the stock file byte for byte.
 
 The Octatrack's files are checked the same way: the container header
 differs only in its 10-character version field, every SysEx message's
@@ -278,6 +287,7 @@ ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=bundle.elemod ELEKLOADER_CTOOL_SYX=its-bu
 ELEKLOADER_OT_SYX=OCTATRACK_OS1.40C.syx ELEKLOADER_OT_BIN=OCTATRACK_OS1.40C.bin python tests/test_octatrack.py
 ELEKLOADER_OT_SYX=... ELEKLOADER_OCTABAM=path/to/octabam python tests/test_octabam.py   # octabam optional
 ELEKLOADER_DN_SYX=Digitone_and_Digitone_Keys_OS1.43.syx python tests/test_digitone.py
+ELEKLOADER_DT2_SYX=Digitakt_II_OS1.17.syx python tests/test_digitakt2.py
 ELEKLOADER_STOCK=... ELEKLOADER_STOCK_154=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
 node tests/test_web.mjs build/site   # the web page's engine, in Pyodide (packaging/build_web.py first)
 ```
