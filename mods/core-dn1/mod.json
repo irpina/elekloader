@@ -1,10 +1,10 @@
 {
- "id": "core", "version": "2.1",
+ "id": "core", "version": "2.2",
  "license": "GPL-2.0-or-later",
  "title": "core", "category": "Framework", "author": "irpina",
- "description": "The boot copier and the hook bus for the Digitone mk1 and Digitone Keys: every other mod needs it. From 2.1 also the voice note-on event, parameter slots, mod pages and project data. On its own it changes nothing the unit does.",
+ "description": "The boot copier and the hook bus for the Digitone mk1 and Digitone Keys: every other mod needs it. From 2.1 also the voice note-on event, parameter slots, mod pages and project data, and from 2.2 the Mod Menu (hold a track key). On its own it changes nothing the unit does.",
  "device": "digitone-mk1", "os": "1.43",
- "sources": ["../core/core.s", "voice.s", "params.s", "pages.s", "projdata.s"],
+ "sources": ["../core/core.s", "voice.s", "params.s", "pages.s", "projdata.s", "menu.s"],
  "defsym": {
   "DRAWALL": "0x400e5c9a",
   "KEYDISP": "0x40016fc0",
@@ -27,14 +27,18 @@
   "SERIALIZE": "0x4000eb10",
   "DESERIALIZE": "0x4000e7f4",
   "MEMCPY": "0x400fb864",
-  "INIT_PROJECT": "0x4001570e"
+  "INIT_PROJECT": "0x4001570e",
+  "FILLRECT": "0x400dd292",
+  "FRAMERECT": "0x400dd076",
+  "TEXTF": "0x400dde68",
+  "FONT5": "0x402315c8"
  },
  "sites": [
   {"addr": "0x40000538", "stock": "4eb940001df4", "op": "jsr", "target": "core_dn_boot"},
-  {"addr": "0x4001900c", "stock": "4eb9400e5c64", "op": "jsr", "target": "core_tick"},
-  {"addr": "0x40019072", "stock": "4eb9400e5c9a", "op": "jsr", "target": "core_draw"},
-  {"addr": "0x40019d9c", "stock": "4eb940016fc0", "op": "jsr", "target": "core_key"},
-  {"addr": "0x40019de4", "stock": "4eb940017012", "op": "jsr", "target": "core_enc"},
+  {"addr": "0x4001900c", "stock": "4eb9400e5c64", "op": "jsr", "target": "core_dn_tick"},
+  {"addr": "0x40019072", "stock": "4eb9400e5c9a", "op": "jsr", "target": "core_dn_draw"},
+  {"addr": "0x40019d9c", "stock": "4eb940016fc0", "op": "jsr", "target": "core_dn_key"},
+  {"addr": "0x40019de4", "stock": "4eb940017012", "op": "jsr", "target": "core_dn_enc"},
   {"addr": "0x40072a34", "stock": "205248780002", "op": "jmp", "target": "core_settings"},
   {"addr": "0x4009d108", "stock": "203c7fffffff", "op": "jsr", "target": "core_render_in"},
   {"addr": "0x4009e51c", "stock": "4cee3fffff48", "op": "jsr", "target": "core_render_out"},
@@ -134,14 +138,18 @@
     "SERIALIZE": "0x4000eb10",
     "DESERIALIZE": "0x4000e7f4",
     "MEMCPY": "0x400fbad8",
-    "INIT_PROJECT": "0x4001570e"
+    "INIT_PROJECT": "0x4001570e",
+    "FILLRECT": "0x400dd506",
+    "FRAMERECT": "0x400dd2ea",
+    "TEXTF": "0x400de0dc",
+    "FONT5": "0x402319c8"
    },
    "sites": [
     {"addr": "0x40000538", "stock": "4eb940001df4", "op": "jsr", "target": "core_dn_boot"},
-    {"addr": "0x4001900c", "stock": "4eb9400e5ed8", "op": "jsr", "target": "core_tick"},
-    {"addr": "0x40019072", "stock": "4eb9400e5f0e", "op": "jsr", "target": "core_draw"},
-    {"addr": "0x40019d9c", "stock": "4eb940016fc0", "op": "jsr", "target": "core_key"},
-    {"addr": "0x40019de4", "stock": "4eb940017012", "op": "jsr", "target": "core_enc"},
+    {"addr": "0x4001900c", "stock": "4eb9400e5ed8", "op": "jsr", "target": "core_dn_tick"},
+    {"addr": "0x40019072", "stock": "4eb9400e5f0e", "op": "jsr", "target": "core_dn_draw"},
+    {"addr": "0x40019d9c", "stock": "4eb940016fc0", "op": "jsr", "target": "core_dn_key"},
+    {"addr": "0x40019de4", "stock": "4eb940017012", "op": "jsr", "target": "core_dn_enc"},
     {"addr": "0x40072a54", "stock": "205248780002", "op": "jmp", "target": "core_settings"},
     {"addr": "0x4009d128", "stock": "203c7fffffff", "op": "jsr", "target": "core_render_in"},
     {"addr": "0x4009e53c", "stock": "4cee3fffff48", "op": "jsr", "target": "core_render_out"},
@@ -221,7 +229,8 @@
  },
  "collections": {
   "ev_tick": 4, "ev_draw": 4, "ev_key": 4, "ev_enc": 4, "ev_settings": 4,
-  "ev_render_in": 4, "ev_render_out": 4, "ev_voice_on": 4, "core_params": 4, "core_pages": 4, "core_projdata": 4
+  "ev_render_in": 4, "ev_render_out": 4, "ev_voice_on": 4, "core_params": 4, "core_pages": 4, "core_projdata": 4,
+  "ev_hold": 4, "core_menu": 4
  },
  "resources": {"names": ["timer:DTIM0"]}
 }

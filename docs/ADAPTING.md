@@ -101,6 +101,7 @@ event (lower first; the shipped mods use 10-90).
 | `ev_settings` | the SETTINGS menu is built | `void f(void *menu)` | add a row with `core_additem(menu, row)`; `row` is four callbacks (label, select, draw, change) in the firmware's MenuItem conventions, which this guide does not document yet |
 | `ev_render_in` | audio render entry, 1500 times a second | `void f(void)` | interrupt level: keep it short |
 | `ev_render_out` | audio render exit | `void f(void)` | the same |
+| `ev_hold` | Digitone mk1 only (core-dn1 2.2): a track key held on its own, UI task | `int f(void *brain, void *event, int track)` | return nonzero to take it; when none does, core opens the Mod Menu ("The Mod Menu" below) |
 | `ev_voice_on` | Digitone mk1 only (core-dn1 2.1): a voice starts a note, in the render | `void f(int voice, int track, void *event)` | interrupt level. The voice's pitch word (`0x41391f80` + 4 x voice, the note << 16) is already written and may be changed: the render reads it every block. The voice's sound and the step's locks load after this, so read the voice's parameters from `ev_render_out` |
 
 The events, their prototypes and their conventions are the same on both
@@ -213,12 +214,9 @@ turns and p-locks its knobs as its own. `int core_page_open(void *brain,
 void *event, int key, descriptor *page)`, called from an `ev_key` handler
 with its brain and event, opens it: it presses and releases the page's key
 (AMP is 24) through the stock key dispatcher until that key's view shows the
-page, and returns 0 if the view was never built. The macro mod opens its TBL
-page when a track key (T1-T4, keys 42-45) is held on its own: that key's
-event then comes with the flags 0x9, about 0.4 s in, which the stock OS does
-nothing with. `int core_page_shown(void *brain, descriptor *page)` is 1
-while the page is on screen with nothing (a menu, a browser) over it; the
-macro mod opens its table editor when the track key is held there.
+page, and returns 0 if the view was never built: from a Mod Menu entry,
+say (below). `int core_page_shown(void *brain, descriptor *page)` is 1
+while the page is on screen with nothing (a menu, a browser) over it.
 
 Core-dn1 2.1 owns two more sites, by jmp at their entries: 0x40089a2c, the
 page record lookup (`core_page_rec`), and 0x40044490, the routine each
@@ -257,7 +255,39 @@ the load of a block already in RAM (at boot, and from SysEx), both by jsr;
 0x4001570e, the new project's builder (CREATE NEW, by jmp), and 0x400acbf4,
 the template copy of slot -1's load (by jsr).
 
-The addresses in these three sections are OS 1.43's. In 1.44 the same
+### The Mod Menu (core-dn1 2.2, Digitone mk1)
+
+Holding a track key (T1-T4) on its own, about half a second, is core's: it
+calls the handlers of `ev_hold` first, and when none takes it, it opens the
+Mod Menu, a screen listing what mods contributed to the table `core_menu`.
+Each entry is a pointer to a descriptor:
+
+| offset | field | |
+|---|---|---|
+| +0 | name | its line in the menu, about 20 characters |
+| +4 | open | `void open(void *brain, void *event, int track)`: picked. `event` is the key's that picked it, `track` the one held (0-3); with them a mod can open its page (`core_page_open`) or a screen of its own |
+
+In the menu UP and DOWN or any knob move the selection, YES or trig key N
+picks, NO or holding a track key again closes it, and a page key (TRIG ...
+LFO) closes it and goes on to its page; PLAY, STOP, FUNC and the track keys
+work as ever. A mod takes the hold from `ev_hold` when it has a better use
+for it where it is: the macro mod lists TABLES (its TBL page) in the menu,
+and opens its table editor when the hold comes with the TBL page on screen.
+
+The hold is the stock key event's flags 0x9 (down, held), about 0.4 s in. A
+key pressed meanwhile stops it, but one pressed before does not (MIDI held,
+then a track key, selects a MIDI track) and neither does a knob, so core
+counts a hold only when the track key went down with no other key down and
+no knob turned since. The stock OS does nothing with 0x9 on a track key held
+alone; a double press (the sound browser) and FUNC + a track key (mute) are
+untouched.
+
+On the Digitone the four UI sites (0x4001900c, 0x40019072, 0x40019d9c and
+0x40019de4) go to core-dn1's own `core_dn_tick`, `core_dn_draw`,
+`core_dn_key` and `core_dn_enc` (`menu.s`), which see to the menu and go on
+to core.s's handlers, so core.s stays the Digitakt's.
+
+The addresses in these four sections are OS 1.43's. In 1.44 the same
 routines are there, unchanged but moved, and RAM is 0x1000 further on:
 `mods/core-dn1/mod.json`'s `ports` has every one of core-dn1's sites for it.
 

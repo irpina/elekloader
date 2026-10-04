@@ -123,7 +123,8 @@ order, and 1.44 has the last three at 0x40072a54, 0x4009d128 and 0x4009e53c
 (`mods/core-dn1/mod.json`, its `ports`). core-dn1 2.1 adds a Digitone-only
 event, `ev_voice_on` (at 0x4009e928; 0x4009e948 in 1.44), and the tables
 `core_params` (parameter slots, docs/ADAPTING.md), `core_pages` (mod pages)
-and `core_projdata` (project data).
+and `core_projdata` (project data); 2.2 the event `ev_hold` and the table
+`core_menu` (the Mod Menu).
 
 The core mod patches each shared site once. It calls the handlers
 subscribed to that event, from a table built by the linker, in order.
@@ -139,4 +140,5 @@ free, the result in d0.
 | `ev_settings` | 0x40058800, SETTINGS builder | `void f(menu)`; `core_additem(menu, row)` |
 | `ev_render_in` | 0x40077428, render entry | `void f(void)` |
 | `ev_render_out` | 0x400784c8, render exit | `void f(void)` |
+| `ev_hold` | Digitone only: a track key held on its own (core-dn1's key site) | `int f(brain, event, track)`; none: the Mod Menu |
 | `ev_voice_on` | Digitone only: 0x4009e928 (1.44: 0x4009e948), a voice's note-on in the render | `void f(voice, track, event)`; the pitch word is written |

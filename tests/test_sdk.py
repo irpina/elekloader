@@ -160,10 +160,10 @@ def dn_core(tmp, drop=None):
 
 
 def test_digitone_core_builds_and_links():
-    """core-dn1 2.1: core 2.1's core.s (the hook bus, without the Digitakt's
+    """core-dn1 2.2: core 2.1's core.s (the hook bus, without the Digitakt's
     machine slots), voice.s (ev_voice_on), params.s (parameter slots, ids
-    182-184), pages.s (mod pages, 27-30) and projdata.s (mods' data saved
-    with the project), the last four Digitone only."""
+    182-184), pages.s (mod pages, 27-30), projdata.s (mods' data saved with
+    the project) and menu.s (the Mod Menu), the last five Digitone only."""
     with tempfile.TemporaryDirectory() as tmp:
         path = dn_core(tmp)
         with open(path) as fh:
@@ -176,11 +176,12 @@ def test_digitone_core_builds_and_links():
         # project data's 5 (the serializer, two loads, two new projects).
         assert dn['target']['device'] == 'digitone-mk1' and len(dn['sites']) == 79
         assert sorted(dn['collections']) == sorted(
-            HOOK_BUS + ['core_pages', 'core_params', 'core_projdata', 'ev_voice_on'])
+            HOOK_BUS + ['core_menu', 'core_pages', 'core_params', 'core_projdata',
+                        'ev_hold', 'ev_voice_on'])
         # The same core.s as core 2.1's, with the Digitone's addresses, and
         # each of its labels where core 2.1 has it.
-        assert sorted(dn['build']['sources']) == ['core.s', 'pages.s', 'params.s', 'projdata.s',
-                                                  'voice.s']
+        assert sorted(dn['build']['sources']) == ['core.s', 'menu.s', 'pages.s', 'params.s',
+                                                  'projdata.s', 'voice.s']
         assert dn['build']['sources']['core.s'] == dt['build']['sources']['core.s']
         placed = {k: v for k, v in dn['symbols'].items() if v[0] != 'abs'}
         shared = {k: v for k, v in placed.items() if k in dt['symbols']}
@@ -188,12 +189,13 @@ def test_digitone_core_builds_and_links():
         assert {'core_voice_on', 'core_dn_boot', 'core_param_ui', 'core_page_rec',
                 'core_view_init', 'core_page_open', 'core_page_shown', 'core_proj_save',
                 'core_proj_load', 'core_proj_import', 'core_proj_new',
-                'core_proj_init'} <= set(placed) - set(shared)
+                'core_proj_init', 'core_dn_key', 'core_dn_enc', 'core_dn_tick',
+                'core_dn_draw'} <= set(placed) - set(shared)
         # voice.s follows core.s's code in .run.
         last = max(off for sec, off in shared.values() if sec == '.run')
         assert placed['core_voice_on'][0] == '.run' and placed['core_voice_on'][1] > last
         rc, r = lint_json(path, '--stock', DN_STOCK)
-        assert rc == 0 and r['link']['order'] == ['core 2.1']
+        assert rc == 0 and r['link']['order'] == ['core 2.2']
 
 
 def test_digitone_core_needs_every_constant():
@@ -276,7 +278,7 @@ def test_digitone_core_port_to_144_is_the_same_core():
     with tempfile.TemporaryDirectory() as tmp:
         old_path = dn_core(tmp)
         path, _m = build.build(os.path.join(ROOT, 'mods', 'core-dn1'), DN_STOCK_144, tmp)
-        assert os.path.basename(path) == 'core-2.1-os1.44.elemod'
+        assert os.path.basename(path) == 'core-2.2-os1.44.elemod'
         with open(path) as fh:
             new = json.load(fh)
         with open(old_path) as fh:

@@ -44,18 +44,24 @@ the Digitone needs it. On its own it changes nothing the unit does.
   header the OS leaves alone. The serializer's entry puts them there for
   every save; the loads and the new project's builder take them out, or
   tell the mod there are none (docs/ADAPTING.md, "Project data").
-- **OS 1.44:** every 2.1 site has its port (`ports` in mod.json): the same
+- **From 2.2, the Mod Menu** ([menu.s](menu.s)): hold a track key on its
+  own and core opens a menu of what mods contributed to `core_menu` (a name
+  and an `open` function each), unless a handler of `ev_hold` takes the
+  hold first. The four UI sites go to `core_dn_tick`, `core_dn_draw`,
+  `core_dn_key` and `core_dn_enc`, which see to the menu and go on to
+  core.s's (docs/ADAPTING.md, "The Mod Menu").
+- **OS 1.44:** every site has its port (`ports` in mod.json): the same
   code, moved, and RAM 0x1000 further on.
 
 Build it with the SDK (it needs m68k binutils):
 
 ```bash
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-2.1.elemod
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-2.1-os1.44.elemod
-python -m elekloader.lint mods/core-dn1/out/core-2.1-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-2.2.elemod
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-2.2-os1.44.elemod
+python -m elekloader.lint mods/core-dn1/out/core-2.2-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
 ```
 
-A release names them `core-dn1-2.1.elemod` and `core-dn1-2.1-os1.44.elemod`.
+A release names them `core-dn1-2.2.elemod` and `core-dn1-2.2-os1.44.elemod`.
 
 Checked by cold-booting it in digikit's emulator against stock (docs/DEVICES.md):
 - every stage passes, and every screen is identical;
