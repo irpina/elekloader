@@ -247,7 +247,49 @@ def test_the_core_moves_the_arena_past_its_reserve():
             seen[int(s['stock'], 16)] = seen.get(int(s['stock'], 16), 0) + 1
     assert seen == {lo: 23, lo + PAGE: 1, STOCK_PAGES: 2, STOCK_PAGES + 1: 1,
                     (STOCK_PAGES + 1) * PAGE: 1}
-    assert [s['op'] for s in j['sites']].count('jsr') == 1
+    calls = {s['target']: int(s['addr'], 16) for s in j['sites'] if s['op'] == 'jsr'}
+    assert calls.pop('boot') == 0x4000050c
+    assert set(calls) == set(BUS_SITES), calls             # the rest are the hook bus's
+
+
+# The hook bus (core-ot 0.2): each site, the instruction it replaces, and its event.
+BUS_SITES = {
+    'core_tick': (0x40061e94, '4eb940031970', 'ev_tick'),        # jsr 0x40031970, sys loop kind 5
+    'core_draw_gate': (0x40013cae, '2a79400b9710', 'ev_draw'),   # movea.l 0x400b9710,a5, compositor
+    'core_key': (0x40061dc8, '4eb940031734', 'ev_key'),          # jsr key(code, pressed), kind 1
+    'core_enc': (0x40061e00, '4eb940031944', 'ev_enc'),          # jsr enc(encoder, delta), kind 2
+    'core_midi': (0x40005572, '20720c004e90', 'ev_midi'),        # the MIDI thread's handler call
+    'core_frame': (0x4000d94e, '4ab946104d08', 'ev_frame'),      # tst.l 0x46104d08, frame interrupt
+}
+# Instructions the converted octabam mods of irpina/octabam2elemod v1.0 hook in the same
+# routines (TUNER, CC FEEDBACK, CC MAP, the USB audio mods, USB MIDI): the bus keeps clear
+# of every one, so those files link with core 0.2 as they did with 0.1.
+V10_NEIGHBOURS = ((0x40056c72, 6), (0x4000d99a, 6), (0x4000d9a0, 6), (0x4005595c, 6),
+                  (0x400d64a0, 4), (0x4001e606, 6), (0x40059ef0, 6))
+
+
+def test_the_core_bus_sites():
+    """core-ot 0.2's hook bus: each site replaces whole stock instructions, has the
+    collection for its event, keeps clear of the v1.0 conversions' sites, and the
+    draw site goes through the gate placed in a free image area (the OS composes
+    the screen twice before the boot site, before .run is in the reserve)."""
+    with open(os.path.join(ROOT, 'mods', 'core-ot', 'mod.json')) as fh:
+        j = json.load(fh)
+    st, img = stock()
+    sites = {s['target']: s for s in j['sites'] if s['op'] == 'jsr' and s['target'] != 'boot'}
+    for target, (addr, stock_hex, event) in BUS_SITES.items():
+        s = sites[target]
+        assert (int(s['addr'], 16), s['stock']) == (addr, stock_hex), target
+        o = addr - DEV.main_load
+        assert img[o:o + 6].hex() == stock_hex, target
+        assert j['collections'][event] == 4, event
+        for a, n in V10_NEIGHBOURS:
+            assert not (a < addr + 6 and addr < a + n), (target, hex(a))
+    assert sorted(j['collections']) == sorted(e for _a, _s, e in BUS_SITES.values())
+    (fx,) = j['fixed']
+    at = int(fx['addr'], 16)
+    assert any(a <= at and at + 24 <= b for a, b in DEV.image_free)
+    assert at + 24 == DEV.image_free[0][1]          # the run's end: its start is octabam's SPECTRUM's
 
 
 def test_a_site_can_add_to_its_target():
@@ -365,6 +407,35 @@ def test_core_builds_and_links():
     assert new[len(img):].find(b'ELEKLOADER MARKER') > 0
     o = 0x4000045e - DEV.main_load
     assert new[o:o + 4] == struct.pack('>I', DEV.ddr[1])
+    # the draw site calls the gate in the image (tst.b core_up), whose flag starts clear
+    gate = 0x400c46ea
+    o = 0x40013cae - DEV.main_load
+    assert new[o:o + 6] == b'\x4e\xb9' + struct.pack('>I', gate)
+    o = gate - DEV.main_load
+    assert new[o:o + 6] == b'\x4a\x39' + struct.pack('>I', gate + 22)
+    assert new[o + 22] == 0
+
+
+def test_the_example_subscribes_to_the_bus():
+    """examples/hello-marker-ot with core-ot: its handler is the one entry of the ev_draw
+    table, in the run image .boot copies to the reserve; the other events have none."""
+    import shutil
+    from elekloader.sdk import build
+    need(SYX)
+    if not shutil.which(os.environ.get('ELEKLOADER_CROSS', DEV.toolchain['prefix']) + 'gcc'):
+        raise Skip('no m68k cross compiler')
+    st, img = stock()
+    with tempfile.TemporaryDirectory() as tmp:
+        core, _m = build.build(os.path.join(ROOT, 'mods', 'core-ot'), SYX, tmp)
+        ex, m = build.build(os.path.join(ROOT, 'examples', 'hello-marker-ot'), SYX, tmp)
+        assert 'hello_draw' in m.exports and not m.imports, m.imports
+        ln = link.link([elemod.load_any(core), elemod.load_any(ex)], img)
+    counts = {t: ln.tables[t][1] for t in ln.tables}
+    assert counts == {'ev_draw': 1, 'ev_enc': 0, 'ev_frame': 0, 'ev_key': 0, 'ev_midi': 0,
+                      'ev_tick': 0}, counts
+    at = ln.tables['ev_draw'][0]
+    o = ln.layout['run_load'] + (at - DEV.ddr[0]) - DEV.main_load
+    assert struct.unpack('>II', ln.image[o:o + 8]) == (ln.map['hello_draw'], 0)
 
 
 def test_mkmod_diff_round_trip():

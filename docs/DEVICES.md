@@ -5,7 +5,7 @@ Everything elekloader knows about a product is in one profile,
 (`_all()`). The Digitakt mk1 profile is the example. The Digitone mk1's
 (`digitone_mk1.py`) is a second device of the same file family, with its own
 core. The Octatrack's (`octatrack.py`) is a second file family, with a core
-of its own that is only a boot copier.
+and a hook bus of its own.
 
 | field | what it is | how it was found for the Digitakt mk1 |
 |---|---|---|
@@ -234,7 +234,15 @@ below was found again in 1.17.
     from the boot site `0x4000050c`, in place of `0x40001e50`, which it
     calls first. It copies the run image to the reserve through the
     uncached alias (`+0x08000000`) and zeroes `.bss`.
-  - There is no hook bus: each mod patches its own sites.
+  - Its hook bus (0.2) has six events of the Octatrack's own: the sys
+    task's tick, each composed frame, the keys, the encoders, MIDI in and
+    the frame interrupt (docs/ADAPTING.md, "The hook bus on the
+    Octatrack"). Its sites keep clear of every byte the converted octabam
+    modules patch, so those link with 0.2 as they did with 0.1.
+  - The OS composes the screen twice before the boot site, so before the
+    run image is in the reserve. The draw site goes through a gate placed
+    (`fixed`) at the end of the zero run at `0x400c45b0`, which waits for
+    `.boot` to have run.
   - `elekloader.sdk.octabam` converts octabam's ColdFire-only modules to
     such mods, and whole remixes, which is how USB AUDIO IN converts
     (docs/ADAPTING.md, 4b).

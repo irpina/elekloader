@@ -148,3 +148,15 @@ free, the result in d0.
 | `ev_render_out` | 0x400784c8, render exit | `void f(void)` |
 | `ev_hold` | Digitone only: a track key held on its own (core-dn1's key site) | `int f(brain, event, track)`; none: the Mod Menu |
 | `ev_voice_on` | Digitone only: 0x4009e928 (1.44: 0x4009e948), a voice's note-on in the render | `void f(voice, track, event)`; the pitch word is written |
+
+The Octatrack's core (core-ot 0.2, OS 1.40C) has events of its own, with the
+same conventions (docs/ADAPTING.md, "The hook bus on the Octatrack"):
+
+| event | site | handler |
+|---|---|---|
+| `ev_tick` | 0x40061e94, the sys task's tick (message 5), 60 Hz | `void f(void)` |
+| `ev_draw` | 0x40013cae in the compositor, through the gate at 0x400c46ea | `void f(frame)`, the 1024-byte frame |
+| `ev_key` | 0x40061dc8, `key(code, pressed)` | `int f(code, pressed)`; nonzero: taken |
+| `ev_enc` | 0x40061e00, `enc(encoder, delta)` | `int f(encoder, delta)`; nonzero: taken |
+| `ev_midi` | 0x40005572, the MIDI thread's handler call | `int f(msg)`; nonzero: taken |
+| `ev_frame` | 0x4000d94e, the frame interrupt, every 16 samples | `void f(void)` |

@@ -1,13 +1,22 @@
 {
- "id": "core", "version": "0.1",
+ "id": "core", "version": "0.2",
  "license": "GPL-2.0-or-later",
  "title": "core", "category": "Framework", "author": "irpina",
- "description": "The boot copier for the Octatrack: it reserves the bottom 10 MB of the sample and recorder memory (1,707 of 14,602 pages) for mods, and copies their code there at boot. Every linkable Octatrack mod needs it.",
+ "description": "The boot copier and the hook bus for the Octatrack: it reserves the bottom 10 MB of the sample and recorder memory (1,707 of 14,602 pages) for mods, copies their code there at boot, and calls them on the UI tick, the screen, the keys, the encoders, MIDI in and the audio frame. Every linkable Octatrack mod needs it. On its own it changes nothing else the unit does.",
  "device": "octatrack", "os": "1.40C",
- "sources": ["core-ot.s"],
- "defsym": {"BOOT_CONTINUE": "0x40001e50", "UNCACHED": "0x08000000", "ARENA_BASE": "0x41495de0"},
+ "sources": ["core-ot.s", "bus.s"],
+ "fixed": [{"source": "gate.s", "addr": "0x400c46ea"}],
+ "defsym": {"BOOT_CONTINUE": "0x40001e50", "UNCACHED": "0x08000000", "ARENA_BASE": "0x41495de0",
+  "TICK_NEXT": "0x40031970", "KEYFN": "0x40031734", "ENCFN": "0x40031944",
+  "FRAME_PTR": "0x400b9710", "ISR_FLAG": "0x46104d08"},
  "sites": [
   {"addr": "0x4000050c", "stock": "4eb940001e50", "op": "jsr", "target": "boot"},
+  {"addr": "0x40061e94", "stock": "4eb940031970", "op": "jsr", "target": "core_tick"},
+  {"addr": "0x40013cae", "stock": "2a79400b9710", "op": "jsr", "target": "core_draw_gate"},
+  {"addr": "0x40061dc8", "stock": "4eb940031734", "op": "jsr", "target": "core_key"},
+  {"addr": "0x40061e00", "stock": "4eb940031944", "op": "jsr", "target": "core_enc"},
+  {"addr": "0x40005572", "stock": "20720c004e90", "op": "jsr", "target": "core_midi"},
+  {"addr": "0x4000d94e", "stock": "4ab946104d08", "op": "jsr", "target": "core_frame"},
   {"addr": "0x4000045e", "stock": "40a955e0", "op": "bytes", "new": "41495de0"},
   {"addr": "0x4000046c", "stock": "40a955e0", "op": "bytes", "new": "41495de0"},
   {"addr": "0x400004c8", "stock": "40a955e0", "op": "bytes", "new": "41495de0"},
@@ -37,5 +46,6 @@
   {"addr": "0x40097008", "stock": "05590800", "op": "bytes", "new": "04b90000"},
   {"addr": "0x40097126", "stock": "0000390a", "op": "bytes", "new": "0000325f"}
  ],
+ "collections": {"ev_tick": 4, "ev_draw": 4, "ev_key": 4, "ev_enc": 4, "ev_midi": 4, "ev_frame": 4},
  "resources": {"names": ["arena:bottom"]}
 }

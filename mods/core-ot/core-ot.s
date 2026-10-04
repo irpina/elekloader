@@ -1,10 +1,10 @@
 | SPDX-License-Identifier: GPL-2.0-or-later
-| core for the Octatrack (MKI and MKII), OS 1.40C: the boot copier.
+| core for the Octatrack (MKI and MKII), OS 1.40C: the boot copier. The
+| hook bus (0.2) is in bus.s.
 | ColdFire V4 (MCF5445x); assemble with -mcpu=54455.
 |
-| The Octatrack has no hook bus yet: its mods (octabam's, converted) patch
-| their own sites. What every one of them needs is RAM and a way to get
-| their code into it, and that is this core:
+| What every Octatrack mod needs is RAM and a way to get its code into it,
+| and that is this file:
 |
 | - mod.json moves the audio page arena's base past its bottom 1,707 pages
 |   (0x40a955e0-0x41495de0, the device's `ddr`), so the OS never uses them.
@@ -46,7 +46,9 @@ boot:
 3:      clr.l   (%a1)+
         subq.l  #1, %d0
         bne.s   3b
-4:      movem.l (%sp), %d0/%a0-%a1
+4:      moveq   #1, %d0                 | the draw gate may call into .run now
+        move.b  %d0, core_up
+        movem.l (%sp), %d0/%a0-%a1
         lea     12(%sp), %sp
         rts
 
