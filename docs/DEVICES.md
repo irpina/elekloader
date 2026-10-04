@@ -31,8 +31,10 @@ of its own that is only a boot copier.
 
 Experimental. Whole builds and the core (mods/core-dt2) boot in digikit's
 emulator, and a build of core with examples/perform-direct works on a unit
-(4 Oct 2026): flashed, it booted, and the key swap and
-a PERSONALIZE row (in an earlier version of the mod) worked. digikit (https://github.com/m-dwyer/digikit,
+(4 Oct 2026): sent with Elektron Transfer over USB (the in-OS upgrade), it
+was accepted and booted, the unit reported the build's own version (PD10),
+and the key swap and a PERSONALIZE row (in an earlier version of the mod)
+worked. digikit (https://github.com/m-dwyer/digikit,
 docs/findings/01-container-and-patching.md) mapped 1.15C and 1.16. Each fact
 below was found again in 1.17.
 
@@ -106,7 +108,8 @@ below was found again in 1.17.
   the build and version fields from there (0x40124978, the answer to
   Transfer's version request; an exception report); there is no version
   string in the main OS. So a build's 4-character version field is what
-  the unit shows, and the loader's default (`2.0a`) differs from stock's.
+  the unit shows (a unit reported PD10 for a build so named), and the
+  loader's default (`2.0a`) differs from stock's.
 - **Recovery.** The startup menu (FUNC at power-on), TRIG 4 for OS UPGRADE,
   over MIDI only (Elektron's readme). It is in the bootstrap, which no build
   changes, and checks only the content checksum and the seal.

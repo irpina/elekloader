@@ -19,7 +19,7 @@ file on your own machine, and you flash it the way you flash any OS update.
 | Device | OS | Status |
 |---|---|---|
 | Digitakt (mk1) | 1.53, 1.54 | supported |
-| Digitakt II | 1.17 | experimental: whole builds (format-1 mods) and linkable mods with its own core (the hook bus's tick, draw, key and encoder events), sealed as the unit checks them; boot in digikit's emulator; core with a key-swap mod works on a unit |
+| Digitakt II | 1.17 | experimental: whole builds (format-1 mods) and linkable mods with its own core (the hook bus's tick, draw, key and encoder events), sealed as the unit checks them; boot in digikit's emulator; core with a key-swap mod works on a unit (Transfer over USB) |
 | Digitone (mk1) and Digitone Keys | 1.43, 1.44 | supported |
 | Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); linkable mods with its own core: boots on an MKII, not yet run on an MKI |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
