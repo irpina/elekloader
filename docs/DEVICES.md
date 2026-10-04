@@ -106,15 +106,23 @@ below was found again in 1.17.
     the rest. Past the copies, 0x80006E80-0x80008000 and 0x8000F100-
     0x80010000 are named by no decoded instruction. They are zeroed after
     the boot copier runs, so they are free at run time only, as on the mk1.
-    There is no `.fast` copy table yet.
+    A write watch over both saw no write from 400M to 781M instructions of
+    a session with 24 key presses. `.fast` code goes to the tail: core-dt2
+    declares `core_fast` and copies it on the first `ev_tick`.
   - The core does not start DTIM0, unlike the mk1's (`NO_DTIM0` in
     core.s). Nothing before the OS starts it on the II either, and ten OS
     sites read its counter: with it running, a cold boot with core alone
     jumped to 0 at 553M instructions in digikit's emucheck.
+  - The core's events: `ev_tick`, `ev_draw`, `ev_key`, `ev_enc`,
+    `ev_settings`, and the II's own `ev_personalize` (SETTINGS >
+    PERSONALIZE, whose builder makes its rows with the same generic
+    `MenuItem`). mods/core-dt2/README.md lists the sites and routines.
   - Checked in the emulator (cold boot, then emucheck to 600M): core 1.0
     alone passes every stage, with its screen at 650M identical to stock's;
     with a mod that inverts an 8x8 block on `ev_draw`, the screen differs
-    from stock in exactly those 64 pixels.
+    from stock in exactly those 64 pixels. Each event was driven with a
+    test mod: key and encoder counts, a SETTINGS row, and
+    examples/perform-direct (a PERSONALIZE checkbox and a key swap).
   - Not covered: anything a session in the emulator does not reach (no
     DSP, no samples, an empty +Drive), and any unit.
 

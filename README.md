@@ -232,8 +232,12 @@ its bytes. See [docs/ADAPTING.md](docs/ADAPTING.md), section 4b.
 
 `examples/hello-marker/` is a complete mod to start from. It is one C
 function on the draw event, and it puts a small square in the corner of
-every screen. Building code needs the device's cross toolchain; for the
-Digitakt mk1 that is m68k binutils and gcc.
+every screen (`examples/hello-marker-dt2/` builds it for the Digitakt II).
+`examples/perform-direct/` is a real Digitakt II mod: [PRESET] toggles
+PERFORM without [FUNC], an option in SETTINGS > PERSONALIZE. Building code
+needs the device's cross toolchain; for the Digitakt mk1 and the Digitakt II
+that is m68k binutils and gcc (Homebrew's `m68k-elf-*` work, with
+`ELEKLOADER_CROSS=m68k-elf-`).
 
 ## The Windows app
 

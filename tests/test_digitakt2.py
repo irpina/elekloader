@@ -230,12 +230,13 @@ def built(moddir, tmp):
 
 CORE_SITES = ((0x40000538, '4eb9400019b0'), (0x40032ad4, '4eb94011bc60'),
               (0x40032b3a, '4eb94011bc96'), (0x40033d94, '4eb940030bd0'),
-              (0x40033dde, '4eb940030b64'), (0x400a5eac, '205248780002'))
+              (0x40033dde, '4eb940030b64'), (0x400a5eac, '205248780002'),
+              (0x4009e2a2, '4cef7c7c0018'))
 
 
 def test_core_builds_links_and_verifies():
-    """mods/core-dt2 built with the SDK, then a build with it alone: its six
-    sites, and nothing else in the image below them changed."""
+    """mods/core-dt2 built with the SDK, then a build with it alone: its
+    seven sites, and nothing else in the image changed."""
     with tempfile.TemporaryDirectory() as tmp:
         core = built(os.path.join('mods', 'core-dt2'), tmp)
         outputs, man = patch.build(SYX, [core], version='DT03', log=lambda *a: None)
@@ -280,6 +281,22 @@ def test_the_example_links_with_core_and_fast_code_is_copied_by_core():
     assert t['entries'] == 1 and t['entry'] == 16
     lo, hi = man['link']['layout']['fast']
     assert DEV.sram_code[0] <= lo < hi <= DEV.sram_code[1]
+
+
+def test_perform_direct_links_with_core():
+    """examples/perform-direct: a key handler and a PERSONALIZE row, no sites
+    of its own."""
+    with tempfile.TemporaryDirectory() as tmp:
+        core = built(os.path.join('mods', 'core-dt2'), tmp)
+        pd = built(os.path.join('examples', 'perform-direct'), tmp)
+        outputs, man = patch.build(SYX, [core, pd], version='DT10', log=lambda *a: None)
+    tables = man['link']['tables']
+    assert tables['ev_key']['entries'] == 1 and tables['ev_personalize']['entries'] == 1
+    st, img = stock()
+    new = formats.main_image(formats.parse(outputs['syx'], DEV), DEV)
+    changed = {i for i in range(len(img)) if new[i] != img[i]}
+    sites = {s - DEV.main_load + k for s, _ in CORE_SITES for k in range(6)}
+    assert changed <= sites
 
 
 if __name__ == '__main__':

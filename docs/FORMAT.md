@@ -127,8 +127,9 @@ event, `ev_voice_on` (at 0x4009e928; 0x4009e948 in 1.44), and the tables
 and `core_projdata` (project data); 2.2 the event `ev_hold` and the table
 `core_menu` (the Mod Menu). The Digitakt II 1.17's core (core-dt2 1.0) has
 `ev_tick`, `ev_draw`, `ev_key`, `ev_enc` and `ev_settings`, at 0x40032ad4,
-0x40032b3a, 0x40033d94, 0x40033dde and 0x400a5eac, and no render events
-(its audio renders on the DSP). It declares the `.fast` copy table itself,
+0x40032b3a, 0x40033d94, 0x40033dde and 0x400a5eac, a Digitakt II-only
+`ev_personalize` (0x4009e2a2, the PERSONALIZE menu, `void f(menu)`), and no
+render events (its audio renders on the DSP). It declares the `.fast` copy table itself,
 `core_fast`, and copies it on the first `ev_tick` (`mods/core/fast.s`).
 
 The core mod patches each shared site once. It calls the handlers

@@ -6,7 +6,8 @@ nothing the unit does.
 
 It builds the shared [../core/core.s](../core/core.s),
 [settings.s](../core/settings.s) and [fast.s](../core/fast.s) with the
-Digitakt II's addresses (`mod.json`). The render hooks (`render.s`) are not
+Digitakt II's addresses (`mod.json`), and its own
+[personalize.s](personalize.s). The render hooks (`render.s`) are not
 in it: the Digitakt II renders its audio on the DSP.
 
 - **At boot** (the OS entry's call at 0x40000538, which called 0x400019b0,
@@ -17,7 +18,7 @@ in it: the Digitakt II renders its audio on the DSP.
   unit starts it, so stock reads it as stopped, and this core keeps that.
   A mod that wants a time base cannot use DTIM0 here.
 - **The shared sites** become the events `ev_tick`, `ev_draw`, `ev_key`,
-  `ev_enc` and `ev_settings`, with the same prototypes as on the mk1
+  `ev_enc`, `ev_settings` and, the Digitakt II's own, `ev_personalize`, with the same prototypes as on the mk1
   ([docs/ADAPTING.md](../../docs/ADAPTING.md), "The hook bus"):
 
   | site | was | event |
@@ -27,12 +28,18 @@ in it: the Digitakt II renders its audio on the DSP.
   | 0x40033d94 | `jsr 0x40030bd0`: `Brain::key(brain, event)` | `ev_key` |
   | 0x40033dde | `jsr 0x40030b64`: `Brain::enc(brain, event)` | `ev_enc` |
   | 0x400a5eac | `movea.l (a2),a0; pea 2.w`, the SETTINGS builder 0x400a5b04 going on at 0x400a5eb2 | `ev_settings` |
+  | 0x4009e2a2 | `movem.l $18(a7),d2-d6/a2-a6`, the end of the PERSONALIZE builder 0x4009daec, after TRK SELECT | `ev_personalize` |
 
   `core_additem(menu, row)` adds a SETTINGS row, after SYSTEM, with the
   firmware's routines: `operator new` 0x4011ebd0, `MenuItem`'s constructor
   0x40115a44, `Menu::addItem` 0x4011527a and the `std::function` manager
   0x4019d8a8 (for `PFSs15FileStorageInfoE`, as on the mk1). A row's label
-  callback builds a `std::string` with 0x401e7e7a.
+  callback builds a `std::string` with 0x401e7e7a. PERSONALIZE's rows are
+  the same generic `MenuItem`, so `core_additem` adds them there too, from
+  `ev_personalize`; such a row redraws with `View::invalidate(menu + 0x38)`
+  (0x4011b126), and draws a checkbox as the firmware's do: `blit` 0x40114168
+  of one of the two Bitmaps (0x1c bytes each, empty then ticked) at
+  `*(char **)0x44f34554`.
 - **`.fast` code** (`fast.s`): core declares the copy table `core_fast`,
   and its `ev_tick` handler copies every mod's `.fast` section into the SRAM
   tail (0x8000F100-0x80010000) on the first tick, once: the OS zeroes SRAM

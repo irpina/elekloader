@@ -4,7 +4,7 @@
  "title": "core", "category": "Framework", "author": "irpina",
  "description": "The boot copier and the hook bus for the Digitakt II: every other mod needs it. On its own it changes nothing the unit does.",
  "device": "digitakt-mk2", "os": "1.17",
- "sources": ["../core/core.s", "../core/settings.s", "../core/fast.s"],
+ "sources": ["../core/core.s", "../core/settings.s", "../core/fast.s", "personalize.s"],
  "defsym": {
   "DRAWALL": "0x4011bc96",
   "KEYDISP": "0x40030bd0",
@@ -23,8 +23,9 @@
   {"addr": "0x40032b3a", "stock": "4eb94011bc96", "op": "jsr", "target": "core_draw"},
   {"addr": "0x40033d94", "stock": "4eb940030bd0", "op": "jsr", "target": "core_key"},
   {"addr": "0x40033dde", "stock": "4eb940030b64", "op": "jsr", "target": "core_enc"},
-  {"addr": "0x400a5eac", "stock": "205248780002", "op": "jmp", "target": "core_settings"}
+  {"addr": "0x400a5eac", "stock": "205248780002", "op": "jmp", "target": "core_settings"},
+  {"addr": "0x4009e2a2", "stock": "4cef7c7c0018", "op": "jmp", "target": "core_personalize"}
  ],
  "subscribe": [{"event": "ev_tick", "fn": "core_fastcopy", "order": 0}],
- "collections": {"ev_tick": 4, "ev_draw": 4, "ev_key": 4, "ev_enc": 4, "ev_settings": 4, "core_fast": 16}
+ "collections": {"ev_tick": 4, "ev_draw": 4, "ev_key": 4, "ev_enc": 4, "ev_settings": 4, "ev_personalize": 4, "core_fast": 16}
 }
