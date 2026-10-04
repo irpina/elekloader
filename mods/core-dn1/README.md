@@ -1,7 +1,8 @@
 # core for the Digitone mk1
 
 The boot copier and the hook bus for the Digitone mk1 and Digitone Keys,
-OS 1.43 and 1.44. It is [../core/core.s](../core/core.s), built with the
+OS 1.43 and 1.44. It is [../core/core.s](../core/core.s), with
+[settings.s](../core/settings.s) and [render.s](../core/render.s), built with the
 Digitone's addresses and sites (`mod.json`: 1.43's, and 1.44's under
 `ports`). Every set of linkable (format 2) mods for
 the Digitone needs it. On its own it changes nothing the unit does.

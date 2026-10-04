@@ -86,7 +86,8 @@ A format-2 mod is a relocatable object:
 3. **Builds the tables.** Each table's entries are sorted by (`order`, mod
    id), followed by one zero entry. A table defines two symbols: `NAME` (its
    address) and `NAME_n` (its count). Each `.fast` section is added to the
-   device's copy table (`fa_copies` on the Digitakt mk1) automatically.
+   device's copy table (`fa_copies` on the Digitakt mk1, `core_fast` on the
+   Digitakt II) automatically.
 4. **Relocates** the sections, the table entries and the sites.
 5. **Checks again** on the result: code sites are still whole
    instructions, and the copied-block rules hold.
@@ -113,7 +114,7 @@ Nothing is built unless all of these pass:
   - decode as whole instructions with no PC-relative operand and no relative
     branch, because it will run from the copy.
 
-## The hook bus (Digitakt mk1, Digitone mk1)
+## The hook bus (Digitakt mk1, Digitone mk1, Digitakt II)
 
 This is a convention between mods for these devices, not a rule of the
 loader. The table gives the Digitakt mk1 1.53's sites, which 1.54 has at
@@ -124,7 +125,12 @@ order, and 1.44 has the last three at 0x40072a54, 0x4009d128 and 0x4009e53c
 event, `ev_voice_on` (at 0x4009e928; 0x4009e948 in 1.44), and the tables
 `core_params` (parameter slots, docs/ADAPTING.md), `core_pages` (mod pages)
 and `core_projdata` (project data); 2.2 the event `ev_hold` and the table
-`core_menu` (the Mod Menu).
+`core_menu` (the Mod Menu). The Digitakt II 1.17's core (core-dt2 1.0) has
+`ev_tick`, `ev_draw`, `ev_key`, `ev_enc` and `ev_settings`, at 0x40032ad4,
+0x40032b3a, 0x40033d94, 0x40033dde and 0x400a5eac, a Digitakt II-only
+`ev_personalize` (0x4009e2a2, the PERSONALIZE menu, `void f(menu)`), and no
+render events (its audio renders on the DSP). It declares the `.fast` copy table itself,
+`core_fast`, and copies it on the first `ev_tick` (`mods/core/fast.s`).
 
 The core mod patches each shared site once. It calls the handlers
 subscribed to that event, from a table built by the linker, in order.

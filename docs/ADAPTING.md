@@ -33,9 +33,11 @@ monolithic build; section 4 says how to go from A to B.
   It owns the shared hook sites, copies every mod's code into RAM at boot,
   and turns the shared sites into events your mod subscribes to. Every
   format-2 mod set needs exactly one core. `mods/core/core.s` is its one
-  source; `mods/core` builds it for the Digitakt mk1
-  (`python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx`)
-  and `mods/core-dn1` for the Digitone mk1. The Octatrack's core,
+  source (with `settings.s` and `render.s` where the device has those
+  sites); `mods/core` builds it for the Digitakt mk1
+  (`python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx`),
+  `mods/core-dn1` for the Digitone mk1 and `mods/core-dt2` for the
+  Digitakt II. The Octatrack's core,
   `mods/core-ot`, is only the boot copier: its mods patch their own sites,
   since it has no events yet.
 
@@ -86,7 +88,7 @@ what you see when it is broken (section 5 has the fixes).
 12. **One file, one release.** A mod targets one stock release by hash.
     Porting to another OS version means finding every address again.
 
-### The hook bus (core's events): the Digitakt mk1 and the Digitone mk1
+### The hook bus (core's events): the Digitakt mk1, the Digitone mk1 and the Digitakt II
 
 Handlers are C functions (arguments on the stack; d0-d1/a0-a1 free,
 everything else kept; the result in d0). `order` sorts handlers of one
@@ -102,18 +104,27 @@ event (lower first; the shipped mods use 10-90).
 | `ev_render_in` | audio render entry, 1500 times a second | `void f(void)` | interrupt level: keep it short |
 | `ev_render_out` | audio render exit | `void f(void)` | the same |
 | `ev_hold` | Digitone mk1 only (core-dn1 2.2): a track key held on its own, UI task | `int f(void *brain, void *event, int track)` | return nonzero to take it; when none does, core opens the Mod Menu ("The Mod Menu" below) |
+| `ev_personalize` | Digitakt II only (core-dt2): SETTINGS > PERSONALIZE is built | `void f(void *menu)` | add a row with `core_additem(menu, row)`, after TRK SELECT; a row redraws the menu with `View::invalidate(menu + 0x38)`, as from SETTINGS; a checkbox is drawn as mods/core-dt2/README.md describes |
 | `ev_voice_on` | Digitone mk1 only (core-dn1 2.1): a voice starts a note, in the render | `void f(int voice, int track, void *event)` | interrupt level. The voice's pitch word (`0x41391f80` + 4 x voice, the note << 16) is already written and may be changed: the render reads it every block. The voice's sound and the step's locks load after this, so read the voice's parameters from `ev_render_out` |
 
-The events, their prototypes and their conventions are the same on both
-devices; only the sites differ, and `ev_voice_on` exists on the Digitone
-only. The sites core owns (do not patch them):
+The events, their prototypes and their conventions are the same on every
+device; only the sites differ, and `ev_voice_on` exists on the Digitone
+only. The Digitakt II's core (mods/core-dt2 1.0) has `ev_tick`, `ev_draw`,
+`ev_key`, `ev_enc`, `ev_settings` and its own `ev_personalize`, and no
+render events: its audio
+renders on the DSP. It copies `.fast` code into SRAM itself, on the first
+`ev_tick` (`core_fast`): subscribe only `.run` code to `ev_key` and
+`ev_enc` there, since a key can come before that tick (`ev_draw` cannot:
+the tick site runs first). The sites core owns (do not patch them):
 - Digitakt mk1 1.53 and 1.54: 0x40000538, 0x4000a770, 0x4000a7d6,
   0x4000b770, 0x4000b7ba, 0x40058800, 0x40077428, 0x400784c8;
 - Digitone mk1 1.43: 0x40000538, 0x4001900c, 0x40019072, 0x40019d9c,
   0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c, and from core-dn1 2.1
   0x4009e928;
 - Digitone mk1 1.44: the same, but 0x40072a54, 0x4009d128 and 0x4009e53c
-  for the last three of the eight, and 0x4009e948.
+  for the last three of the eight, and 0x4009e948;
+- Digitakt II 1.17: 0x40000538, 0x40032ad4, 0x40032b3a, 0x40033d94,
+  0x40033dde, 0x400a5eac, 0x4009e2a2.
 
 A firmware routine your mod calls has its own address on each device and
 each OS version: look it up for the release you target, and build one
@@ -304,7 +315,9 @@ in 1.54 they are at the same addresses, but 0x400a1706 is 0x400a1862):
 
 **3.1 Start from the template.** Copy `examples/hello-marker/` to a folder
 of your own. It is a complete mod: a C handler on `ev_draw` that draws a
-small square in the top-right corner of every screen.
+small square in the top-right corner of every screen. For the Digitakt II,
+`examples/hello-marker-dt2/` builds the same source, and
+`examples/perform-direct/` is a real mod in one key handler.
 
 **3.2 Fill in `mod.json`.**
 

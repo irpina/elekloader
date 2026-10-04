@@ -19,6 +19,7 @@ file on your own machine, and you flash it the way you flash any OS update.
 | Device | OS | Status |
 |---|---|---|
 | Digitakt (mk1) | 1.53, 1.54 | supported |
+| Digitakt II | 1.17 | experimental: whole builds (format-1 mods) and linkable mods with its own core (the hook bus's tick, draw, key and encoder events), sealed as the unit checks them; boot in digikit's emulator; core with a key-swap mod works on a unit (Transfer over USB) |
 | Digitone (mk1) and Digitone Keys | 1.43, 1.44 | supported |
 | Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); linkable mods with its own core: boots on an MKII, not yet run on an MKI |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
@@ -70,6 +71,7 @@ it, below), and install it like any mod. There is one per device and OS:
 | Digitakt mk1 | 1.54 | `core-2.1-os1.54.elemod` |
 | Digitone mk1, Digitone Keys | 1.43 | `core-dn1-2.0a.elemod` |
 | Digitone mk1, Digitone Keys | 1.44 | `core-dn1-2.0a-os1.44.elemod` |
+| Digitakt II | 1.17 | `core-dt2-1.0.elemod` |
 
 A mod is made for one OS version: one built for 1.53 is refused with a 1.54
 stock file, and its author has to build it for 1.54 (docs/ADAPTING.md,
@@ -79,6 +81,7 @@ You also need the **stock OS file** for your device, exactly as Elektron
 publishes it:
 - Digitakt mk1: `Digitakt_OS1.54.syx` or `Digitakt_OS1.53.syx`, from
   [Elektron's Digitakt downloads](https://www.elektron.se/support-downloads/digitakt);
+- Digitakt II: `Digitakt_II_OS1.17.syx`, from Elektron's Digitakt II downloads;
 - Digitone mk1 or Digitone Keys: `Digitone_and_Digitone_Keys_OS1.44.syx` or
   `..._OS1.43.syx` (one file serves both), from Elektron's Digitone downloads;
 - Octatrack MKI or MKII: `OCTATRACK_OS1.40C.syx` or `OCTATRACK_OS1.40C.bin`
@@ -117,7 +120,7 @@ file you chose last are kept in `%APPDATA%\elekloader` (Windows) or
 
 Send the `.syx` to the unit the way Elektron describes for OS updates
 ([How to update your device](https://support.elektron.se/support/solutions/articles/43000662890-how-to-update-your-device)).
-For the Digitakt mk1 and the Digitone mk1:
+For the Digitakt mk1, the Digitakt II and the Digitone mk1:
 1. Connect it over USB and open Elektron Transfer.
 2. Select the unit and **Connect**.
 3. Drag the `.syx` onto **Drop files here**.
@@ -133,10 +136,11 @@ For the Octatrack, from the card (back it up first):
 4. When it restarts, power-cycle it once more before judging anything.
 
 **Recovery:** the bootloader is never changed, so the stock OS file always
-restores the unit. If a custom OS will not start on a Digitakt mk1 or a
-Digitone mk1, hold **FUNC** while powering on for the startup menu, and
-press **TRIG 4** for OS UPGRADE.
-Then send the stock `.syx` with Transfer's legacy OS upgrade mode. On the
+restores the unit. If a custom OS will not start on a Digitakt mk1, a
+Digitakt II or a Digitone mk1, hold **FUNC** while powering on for the
+startup menu, and press **TRIG 4** for OS UPGRADE.
+Then send the stock `.syx` with Transfer's legacy OS upgrade mode (on the
+Digitakt II, over its MIDI ports: not USB). On the
 Octatrack: hold **FUNC** while powering on, press **TRIG 3** for MIDI
 UPGRADE, and send the stock `.syx` over 5-pin DIN MIDI (USB MIDI does not
 work for this).
@@ -158,6 +162,12 @@ For the Digitakt mk1, the writer produces the same bytes as
 elektron-firmware-tool when given the same main OS stream. For the Digitone
 mk1 (the same file family, with seven sections), it reproduces the stock
 file from its own main OS stream.
+
+The Digitakt II's files are sealed: the container ends in an HMAC-SHA256 of
+the rest, which its bootstrap checks before it flashes anything. elekloader
+derives the key from your stock file's bootstrap, as the unit does, seals
+the output, and checks the seal again. From its own main OS stream, the
+writer reproduces the stock file byte for byte.
 
 The Octatrack's files are checked the same way: the container header
 differs only in its 10-character version field, every SysEx message's
@@ -183,7 +193,8 @@ Every set of format-2 mods needs the **core** mod for its device. The
 Windows and macOS apps have them built in, and each release carries them:
 one source, [mods/core/core.s](mods/core/core.s), built with each device's addresses
 ([mods/core](mods/core) for the Digitakt mk1, [mods/core-dn1](mods/core-dn1)
-for the Digitone mk1). Each `mod.json` gives the addresses of every OS it
+for the Digitone mk1, [mods/core-dt2](mods/core-dt2) for the Digitakt II).
+Each `mod.json` gives the addresses of every OS it
 supports (its `os`, and its `ports`): the stock file you build with picks
 them. The Octatrack's, [mods/core-ot](mods/core-ot), is
 only the boot copier, with no hook bus: it reserves RAM for mods and copies
@@ -192,6 +203,7 @@ their code there. To build one yourself, use the SDK (below):
 ```bash
 python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.54.syx                          # the Digitakt mk1's (or 1.53)
 python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # the Digitone mk1's (or 1.43)
+python -m elekloader.sdk.build mods/core-dt2 --stock Digitakt_II_OS1.17.syx                      # the Digitakt II's
 python -m elekloader.sdk.build mods/core-ot --stock OCTATRACK_OS1.40C.syx                    # the Octatrack's
 ```
 
@@ -220,8 +232,11 @@ its bytes. See [docs/ADAPTING.md](docs/ADAPTING.md), section 4b.
 
 `examples/hello-marker/` is a complete mod to start from. It is one C
 function on the draw event, and it puts a small square in the corner of
-every screen. Building code needs the device's cross toolchain; for the
-Digitakt mk1 that is m68k binutils and gcc.
+every screen (`examples/hello-marker-dt2/` builds it for the Digitakt II).
+`examples/perform-direct/` is a real Digitakt II mod: [PRESET] toggles
+PERFORM without [FUNC]. Building code needs the device's cross toolchain;
+for the Digitakt mk1 and the Digitakt II that is m68k binutils and gcc (Homebrew's `m68k-elf-*` work, with
+`ELEKLOADER_CROSS=m68k-elf-`).
 
 ## The Windows app
 
@@ -278,6 +293,7 @@ ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=bundle.elemod ELEKLOADER_CTOOL_SYX=its-bu
 ELEKLOADER_OT_SYX=OCTATRACK_OS1.40C.syx ELEKLOADER_OT_BIN=OCTATRACK_OS1.40C.bin python tests/test_octatrack.py
 ELEKLOADER_OT_SYX=... ELEKLOADER_OCTABAM=path/to/octabam python tests/test_octabam.py   # octabam optional
 ELEKLOADER_DN_SYX=Digitone_and_Digitone_Keys_OS1.43.syx python tests/test_digitone.py
+ELEKLOADER_DT2_SYX=Digitakt_II_OS1.17.syx python tests/test_digitakt2.py
 ELEKLOADER_STOCK=... ELEKLOADER_STOCK_154=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
 node tests/test_web.mjs build/site   # the web page's engine, in Pyodide (packaging/build_web.py first)
 ```

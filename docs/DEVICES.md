@@ -15,6 +15,7 @@ of its own that is only a boot copier.
 | `stage` | where the bootloader stages the main OS before unpacking it in place | the bootstrap's loader (`0x800005fe`: read to `0x40200000`, unpack to `0x40000400`) |
 | `flash_at`, `flash_limit` | where the container sits in flash and must end | the bootstrap (`0x80000` .. `0x380000`) |
 | `trailer` | how the file is sealed: `None`, or `'hmac'` | mk1 has none |
+| `hmac_key_from` | for `'hmac'`: the section and seed string the key is derived from (never the key itself) | none on the mk1 |
 | `isa` | the main CPU's instruction decoder, for the boundary checks | ColdFire (`isa/coldfire.py`) |
 | `areas` | memory that is free at run time: where a mod's regions may lie | the research on what the OS never touches |
 | `ddr`, `sram_code`, `fast_table` | where the linker puts mods' code and data, fast code, and the table that copies it | the areas above |
@@ -25,6 +26,138 @@ of its own that is only a boot copier.
 | `blob_max` | a cap on the appended blob, if the DDR areas do not give one | none on the mk1 |
 | `image_free` | zero runs inside the main OS that `fixed` code may take (sdk.build) | none on the mk1 |
 | `toolchain` | the compiler, assembler and flags the SDK uses | the CFW's build |
+
+## The Digitakt II (1.17)
+
+Experimental. Whole builds and the core (mods/core-dt2) boot in digikit's
+emulator, and a build of core with examples/perform-direct works on a unit
+(4 Oct 2026): sent with Elektron Transfer over USB (the in-OS upgrade), it
+was accepted and booted, the unit reported the build's own version (PD10),
+and the key swap and a PERSONALIZE row (in an earlier version of the mod)
+worked. digikit (https://github.com/m-dwyer/digikit,
+docs/findings/01-container-and-patching.md) mapped 1.15C and 1.16. Each fact
+below was found again in 1.17.
+
+- **Files.** The Digitakt mk1's family (ELE3, the same SysEx transport),
+  device byte `0x14`. It has six sections: 5, 2 (the bootstrap, run at
+  `0x80000400`; its `dest` is a version, `0x0201`), 3 (MAIN OS), 4 (the
+  updater), 7 (the SHARC DSP's program) and 8.
+- **Sealed.** After the last section's 16-byte padding comes a 32-byte
+  HMAC-SHA256 of everything before it, inside the preamble's length.
+  - The bootstrap checks it, and the content checksum, before it flashes;
+    the OS checks it on an upgrade. A file that fails is refused with
+    `Checksum failed` or `UPGRADE ABORTED`, and nothing is written.
+  - The key: in section 2, the seed `"Master Overdrive"`, a NUL and a
+    32-byte constant C; the key is C ^ sha256(seed) ^ sha256(reversed seed).
+    `syx.seal_key` reads it from the user's stock file, so it is never
+    stored here.
+  - From its own main OS stream, the writer reproduces the stock file byte
+    for byte, seal included.
+- **Staging.** The bootstrap's loader (`0x80000596`) reads section 3 from
+  flash, at its container offset + `0x80000`, to `0x40400000`, and unpacks
+  it from there to `0x40000400` with its depacker (`0x80000432`). The mk1
+  stages at `0x40200000`; this image, 3.27 MB depacked, runs past that.
+  Stock's in-place gap is 2,065,240 bytes.
+- **The unit's own depacker takes elekloader's stream.** Run in Unicorn
+  through digikit's harness (`emu/oracle.py`, with the 1.17 entry), the
+  bootstrap's depacker yields the stock main OS from both Elektron's
+  stream and elekloader's repack of it (1,385,586 bytes against
+  1,147,584).
+- **Flash.** The container starts at `0x80000`: the bootstrap's read above,
+  and digikit's map of the OS's own reads. The OS keeps a store at
+  `0x380000`-`0x400000`, with the mk1's code at its own addresses: it reads
+  a 0x14-byte header at `0x380000`, and erases the sectors at `0x380000` and
+  `0x3c0000` (26 and 12 call sites, from `0x400ca504`). So `flash_limit` is
+  `0x380000`: 3 MB for the container, of which stock takes 1.48 MB. The
+  bootstrap's receive path has no size check of its own, so this limit is
+  elekloader's alone.
+- **Checked in an emulator** (digikit's, `emu.checkpoint` from a cold
+  boot, then `tools/emucheck.py` to 600M instructions; 4 Oct 2026):
+  - Two elekloader builds, a repack of stock 1.17 (version `DT01`) and a
+    whole build with one data site (`DT02`), pass every stage as stock does:
+    the main screen, six tasks, the +Drive formatted, the same instruction
+    count. The repack's screen at 650M is identical to stock's.
+  - digikit's extractor reads both, and its checker passes their content
+    checksum, seal, framing count and every packet checksum.
+  - Not checked in the emulator: the bootstrap's own flash path (it serves
+    the container to the OS's flash reads and boots the main OS directly).
+    The unit above accepted a sealed build.
+- **What writes the flash** (tests/test_digitakt2.py checks each against
+  the stock file). The OS's SPI NOR driver writes through 0x40137cbe and
+  erases through 0x40137d3a/0x40137da4 (256 KB) and 0x401373e6 (64 KB). Its
+  only callers:
+  - the settings store, 0x380000-0x400000 (above);
+  - the in-OS upgrade, 0x4013ac54 (the route Transfer takes over USB): it
+    runs the validator 0x400d9fb0 (content checksum, the build floor,
+    the seal), then erases from 0x80000 block by block to cover the
+    container and writes it there. A container that ends below 0x380000
+    cannot make it erase past it: 0x380000 - 0x80000 is a whole number of
+    256 KB units;
+  - the factory console's upload (0x400caff0, "READY FOR OS" over the debug
+    UART), which writes a container to 0x80000 or another image to
+    0x40000-0x80000.
+  None of them writes anything from the main OS image: unlike the Analog
+  Rytm's, it holds no copy of the bootstrap to re-flash, and needs no
+  `protected` range. The bootstrap itself is section 2, which every build
+  keeps stock (version 0x0201: the bootstrap's own upgrade only runs for a
+  greater one). The bootstrap's MIDI upgrade (the STARTUP menu) writes the
+  container to 0x80000 too, and checks the content checksum and the seal
+  first.
+- **The version a unit reports** is its container's. The OS caches the
+  container's first 0x20 bytes from flash 0x80000 (0x4013641c) and reads
+  the build and version fields from there (0x40124978, the answer to
+  Transfer's version request; an exception report); there is no version
+  string in the main OS. So a build's 4-character version field is what
+  the unit shows (a unit reported PD10 for a build so named), and the
+  loader's default (`2.0a`) differs from stock's.
+- **Recovery.** The startup menu (FUNC at power-on), TRIG 4 for OS UPGRADE,
+  over MIDI only (Elektron's readme). It is in the bootstrap, which no build
+  changes, and checks only the content checksum and the seal.
+- **At reset** (`0x400004e8`), the OS:
+  - copies `0x40312000-0x40318e80` to SRAM at `0x80000000` and
+    `0x40318e80-0x4031ff60` to `0x80008000`, and zeroes the rest of each
+    32 KB half;
+  - clears DDR `0x40312000-0x47E28470`;
+  - runs its stack down from `0x48000000`.
+  The mk1's reset code, with the II's addresses.
+- **Free memory, and the core** (mods/core-dt2):
+  - There is no sample pool in its DDR to take from: samples go to the DSP
+    over FlexBus (0x8C000000, digikit). The reset clears 0x40312000-
+    0x47E28470 for the OS's static `.bss`, almost all of the 128 MB.
+  - Above the clear, the OS reaches its DSP buffers only through the
+    uncached alias (+0x08000000): 0x4FE30000-0x4FE7AE80, so 0x47E30000-
+    0x47E7AE80. The boot stack runs down from 0x48000000.
+  - Between them, 0x47E7B000-0x48000000: no decoded instruction (digikit's
+    `tools/refscan.py`, 96.75% coverage) names it or its alias (the only
+    hit, 0x47efffff, is the high word of the double FLT_MAX); it is zero in
+    every rung of a cold boot; and a write watch over all of it, cached and
+    uncached, saw no write from 400M to 808M instructions of a session
+    with 37 key events. The core takes 0x47F00000-0x47F40000 (256 KB) from
+    the middle, 520 KB clear of the buffers and 768 KB of the stack.
+  - SRAM: the reset copies the image's tail into each 32 KB half and zeroes
+    the rest. Past the copies, 0x80006E80-0x80008000 and 0x8000F100-
+    0x80010000 are named by no decoded instruction. They are zeroed after
+    the boot copier runs, so they are free at run time only, as on the mk1.
+    A write watch over both saw no write from 400M to 781M instructions of
+    a session with 24 key presses. `.fast` code goes to the tail: core-dt2
+    declares `core_fast` and copies it on the first `ev_tick`.
+  - The core does not start DTIM0, unlike the mk1's (`NO_DTIM0` in
+    core.s). Nothing before the OS starts it on the II either, and ten OS
+    sites read its counter: with it running, a cold boot with core alone
+    jumped to 0 at 553M instructions in digikit's emucheck.
+  - The core's events: `ev_tick`, `ev_draw`, `ev_key`, `ev_enc`,
+    `ev_settings`, and the II's own `ev_personalize` (SETTINGS >
+    PERSONALIZE, whose builder makes its rows with the same generic
+    `MenuItem`). mods/core-dt2/README.md lists the sites and routines.
+  - Checked in the emulator (cold boot, then emucheck to 600M): core 1.0
+    alone passes every stage, with its screen at 650M identical to stock's;
+    with a mod that inverts an 8x8 block on `ev_draw`, the screen differs
+    from stock in exactly those 64 pixels. Each event was driven with a
+    test mod: key and encoder counts, a SETTINGS row, and
+    a PERSONALIZE checkbox row. examples/perform-direct (a key swap) works
+    on a unit, with core's other events registered but not used there.
+  - Not covered: anything a session in the emulator does not reach (no
+    DSP, no samples, an empty +Drive) and the unit run did not use.
 
 ## The Digitone mk1 and Digitone Keys (1.43)
 
@@ -128,13 +261,10 @@ of its own that is only a boot copier.
 
 ## What a new device needs besides its profile
 
-- **Sealed files.** The Digitakt II and Digitone II seal the container with
-  an HMAC-SHA256 trailer. digikit computes it (`dt2/authcode.py`).
-  - `syx.write` refuses any device whose `trailer` is not `None` until that
-    is ported and verified against the stock files.
-  - The trailer's layout, and the preamble's length rule, must be checked
-    against real files first, as the mk1's were against
-    elektron-firmware-tool's output.
+- **Sealed files.** `trailer='hmac'` with `hmac_key_from` (the Digitakt
+  II, above). Another sealed device needs its seed found in its bootstrap
+  (the Digitone II's is `"Multiplier"`, digikit), and the writer checked to
+  reproduce its stock file, seal included.
 - **The packing format.** The loader repacks with the same codec
   (`codec/`). Check that the device's own depacker accepts it: every
   section must round-trip through `codec/elz.py`, and the in-place

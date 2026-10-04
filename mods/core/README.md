@@ -4,10 +4,12 @@ The boot copier and the hook bus for Digitakt mk1 OS 1.53 and 1.54. Every
 set of linkable (format 2) mods needs exactly one core. On its own it
 changes nothing the unit does.
 
-`core.s` and `machines.s` have no addresses: `mod.json` gives them
-(`defsym`), with the sites, for 1.53, and again for 1.54 under `ports`.
-The stock file you build with picks them. [../core-dn1](../core-dn1) builds
-the same `core.s` for the Digitone mk1. The addresses in this README and in
+`core.s`, `settings.s`, `render.s` and `machines.s` have no addresses:
+`mod.json` gives them (`defsym`), with the sites, for 1.53, and again for
+1.54 under `ports`. The stock file you build with picks them.
+[../core-dn1](../core-dn1) builds the same `core.s`, `settings.s` and
+`render.s` for the Digitone mk1, and [../core-dt2](../core-dt2) `core.s`
+alone for the Digitakt II. The addresses in this README and in
 the sources' comments are 1.53's.
 
 - **At boot** (the OS entry's call at 0x40000538), `boot` copies the RAM

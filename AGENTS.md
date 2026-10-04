@@ -25,7 +25,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 |---|---|
 | `elekloader/devices/` | everything device-specific: one profile per product, releases by hash |
 | `elekloader/formats.py` | one interface over the OS file families (`Device.container`); `load` also takes Elektron's zip |
-| `elekloader/syx.py` | the Digitakt mk1's and Digitone mk1's family (ELE3, SysEx): parse, write (only the main OS changes), verify |
+| `elekloader/syx.py` | the Digitakt mk1's, Digitone mk1's and Digitakt II's family (ELE3, SysEx; the II's sealed with an HMAC): parse, write (only the main OS changes), verify |
 | `elekloader/elek.py` | the Octatrack's family (ELEK, legacy SysEx, the ELUP card file): the same |
 | `elekloader/elemod.py` | the mod format: shared validation, format 1, the instruction check, `summarize` |
 | `elekloader/link.py` | format 2: the linker and its checks |
@@ -33,7 +33,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 | `elekloader/gui.py` | the window (Tkinter); `LoaderModel` is its logic without Tk |
 | `elekloader/lint.py`, `elekloader/mkmod.py`, `elekloader/sdk/` | tools for mod authors; `sdk/octabam.py` converts octabam's modules |
 | `elekloader/codec/`, `elekloader/isa/` | code from digikit (GPL-2.0-or-later): change it only with a round-trip test |
-| `mods/core/`, `mods/core-dn1/` | the core mod (the hook bus every format-2 mod needs): one `core.s`, each device's addresses and sites in its `mod.json`, each further OS version's in its `ports` |
+| `mods/core/`, `mods/core-dn1/`, `mods/core-dt2/` | the core mod (the hook bus every format-2 mod needs): one `core.s` (with `settings.s` and `render.s` where the device has those sites), each device's addresses and sites in its `mod.json`, each further OS version's in its `ports` |
 | `mods/core-ot/` | the Octatrack's core: a boot copier only (its RAM reserve and `.boot`), no hook bus |
 | `packaging/`, `.github/workflows/windows-build.yml`, `macos-build.yml` | the apps: `elekloader-<version>-windows.exe`, and `elekloader-<version>-macos.dmg` (signed and notarized), with core built in (`elekloader/bundled`, never committed) |
 | `web/`, `packaging/build_web.py`, `.github/workflows/pages.yml` | the web page (GitHub Pages): elekloader in Pyodide, in a worker; `bridge.py` is its only Python, a thin layer over `gui.LoaderModel` and `patch`; `catalog.json` is its mod shop's curated list (docs/WEB.md). Everything it loads comes from the site itself |
@@ -48,6 +48,7 @@ ELEKLOADER_STOCK=... ELEKLOADER_BUNDLE=... ELEKLOADER_CTOOL_SYX=... python tests
 ELEKLOADER_OT_SYX=... ELEKLOADER_OT_BIN=... python tests/test_octatrack.py
 ELEKLOADER_OT_SYX=... ELEKLOADER_OCTABAM=... python tests/test_octabam.py
 ELEKLOADER_DN_SYX=... python tests/test_digitone.py
+ELEKLOADER_DT2_SYX=... python tests/test_digitakt2.py
 ELEKLOADER_RELEASES=<folder of stock files> python tests/test_releases.py   # every known release, and the cores for it
 ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
 python packaging/build_web.py --pyodide pyodide-core-<v>.tar.bz2 --core core-*.elemod --out build/site

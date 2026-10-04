@@ -44,8 +44,10 @@ class Device:
                                  # None: unknown, so the in-place unpack is not simulated
     flash_at: int                # where the container starts in flash
     flash_limit: int             # where it must end
-    trailer: str                 # None: no trailer (mk1); 'hmac': sealed (not yet)
+    trailer: str                 # None: no trailer (mk1); 'hmac': sealed (syx.seal_key)
     isa: str                     # 'coldfire'
+    hmac_key_from: tuple = ()    # for 'hmac': (section id, seed string); the key is read from
+                                 # the stock file's own section, never stored here (syx.seal_key)
     container: str = 'ele3'      # the file family: 'ele3' (syx.py) or 'elek' (elek.py)
     version_len: int = 4         # the characters of the version field the unit shows
     protected: tuple = ()        # ((lo, hi, why), ...): main OS bytes no mod may change
@@ -87,8 +89,8 @@ class Device:
 
 
 def _all():
-    from . import digitakt_mk1, digitone_mk1, octatrack
-    return [digitakt_mk1.DEVICE, digitone_mk1.DEVICE, octatrack.DEVICE]
+    from . import digitakt_mk1, digitakt_mk2, digitone_mk1, octatrack
+    return [digitakt_mk1.DEVICE, digitakt_mk2.DEVICE, digitone_mk1.DEVICE, octatrack.DEVICE]
 
 
 DEVICES = None
