@@ -428,6 +428,31 @@ def test_a_remix_is_checked_against_its_build_byte_for_byte():
             assert '0x4001de6f' in str(e), str(e)
         else:
             raise AssertionError('the check passed a different detour')
+        ref[0x4001de6e - DEV.main_load + 1] = 0xf9
+        # The core's own sites (its hook bus): octabam's builds have no bus, so those bytes
+        # are stock in its build and ours differ. That is passed, and counted ...
+        cs = [s for s in elemod.load_any(core(tmp)).sites
+              if ref[s['addr'] - DEV.main_load:s['addr'] - DEV.main_load + s['len']]
+              != img[s['addr'] - DEV.main_load:s['addr'] - DEV.main_load + s['len']]]
+        assert cs
+        for s in cs:
+            o = s['addr'] - DEV.main_load
+            ref[o:o + s['len']] = img[o:o + s['len']]
+        plan = octabam.convert(ob, 'rx-test', img, DEV, fake_remix(img, ref))
+        lines = octabam.check(ob, plan, path, core(tmp), SYX, os.path.join(tmp, 'c3'))
+        n = sum(sum(1 for i in range(s['len']) if ln.image[s['addr'] - DEV.main_load + i]
+                    != img[s['addr'] - DEV.main_load + i]) for s in cs)
+        assert any('%d bytes of the core\'s own sites differ' % n in x for x in lines), lines
+        # ... but a core site's byte that octabam's build changes must still be ours
+        a = cs[0]['addr'] + 1
+        ref[a - DEV.main_load] ^= 0x10
+        plan = octabam.convert(ob, 'rx-test', img, DEV, fake_remix(img, ref))
+        try:
+            octabam.check(ob, plan, path, core(tmp), SYX, os.path.join(tmp, 'c4'))
+        except octabam.CheckError as e:
+            assert '0x%08x' % a in str(e), str(e)
+        else:
+            raise AssertionError('the check passed a core site octabam\'s build changes')
 
 
 def test_converted_mods_stay_out_of_the_checkout():

@@ -197,9 +197,10 @@ one source, [mods/core/core.s](mods/core/core.s), built with each device's addre
 for the Digitone mk1, [mods/core-dt2](mods/core-dt2) for the Digitakt II).
 Each `mod.json` gives the addresses of every OS it
 supports (its `os`, and its `ports`): the stock file you build with picks
-them. The Octatrack's, [mods/core-ot](mods/core-ot), is
-only the boot copier, with no hook bus: it reserves RAM for mods and copies
-their code there. To build one yourself, use the SDK (below):
+them. The Octatrack's, [mods/core-ot](mods/core-ot), has a source of its
+own: it reserves RAM for mods, copies their code there, and from 0.2 has a
+hook bus with the Octatrack's events. To build one yourself, use the SDK
+(below):
 
 ```bash
 python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.54.syx                          # the Digitakt mk1's (or 1.53)

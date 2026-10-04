@@ -1035,8 +1035,9 @@ def check(ob, plan, mod_path, core_path, stock_path, work):
                         ', '.join('0x%08x' % x for x in refs)))
 
     # a remix: the linked OS image is octabam's build of it, byte for byte, except where our
-    # code's addresses go (the operands our relocations fill) and the descriptor it serves
-    # from a copy instead of poking
+    # code's addresses go (the operands our relocations fill), the descriptor it serves
+    # from a copy instead of poking, and the core's own sites (its hook bus, from 0.2:
+    # octabam's build has no bus, so those bytes are stock there)
     if plan.get('remix'):
         ref, base = plan['remix']['ref'], dev.main_load
         ours = set()
@@ -1044,8 +1045,10 @@ def check(ob, plan, mod_path, core_path, stock_path, work):
             for o, _t, _tgt, _a in s.get('relocs', []):
                 ours.update(range(s['addr'] + o, s['addr'] + o + 4))
         moved = {a + i for r in plan['relocs'] for a, w in r['pokes'] for i in range(len(w))}
+        cores = {a for s in core.sites for a in range(s['addr'], s['addr'] + s['len'])
+                 if ref[a - base] == image[a - base]}      # only where octabam's build is stock
         diff = [base + i for i in _changed(ln.image[:len(image)], ref)]
-        bad = [a for a in diff if a not in ours and a not in moved]
+        bad = [a for a in diff if a not in ours and a not in moved and a not in cores]
         if bad:
             raise CheckError('the linked image differs from octabam\'s build of %s at %d bytes '
                              'that are not our code\'s addresses, the first at 0x%08x'
@@ -1053,9 +1056,10 @@ def check(ob, plan, mod_path, core_path, stock_path, work):
         wrote = _changed(image, ref)
         lines.append('the OS image equals octabam\'s build of %s: all %d bytes it changes, '
                      'but for %d address bytes of our placed code and %d of the descriptor '
-                     'served from a copy' % (plan['name'], len(wrote),
-                                             sum(a in ours for a in diff),
-                                             sum(a in moved for a in diff)))
+                     'served from a copy; %d bytes of the core\'s own sites differ'
+                     % (plan['name'], len(wrote), sum(a in ours for a in diff),
+                        sum(a in moved for a in diff),
+                        sum(a in cores and a not in ours and a not in moved for a in diff)))
 
     # the whole of the mod's RAM and fixed code against GNU ld's link of the same object
     obj = os.path.join(os.path.dirname(mod_path), plan['id'] + '.work', plan['id'] + '.o')

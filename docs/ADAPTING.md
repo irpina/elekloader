@@ -37,9 +37,9 @@ monolithic build; section 4 says how to go from A to B.
   uses them); `mods/core` builds it for the Digitakt mk1
   (`python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx`),
   `mods/core-dn1` for the Digitone mk1 and `mods/core-dt2` for the
-  Digitakt II. The Octatrack's core,
-  `mods/core-ot`, is only the boot copier: its mods patch their own sites,
-  since it has no events yet.
+  Digitakt II. The Octatrack's core, `mods/core-ot`, has a hook bus of
+  its own from 0.2, with the Octatrack's events ("The hook bus on the
+  Octatrack" below).
 
 ## 2. The rules
 
@@ -130,6 +130,29 @@ A firmware routine your mod calls has its own address on each device and
 each OS version: look it up for the release you target, and build one
 `.elemod` per device and OS (a mod's `device` and `os`, or one of its
 `ports`, pick the stock file: 3.10).
+
+### The hook bus on the Octatrack (core-ot 0.2)
+
+The Octatrack's firmware is not the Digitakt's, so its events carry what
+its own routines have. The conventions are the same: C handlers, `order`,
+and `subscribe` in mod.json. A mod that subscribes to one of these is
+refused with core-ot 0.1 (*"adds to table ev_tick, which no given mod
+declares"*).
+
+| event | when | C prototype | notes |
+|---|---|---|---|
+| `ev_tick` | 60 times a second, sys task | `void f(void)` | the task `ev_key`, `ev_enc` and (nearly always) `ev_draw` run in, so their handlers never interrupt one another |
+| `ev_draw` | each composed frame, before the bytes that changed go to the LCD | `void f(unsigned char *frame)` | 1024 bytes: 128 rows of 8 bytes, one per screen column x (0 at the left); line y (0 at the top) is bit 63 - y of the row, counting from its first byte's most significant bit. The frame is cleared and composed again each time: what you draw stays one frame. `examples/hello-marker-ot` |
+| `ev_key` | each key press and release | `int f(int code, int pressed)` | the firmware's key code (PLAY 0x28, YES 0x31, NO 0x32, UP 0x33: octabam's docs/firmware/PANEL.md); `pressed` nonzero on a press, 0 on a release. Return nonzero to take it: the firmware never sees it. Auto-repeat does not come here |
+| `ev_enc` | each encoder turn | `int f(int encoder, int delta)` | the firmware's encoder index, 0-7; return nonzero to take it |
+| `ev_midi` | each MIDI message in, MIDI thread | `int f(const unsigned char *msg)` | `msg[0]` the status, then its data bytes; return nonzero to take it: the firmware's handler for it is not called |
+| `ev_frame` | the frame interrupt, every 16 samples (2,756 a second) | `void f(void)` | interrupt level: keep it short. It runs before the interrupted task's EMAC state is put back, so it may use the EMAC |
+
+The sites core-ot owns (Octatrack 1.40C): the boot site 0x4000050c, the 28
+arena writes listed in its `mod.json`, 0x40061e94, 0x40013cae, 0x40061dc8,
+0x40061e00, 0x40005572 and 0x4000d94e, and its draw gate at
+0x400c46ea-0x400c4702. They keep clear of every byte that the converted
+octabam modules (4b) patch.
 
 ### SRC machines (core 2.1, Digitakt mk1)
 

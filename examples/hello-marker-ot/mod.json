@@ -1,0 +1,15 @@
+{
+ "id": "hello-marker",
+ "version": "1.0",
+ "title": "Hello marker",
+ "category": "Examples",
+ "license": "GPL-2.0-or-later",
+ "description": "Sets a small square in the top-right corner of every screen: the smallest mod that runs code on the Octatrack. A template to start from (docs/ADAPTING.md).",
+ "device": "octatrack",
+ "os": "1.40C",
+ "sources": ["hello.c"],
+ "subscribe": [
+  {"event": "ev_draw", "fn": "hello_draw", "order": 60}
+ ],
+ "requires": ["core"]
+}
