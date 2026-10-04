@@ -49,10 +49,16 @@ below was found again in 1.17.
     stored here.
   - From its own main OS stream, the writer reproduces the stock file byte
     for byte, seal included.
-- **Staging.** The bootstrap (`0x800005be`) reads section 3 from flash, at
-  its container offset + `0x80000`, to `0x40400000`, and unpacks it from
-  there to `0x40000400`. The mk1 stages at `0x40200000`; this image, 3.27 MB
-  depacked, runs past that. Stock's in-place gap is 2,065,240 bytes.
+- **Staging.** The bootstrap's loader (`0x80000596`) reads section 3 from
+  flash, at its container offset + `0x80000`, to `0x40400000`, and unpacks
+  it from there to `0x40000400` with its depacker (`0x80000432`). The mk1
+  stages at `0x40200000`; this image, 3.27 MB depacked, runs past that.
+  Stock's in-place gap is 2,065,240 bytes.
+- **The unit's own depacker takes elekloader's stream.** Run in Unicorn
+  through digikit's harness (`emu/oracle.py`, with the 1.17 entry), the
+  bootstrap's depacker yields the stock main OS from both Elektron's
+  stream and elekloader's repack of it (1,385,586 bytes against
+  1,147,584).
 - **Flash.** The container starts at `0x80000`: the bootstrap's read above,
   and digikit's map of the OS's own reads. The OS keeps a store at
   `0x380000`-`0x400000`, with the mk1's code at its own addresses: it reads

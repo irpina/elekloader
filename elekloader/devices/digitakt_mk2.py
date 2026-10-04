@@ -15,10 +15,11 @@ docs/findings/01-container-and-patching.md) as the map:
   "Master Overdrive" and the 32 bytes after its NUL (syx.seal_key). From a
   stock file's own main OS stream, syx.write reproduces that file byte for
   byte.
-- Staging: the bootstrap (0x800005be) reads section 3 from flash, at its
-  offset + 0x80000 (the container's place), to 0x40400000, and unpacks it
-  from there to 0x40000400. The mk1 stages at 0x40200000, which this image
-  runs past. Stock's in-place gap is 2,065,240 bytes.
+- Staging: the bootstrap's loader (0x80000596) reads section 3 from flash,
+  at its offset + 0x80000 (the container's place), to 0x40400000, and
+  unpacks it from there to 0x40000400 with its depacker (0x80000432). The
+  mk1 stages at 0x40200000, which this image runs past. Stock's in-place
+  gap is 2,065,240 bytes.
 - Flash: the container starts at 0x80000 (the bootstrap, and digikit's map
   of the OS's flash reads). The OS keeps a store at 0x380000-0x400000: it
   reads a 0x14-byte header at 0x380000 and erases the sectors at 0x380000
