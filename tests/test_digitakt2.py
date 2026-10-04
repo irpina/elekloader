@@ -284,14 +284,13 @@ def test_the_example_links_with_core_and_fast_code_is_copied_by_core():
 
 
 def test_perform_direct_links_with_core():
-    """examples/perform-direct: a key handler and a PERSONALIZE row, no sites
-    of its own."""
+    """examples/perform-direct: one key handler, no sites of its own."""
     with tempfile.TemporaryDirectory() as tmp:
         core = built(os.path.join('mods', 'core-dt2'), tmp)
         pd = built(os.path.join('examples', 'perform-direct'), tmp)
         outputs, man = patch.build(SYX, [core, pd], version='DT10', log=lambda *a: None)
     tables = man['link']['tables']
-    assert tables['ev_key']['entries'] == 1 and tables['ev_personalize']['entries'] == 1
+    assert tables['ev_key']['entries'] == 1 and tables['ev_personalize']['entries'] == 0
     st, img = stock()
     new = formats.main_image(formats.parse(outputs['syx'], DEV), DEV)
     changed = {i for i in range(len(img)) if new[i] != img[i]}

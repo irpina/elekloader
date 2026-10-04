@@ -104,7 +104,7 @@ event (lower first; the shipped mods use 10-90).
 | `ev_render_in` | audio render entry, 1500 times a second | `void f(void)` | interrupt level: keep it short |
 | `ev_render_out` | audio render exit | `void f(void)` | the same |
 | `ev_hold` | Digitone mk1 only (core-dn1 2.2): a track key held on its own, UI task | `int f(void *brain, void *event, int track)` | return nonzero to take it; when none does, core opens the Mod Menu ("The Mod Menu" below) |
-| `ev_personalize` | Digitakt II only (core-dt2): SETTINGS > PERSONALIZE is built | `void f(void *menu)` | add a row with `core_additem(menu, row)`, after TRK SELECT; a row redraws the menu with `View::invalidate(menu + 0x38)`, as from SETTINGS (examples/perform-direct) |
+| `ev_personalize` | Digitakt II only (core-dt2): SETTINGS > PERSONALIZE is built | `void f(void *menu)` | add a row with `core_additem(menu, row)`, after TRK SELECT; a row redraws the menu with `View::invalidate(menu + 0x38)`, as from SETTINGS; a checkbox is drawn as mods/core-dt2/README.md describes |
 | `ev_voice_on` | Digitone mk1 only (core-dn1 2.1): a voice starts a note, in the render | `void f(int voice, int track, void *event)` | interrupt level. The voice's pitch word (`0x41391f80` + 4 x voice, the note << 16) is already written and may be changed: the render reads it every block. The voice's sound and the step's locks load after this, so read the voice's parameters from `ev_render_out` |
 
 The events, their prototypes and their conventions are the same on every
@@ -317,7 +317,7 @@ in 1.54 they are at the same addresses, but 0x400a1706 is 0x400a1862):
 of your own. It is a complete mod: a C handler on `ev_draw` that draws a
 small square in the top-right corner of every screen. For the Digitakt II,
 `examples/hello-marker-dt2/` builds the same source, and
-`examples/perform-direct/` shows a key handler and a PERSONALIZE option.
+`examples/perform-direct/` is a real mod in one key handler.
 
 **3.2 Fill in `mod.json`.**
 

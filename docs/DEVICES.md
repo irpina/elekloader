@@ -30,7 +30,9 @@ of its own that is only a boot copier.
 ## The Digitakt II (1.17)
 
 Experimental. Whole builds and the core (mods/core-dt2) boot in digikit's
-emulator; nothing has been run on a unit yet. digikit (https://github.com/m-dwyer/digikit,
+emulator, and a build of core with examples/perform-direct works on a unit
+(4 Oct 2026): flashed, it booted, and the key swap and
+a PERSONALIZE row (in an earlier version of the mod) worked. digikit (https://github.com/m-dwyer/digikit,
 docs/findings/01-container-and-patching.md) mapped 1.15C and 1.16. Each fact
 below was found again in 1.17.
 
@@ -75,9 +77,9 @@ below was found again in 1.17.
     count. The repack's screen at 650M is identical to stock's.
   - digikit's extractor reads both, and its checker passes their content
     checksum, seal, framing count and every packet checksum.
-  - Not checked: the bootstrap's own flash path (the emulator serves the
-    container to the OS's flash reads and boots the main OS directly), and
-    any unit.
+  - Not checked in the emulator: the bootstrap's own flash path (it serves
+    the container to the OS's flash reads and boots the main OS directly).
+    The unit above accepted a sealed build.
 - **Recovery.** The startup menu (FUNC at power-on), TRIG 4 for OS UPGRADE,
   over MIDI only (Elektron's readme). It is in the bootstrap, which no build
   changes, and checks only the content checksum and the seal.
@@ -122,9 +124,10 @@ below was found again in 1.17.
     with a mod that inverts an 8x8 block on `ev_draw`, the screen differs
     from stock in exactly those 64 pixels. Each event was driven with a
     test mod: key and encoder counts, a SETTINGS row, and
-    examples/perform-direct (a PERSONALIZE checkbox and a key swap).
+    a PERSONALIZE checkbox row. examples/perform-direct (a key swap) works
+    on a unit, with core's other events registered but not used there.
   - Not covered: anything a session in the emulator does not reach (no
-    DSP, no samples, an empty +Drive), and any unit.
+    DSP, no samples, an empty +Drive) and the unit run did not use.
 
 ## The Digitone mk1 and Digitone Keys (1.43)
 

@@ -71,5 +71,9 @@ and draws the counts as bars: after three trig presses and two encoder
 turns (+3, -4), the screen differs from stock's under the same input only
 in a 9-pixel bar (press, repeat and release of each key) and a 7-pixel one,
 and the OS acted on every input as stock does. A mod with one
-`ev_settings` row: the SETTINGS menu lists it after SYSTEM. Not run on a
-unit.
+`ev_settings` row: the SETTINGS menu lists it after SYSTEM.
+
+On a unit (4 Oct 2026), core with [examples/perform-direct](../../examples/perform-direct)
+works: it boots, and the key swap through `ev_key` and (in an earlier
+version of that mod) a PERSONALIZE checkbox row through `ev_personalize`
+work. The other events have run in the emulator only.

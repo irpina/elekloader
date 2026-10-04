@@ -19,7 +19,7 @@ file on your own machine, and you flash it the way you flash any OS update.
 | Device | OS | Status |
 |---|---|---|
 | Digitakt (mk1) | 1.53, 1.54 | supported |
-| Digitakt II | 1.17 | experimental: whole builds (format-1 mods) and linkable mods with its own core (the hook bus's tick, draw, key and encoder events), sealed as the unit checks them; boot in digikit's emulator, not yet run on a unit |
+| Digitakt II | 1.17 | experimental: whole builds (format-1 mods) and linkable mods with its own core (the hook bus's tick, draw, key and encoder events), sealed as the unit checks them; boot in digikit's emulator; core with a key-swap mod works on a unit |
 | Digitone (mk1) and Digitone Keys | 1.43, 1.44 | supported |
 | Octatrack (MKI and MKII) | 1.40C | supported: whole builds (format-1 mods); linkable mods with its own core: boots on an MKII, not yet run on an MKI |
 | other Elektron devices | | planned: see [docs/DEVICES.md](docs/DEVICES.md) |
@@ -234,9 +234,8 @@ its bytes. See [docs/ADAPTING.md](docs/ADAPTING.md), section 4b.
 function on the draw event, and it puts a small square in the corner of
 every screen (`examples/hello-marker-dt2/` builds it for the Digitakt II).
 `examples/perform-direct/` is a real Digitakt II mod: [PRESET] toggles
-PERFORM without [FUNC], an option in SETTINGS > PERSONALIZE. Building code
-needs the device's cross toolchain; for the Digitakt mk1 and the Digitakt II
-that is m68k binutils and gcc (Homebrew's `m68k-elf-*` work, with
+PERFORM without [FUNC]. Building code needs the device's cross toolchain;
+for the Digitakt mk1 and the Digitakt II that is m68k binutils and gcc (Homebrew's `m68k-elf-*` work, with
 `ELEKLOADER_CROSS=m68k-elf-`).
 
 ## The Windows app

@@ -4,13 +4,12 @@
  "title": "Direct perform",
  "category": "Examples",
  "license": "GPL-2.0-or-later",
- "description": "[PRESET] toggles PERFORM without [FUNC], quicker to reach live; [FUNC] + [PRESET] opens the PRESET/KIT menu. An option in SETTINGS > PERSONALIZE (DIRECT PERFORM), on by default.",
+ "description": "[PRESET] toggles PERFORM without [FUNC], quicker to reach live; [FUNC] + [PRESET] opens the PRESET/KIT menu.",
  "device": "digitakt-mk2",
  "os": "1.17",
- "sources": ["perform.c", "perform_label.s"],
+ "sources": ["perform.c"],
  "subscribe": [
-  {"event": "ev_key", "fn": "pd_key", "order": 10},
-  {"event": "ev_personalize", "fn": "pd_personalize", "order": 50}
+  {"event": "ev_key", "fn": "pd_key", "order": 10}
  ],
  "requires": ["core"]
 }
