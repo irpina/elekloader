@@ -48,7 +48,13 @@ of its own that is only a boot copier.
   Digitone's addresses. Its eight sites and every routine it calls are the
   Digitakt mk1's found again in 1.43. They are the same code instruction
   for instruction, bar the addresses in it. The render handler's frame is
-  0xB8 bytes (0xA8 on the Digitakt), hence `RENDER_FRAME`.
+  0xB8 bytes (0xA8 on the Digitakt), hence `RENDER_FRAME`. From 2.1
+  (`voice.s`) it has a ninth site, the render's voice note-on at
+  0x4009e928, for the Digitone-only `ev_voice_on`, and parameter slots
+  (`params.s`): ids 182-184 for mods, through 63 more sites; mod pages
+  (`pages.s`): pages 27-30, through two more; and project data
+  (`projdata.s`): mods' blocks saved with the project, through five more.
+  1.44 has all of them, at its own addresses (`ports`).
 - **The DDR area** is the Digitakt's, `0x47BE0000-0x47C00000`:
   - The OS clears `0x4028E000-0x43229E60` at start, and its stack runs down
     from `0x48000000`.
