@@ -33,8 +33,8 @@ monolithic build; section 4 says how to go from A to B.
   It owns the shared hook sites, copies every mod's code into RAM at boot,
   and turns the shared sites into events your mod subscribes to. Every
   format-2 mod set needs exactly one core. `mods/core/core.s` is its one
-  source (with `settings.s` and `render.s` where the device has those
-  sites); `mods/core` builds it for the Digitakt mk1
+  source (with `settings.s`, `render.s` and `fast.s` where the device
+  uses them); `mods/core` builds it for the Digitakt mk1
   (`python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.53.syx`),
   `mods/core-dn1` for the Digitone mk1 and `mods/core-dt2` for the
   Digitakt II. The Octatrack's core,
