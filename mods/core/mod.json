@@ -4,7 +4,7 @@
  "title": "core", "category": "Framework", "author": "irpina",
  "description": "The boot copier, the hook bus and SRC machine slots: every other mod needs it. On its own it changes nothing the unit does.",
  "device": "digitakt-mk1", "os": "1.53",
- "sources": ["core.s", "machines.s"],
+ "sources": ["core.s", "settings.s", "render.s", "machines.s"],
  "defsym": {
   "DRAWALL": "0x400ca382",
   "KEYDISP": "0x400084fe",

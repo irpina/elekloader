@@ -1,0 +1,23 @@
+{
+ "id": "core", "version": "1.0",
+ "license": "GPL-2.0-or-later",
+ "title": "core", "category": "Framework", "author": "irpina",
+ "description": "The boot copier and the hook bus for the Digitakt II: every other mod needs it. On its own it changes nothing the unit does.",
+ "device": "digitakt-mk2", "os": "1.17",
+ "sources": ["../core/core.s"],
+ "defsym": {
+  "DRAWALL": "0x4011bc96",
+  "KEYDISP": "0x40030bd0",
+  "ENCDISP": "0x40030b64",
+  "NO_DTIM0": "1",
+  "VBR_FN": "0x400019b0"
+ },
+ "sites": [
+  {"addr": "0x40000538", "stock": "4eb9400019b0", "op": "jsr", "target": "boot"},
+  {"addr": "0x40032ad4", "stock": "4eb94011bc60", "op": "jsr", "target": "core_tick"},
+  {"addr": "0x40032b3a", "stock": "4eb94011bc96", "op": "jsr", "target": "core_draw"},
+  {"addr": "0x40033d94", "stock": "4eb940030bd0", "op": "jsr", "target": "core_key"},
+  {"addr": "0x40033dde", "stock": "4eb940030b64", "op": "jsr", "target": "core_enc"}
+ ],
+ "collections": {"ev_tick": 4, "ev_draw": 4, "ev_key": 4, "ev_enc": 4}
+}

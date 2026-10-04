@@ -29,8 +29,8 @@ of its own that is only a boot copier.
 
 ## The Digitakt II (1.17)
 
-Experimental: whole builds only. They boot in digikit's emulator; nothing
-has been run on a unit yet. digikit (https://github.com/m-dwyer/digikit,
+Experimental. Whole builds and the core (mods/core-dt2) boot in digikit's
+emulator; nothing has been run on a unit yet. digikit (https://github.com/m-dwyer/digikit,
 docs/findings/01-container-and-patching.md) mapped 1.15C and 1.16. Each fact
 below was found again in 1.17.
 
@@ -88,13 +88,35 @@ below was found again in 1.17.
   - clears DDR `0x40312000-0x47E28470`;
   - runs its stack down from `0x48000000`.
   The mk1's reset code, with the II's addresses.
-- **Not known yet: free memory at run time.** No `areas`, `ddr`,
-  `sram_code` or `fast_table` are given until they are measured, so
-  linkable mods are refused. The mk1's areas are not the II's. Its SRAM
-  halves are fuller, and its clear runs to `0x47E28470`, past the mk1's
-  DDR area. Measuring needs digikit's emulator (`emu.run`, a cold boot and
-  a settled session) and the steps the Digitone took: what is cleared, no
-  operand into the candidate, and no page mapped there in a run.
+- **Free memory, and the core** (mods/core-dt2):
+  - There is no sample pool in its DDR to take from: samples go to the DSP
+    over FlexBus (0x8C000000, digikit). The reset clears 0x40312000-
+    0x47E28470 for the OS's static `.bss`, almost all of the 128 MB.
+  - Above the clear, the OS reaches its DSP buffers only through the
+    uncached alias (+0x08000000): 0x4FE30000-0x4FE7AE80, so 0x47E30000-
+    0x47E7AE80. The boot stack runs down from 0x48000000.
+  - Between them, 0x47E7B000-0x48000000: no decoded instruction (digikit's
+    `tools/refscan.py`, 96.75% coverage) names it or its alias (the only
+    hit, 0x47efffff, is the high word of the double FLT_MAX); it is zero in
+    every rung of a cold boot; and a write watch over all of it, cached and
+    uncached, saw no write from 400M to 808M instructions of a session
+    with 37 key events. The core takes 0x47F00000-0x47F40000 (256 KB) from
+    the middle, 520 KB clear of the buffers and 768 KB of the stack.
+  - SRAM: the reset copies the image's tail into each 32 KB half and zeroes
+    the rest. Past the copies, 0x80006E80-0x80008000 and 0x8000F100-
+    0x80010000 are named by no decoded instruction. They are zeroed after
+    the boot copier runs, so they are free at run time only, as on the mk1.
+    There is no `.fast` copy table yet.
+  - The core does not start DTIM0, unlike the mk1's (`NO_DTIM0` in
+    core.s). Nothing before the OS starts it on the II either, and ten OS
+    sites read its counter: with it running, a cold boot with core alone
+    jumped to 0 at 553M instructions in digikit's emucheck.
+  - Checked in the emulator (cold boot, then emucheck to 600M): core 1.0
+    alone passes every stage, with its screen at 650M identical to stock's;
+    with a mod that inverts an 8x8 block on `ev_draw`, the screen differs
+    from stock in exactly those 64 pixels.
+  - Not covered: anything a session in the emulator does not reach (no
+    DSP, no samples, an empty +Drive), and any unit.
 
 ## The Digitone mk1 and Digitone Keys (1.43)
 

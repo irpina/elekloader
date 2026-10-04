@@ -31,10 +31,17 @@ docs/findings/01-container-and-patching.md) as the map:
   0x80000000 and 0x40318e80-0x4031ff60 to 0x80008000, zeroing the rest of
   each 32 KB half; it clears DDR 0x40312000-0x47E28470, and its stack runs
   down from 0x48000000.
-- Not known yet: the memory free at run time (areas, ddr, sram_code,
-  fast_table). Until it is measured in an emulator (docs/DEVICES.md) no area
-  is given, so the device takes whole builds (format 1) only, not linkable
-  mods.
+- Free at run time (docs/DEVICES.md has the evidence):
+  - DDR 0x47F00000-0x47F40000: above the clear's end and the DSP's buffers
+    (reached through the uncached alias, 0x4FE30000-0x4FE7AE80), below the
+    boot stack. No decoded instruction names 0x47E7B000-0x48000000 (or its
+    alias), it is zero in every rung of a cold boot, and a write watch over
+    all of it saw nothing from 400M to 808M instructions of a session with
+    key presses.
+  - SRAM 0x80006E80-0x80008000 and 0x8000F100-0x80010000: past the data
+    the reset copies into each half, which it zeroes; no decoded
+    instruction names either.
+  There is no .fast copy table yet (fast_table): .fast code is refused.
 """
 from . import Device, Release
 
@@ -57,6 +64,13 @@ DEVICE = Device(
     trailer='hmac',
     hmac_key_from=(2, b'Master Overdrive'),
     isa='coldfire',
+    areas={
+        'ddr': (0x47F00000, 0x47F40000),          # above the DSP buffers, below the boot stack
+        'sram-tail': (0x8000F100, 0x80010000),    # the SRAM's free tail
+        'sram-block': (0x80006E80, 0x80008000),   # free SRAM after the first half's data
+    },
+    ddr=(0x47F00000, 0x47F40000),
+    sram_code=(0x8000F100, 0x80010000),
     recovery=('hold FUNC while powering on for the STARTUP menu, press TRIG 4 (OS UPGRADE), '
               'then send the stock .syx over MIDI (not USB)'),
     toolchain={

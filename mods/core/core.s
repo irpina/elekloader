@@ -1,23 +1,19 @@
 | SPDX-License-Identifier: GPL-2.0-or-later
 | core: the boot copier and the hook bus every other mod builds on.
 | ColdFire V4 (MCF5441x); assemble with -mcpu=54455. One source for every
-| device with this hook bus: the Digitakt mk1 (OS 1.53, mods/core) and the
-| Digitone mk1 (OS 1.43, mods/core-dn1). The addresses below are not here:
-| each device's mod.json gives them as "defsym", so a missing one fails the
-| build instead of using another device's.
+| device with this hook bus: the Digitakt mk1 (OS 1.53, mods/core), the
+| Digitone mk1 (OS 1.43, mods/core-dn1) and the Digitakt II (OS 1.17,
+| mods/core-dt2). The SETTINGS and render hooks are in settings.s and
+| render.s, for the devices that have those sites. The addresses below are
+| not here: each device's mod.json gives them as "defsym", so a missing one
+| fails the build instead of using another device's.
 |
 |   DRAWALL      ViewController::drawAll(ctrl, Bitmap&)
 |   KEYDISP      Brain::key(brain, KeyEvent*)
 |   ENCDISP      Brain::enc(brain, EncoderEvent*)
-|   OP_NEW       operator new(size) -> d0
-|   ITEM_CTOR    MenuItem(this, label, select, draw, change, id, step)
-|   MENU_ADD     Menu::addItem(menu, item)
-|   FN_MGR       a std::function manager for a 4-byte function pointer
 |   DTMR0        DMA timer 0 mode;  PPMSR0: the peripheral clock set register
+|                (neither, with NO_DTIM0: the core leaves DTIM0 alone)
 |   VBR_FN       what the OS entry's call at 0x40000538 called
-|   SETTINGS_RET where the SETTINGS item builder goes on after its site
-|   RENDER_FRAME the render handler's frame: its registers are saved at
-|                -RENDER_FRAME(a6)
 |
 | .boot runs where the bootstrap unpacks it (appended to MAIN OS), once,
 | from the OS entry's call at 0x40000538: before the OS zeroes its .bss and
@@ -46,9 +42,12 @@ boot:
 2:      clr.l   (%a1)+
         subq.l  #1, %d0
         bne.s   2b
-3:      | DTIM0: the OS reads its counter as a 132 MHz time base and never
+3:
+        .ifndef NO_DTIM0
+        | DTIM0: the OS reads its counter as a 132 MHz time base and never
         | starts it, so something before the OS does. Start it only if it is
-        | held in reset: rewriting DTMR0 while it runs would stop it.
+        | held in reset: rewriting DTMR0 while it runs would stop it. A core
+        | that defines NO_DTIM0 (the Digitakt II's) leaves it as stock does.
         move.w  DTMR0, %d0
         btst    #0, %d0
         bne.s   4f
@@ -58,7 +57,9 @@ boot:
         move.w  %d0, DTMR0
         moveq   #3, %d0
         move.w  %d0, DTMR0              | bus clock, free running
-4:      jmp     VBR_FN                  | its rts returns to 0x4000053e
+4:
+        .endif
+        jmp     VBR_FN                  | its rts returns to 0x4000053e
 
 | ============================ .run ========================================
         .section .run, "ax"
@@ -145,116 +146,6 @@ dispatch:
         tst.l   %d0
         beq.s   1b
 2:      rts
-
-| ---- ev_settings: the SETTINGS menu's rows ---------------------------------
-| At 0x40058800 in the item builder 0x400583fc (was: movea.l (a2),a0 ;
-| pea 2.w), by jmp, after the last row and before the selection is
-| restored; a2 = the menu. Handlers: f(menu), which add rows with
-| core_additem(menu, row).
-        .globl  core_settings
-core_settings:
-        move.l  %a3, -(%sp)
-        lea     ev_settings, %a3
-1:      move.l  (%a3)+, %d0
-        beq.s   2f
-        move.l  %a2, -(%sp)             | the menu
-        movea.l %d0, %a0
-        jsr     (%a0)
-        addq.l  #4, %sp
-        bra.s   1b
-2:      movea.l (%sp)+, %a3
-        movea.l (%a2), %a0              | the instructions this replaced
-        pea     2.w
-        jmp     SETTINGS_RET
-
-| core_additem(Menu*, row*): a 0x54-byte MenuItem with four std::function
-| objects, the callbacks from row: label, select, draw, change.
-        .globl  core_additem
-core_additem:
-        link    %a6, #-64
-        lea     -12(%sp), %sp
-        movem.l %d2/%a2-%a3, (%sp)
-        movea.l 8(%a6), %a2
-        movea.l 12(%a6), %a3
-        lea     -64(%a6), %a0           | label: no payload
-        clr.l   (%a0)
-        clr.l   4(%a0)
-        move.l  #FN_MGR, %d0
-        move.l  %d0, 8(%a0)
-        move.l  (%a3), %d0
-        move.l  %d0, 12(%a0)
-        lea     -48(%a6), %a0           | select: payload = the menu
-        move.l  %a2, (%a0)
-        clr.l   4(%a0)
-        move.l  #FN_MGR, %d0
-        move.l  %d0, 8(%a0)
-        move.l  4(%a3), %d0
-        move.l  %d0, 12(%a0)
-        lea     -32(%a6), %a0           | draw: no payload
-        clr.l   (%a0)
-        clr.l   4(%a0)
-        move.l  #FN_MGR, %d0
-        move.l  %d0, 8(%a0)
-        move.l  8(%a3), %d0
-        move.l  %d0, 12(%a0)
-        lea     -16(%a6), %a0           | change: payload = the menu
-        move.l  %a2, (%a0)
-        clr.l   4(%a0)
-        move.l  #FN_MGR, %d0
-        move.l  %d0, 8(%a0)
-        move.l  12(%a3), %d0
-        move.l  %d0, 12(%a0)
-        pea     0x54.w
-        jsr     OP_NEW
-        addq.l  #4, %sp
-        move.l  %d0, %d2
-        pea     8.w
-        pea     -1.w
-        pea     -16(%a6)
-        pea     -32(%a6)
-        pea     -48(%a6)
-        pea     -64(%a6)
-        move.l  %d2, -(%sp)
-        jsr     ITEM_CTOR
-        lea     28(%sp), %sp
-        move.l  %d2, -(%sp)
-        move.l  %a2, -(%sp)
-        jsr     MENU_ADD
-        addq.l  #8, %sp
-        movem.l -76(%a6), %d2/%a2-%a3
-        unlk    %a6
-        rts
-
-| ---- ev_render_in, ev_render_out: the audio render (vector 191) ------------
-| Entry, at 0x40077428 (was: move.l #$7fffffff,d0). The handler has saved
-| d0-d7/a0-a5; a6 is its frame. d1/a0/a1 are kept around the handlers.
-        .globl  core_render_in
-core_render_in:
-        lea     -16(%sp), %sp
-        movem.l %d1/%a0-%a2, (%sp)
-        lea     ev_render_in, %a2
-1:      move.l  (%a2)+, %d0
-        beq.s   2f
-        movea.l %d0, %a0
-        jsr     (%a0)
-        bra.s   1b
-2:      movem.l (%sp), %d1/%a0-%a2
-        lea     16(%sp), %sp
-        move.l  #0x7fffffff, %d0        | the instruction this replaced
-        rts
-
-| Exit, at 0x400784c8 (was: movem.l -$a8(a6),d0-d7/a0-a5), the handler's
-| only way out: every register but a6 is restored after the handlers.
-        .globl  core_render_out
-core_render_out:
-        lea     ev_render_out, %a2
-1:      move.l  (%a2)+, %d0
-        beq.s   2f
-        movea.l %d0, %a0
-        jsr     (%a0)
-        bra.s   1b
-2:      movem.l -RENDER_FRAME(%a6), %d0-%d7/%a0-%a5
-        rts
 
 | ============================ .bss ========================================
         .section .bss
