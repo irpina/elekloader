@@ -574,6 +574,7 @@ function drawMotif(motif, en, { add, rnd, line, faint, dot, pt }) {
 // where Elektron publishes each device's stock OS (README, "You also need")
 const DOWNLOADS = {
   'digitakt-mk1': { label: 'Digitakt', url: 'https://www.elektron.se/support-downloads/digitakt' },
+  'digitakt-mk2': { label: 'Digitakt II', url: 'https://www.elektron.se/support-downloads/digitakt-ii' },
   'digitone-mk1': { label: 'Digitone and Digitone Keys', url: 'https://www.elektron.se/support-downloads/digitone' },
   octatrack: { label: 'Octatrack (MKI and MKII use the same file)', url: 'https://www.elektron.se/support-downloads/octatrack-mkii' },
 };

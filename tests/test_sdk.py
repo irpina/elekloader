@@ -150,7 +150,7 @@ def dn_core(tmp, drop=None):
         with open(os.path.join(src, 'mod.json')) as fh:
             j = json.load(fh)
         del j['defsym'][drop]
-        j['sources'] = [os.path.join(ROOT, 'mods', 'core', 'core.s')]
+        j['sources'] = [os.path.join(src, s) for s in j['sources']]
         src = os.path.join(tmp, 'core-dn1')
         os.makedirs(src)
         with open(os.path.join(src, 'mod.json'), 'w') as fh:
@@ -181,7 +181,8 @@ def test_digitone_core_builds_and_links():
         # The same core.s as core 2.1's, with the Digitone's addresses, and
         # each of its labels where core 2.1 has it.
         assert sorted(dn['build']['sources']) == ['core.s', 'menu.s', 'pages.s', 'params.s',
-                                                  'projdata.s', 'voice.s']
+                                                  'projdata.s', 'render.s', 'settings.s',
+                                                  'voice.s']
         assert dn['build']['sources']['core.s'] == dt['build']['sources']['core.s']
         placed = {k: v for k, v in dn['symbols'].items() if v[0] != 'abs'}
         shared = {k: v for k, v in placed.items() if k in dt['symbols']}

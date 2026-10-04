@@ -10,7 +10,7 @@ handler.
 
 How it works (`perform.c`): core's `ev_key` hands it every key event first.
 For [PRESET]'s events (key 7) it flips the flag the firmware reads as
-"[FUNC] held" (bit 2 of the event's flags) and lets the firmware go on, so
+"[FUNC] held" (0x2 in the event's flags) and lets the firmware go on, so
 each combination does what the other one did.
 
 ```bash

@@ -8,9 +8,10 @@ changes nothing the unit does.
 `mod.json` gives them (`defsym`), with the sites, for 1.53, and again for
 1.54 under `ports`. The stock file you build with picks them.
 [../core-dn1](../core-dn1) builds the same `core.s`, `settings.s` and
-`render.s` for the Digitone mk1, and [../core-dt2](../core-dt2) `core.s`
-alone for the Digitakt II. The addresses in this README and in
-the sources' comments are 1.53's.
+`render.s` for the Digitone mk1, and [../core-dt2](../core-dt2) `core.s`,
+`settings.s` and `fast.s` (with its own `personalize.s`) for the
+Digitakt II. The addresses in this README and in the sources' comments
+are 1.53's.
 
 - **At boot** (the OS entry's call at 0x40000538), `boot` copies the RAM
   image the linker built to 0x47BE0000, zeroes `.bss`, starts the DTIM0
