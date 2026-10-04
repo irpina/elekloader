@@ -298,6 +298,83 @@ def test_perform_direct_links_with_core():
     assert changed <= sites
 
 
+# ---- the flash: what the firmware reads and writes there (docs/DEVICES.md) ------------------
+
+def calls_to(img, target):
+    """-> addresses of every jsr/jmp abs.l, jsr/bsr.w pc-relative and bra.w to `target`."""
+    out = []
+    for i in range(0, len(img) - 6, 2):
+        a = DEV.main_load + i
+        op = img[i:i + 2]
+        if op in (b'\x4e\xb9', b'\x4e\xf9') and int.from_bytes(img[i + 2:i + 6], 'big') == target:
+            out.append(a)
+        elif op in (b'\x4e\xba', b'\x61\x00', b'\x60\x00'):
+            if a + 2 + int.from_bytes(img[i + 2:i + 4], 'big', signed=True) == target:
+                out.append(a)
+    return out
+
+
+def word(img, addr, n=4):
+    return int.from_bytes(img[addr - DEV.main_load:addr - DEV.main_load + n], 'big')
+
+
+def test_the_bootstrap_stages_at_stage_from_flash_at():
+    """The loader 0x80000596 (section 2 runs at 0x80000400, after a 4-byte
+    prefix): pea stage ; ... addi.l #flash_at, d0 ; jsr flash read ; ...
+    pea stage ; bsr depack (0x80000432)."""
+    st, img = stock()
+    boot = st.section(2)
+    at = lambda a: a - 0x80000400 + 4
+    assert boot[at(0x800005c6):at(0x800005c6) + 6] == bytes.fromhex('4879') + DEV.stage.to_bytes(4, 'big')
+    assert boot[at(0x800005d4):at(0x800005d4) + 6] == bytes.fromhex('0680') + DEV.flash_at.to_bytes(4, 'big')
+    assert boot[at(0x800005e6):at(0x800005e6) + 6] == bytes.fromhex('4879') + DEV.stage.to_bytes(4, 'big')
+    bsr = at(0x800005ec)
+    assert boot[bsr:bsr + 2] == b'\x4e\xba'
+    assert 0x800005ee + int.from_bytes(boot[bsr + 2:bsr + 4], 'big', signed=True) == 0x80000432
+
+
+def test_the_settings_store_is_the_flash_limit():
+    """The OS reads a header at flash 0x380000 and erases 0x380000 and
+    0x3c0000 (move.l #imm,-(sp) before each call): the container must end
+    below it."""
+    st, img = stock()
+    push = lambda v: bytes.fromhex('2f3c') + v.to_bytes(4, 'big')
+    assert img.count(push(0x380000)) == 26 and img.count(push(0x3c0000)) == 12
+    assert DEV.flash_limit == 0x380000
+    # every erase is a 64 KB or 256 KB unit from flash_at: one cannot cross the limit
+    assert (DEV.flash_limit - DEV.flash_at) % 0x40000 == 0
+
+
+def test_every_flash_write_and_erase_in_the_os_is_known():
+    """The OS's SPI NOR driver: write 0x40137cbe, erase 0x40137d3a,
+    0x40137da4 (256 KB) and 0x401373e6 (64 KB). Their only callers: the
+    settings store (0x400ca6c0-0x400cab80), the factory console's upload
+    (0x400caff0-0x400cb370: 'READY FOR OS', the container at 0x80000), and
+    the in-OS upgrade (0x4013ac54: validated, then erase and write from
+    0x80000). None writes from the main OS image, so no range of it is a
+    bootstrap the OS could re-flash (unlike the Analog Rytm's)."""
+    st, img = stock()
+    known = [(0x400ca6c0, 0x400cab80), (0x400caff0, 0x400cb370), (0x4013ac54, 0x4013ad94),
+             (0x40137cbe, 0x40137e10)]                 # the driver's own wrappers
+    for routine in (0x40137cbe, 0x40137d3a, 0x40137da4, 0x401373e6, 0x40137468, 0x401370ee):
+        for c in calls_to(img, routine):
+            assert any(lo <= c < hi for lo, hi in known), (hex(routine), hex(c))
+    assert word(img, 0x4013ac64 + 2) == 0x400d9fb0             # the validator runs first
+    assert img[0x4013ac7e - DEV.main_load:][:6] == bytes.fromhex('267c00080000')   # a3 = 0x80000
+    assert word(img, 0x400cb2f8 + 2) == DEV.flash_at
+
+
+def test_the_version_the_unit_reports_is_the_containers():
+    """The OS caches the container's first 0x20 bytes from flash 0x80000
+    (0x4013641c) and reports its build and version fields from there
+    (0x40124978, the version answer to Transfer): a build's own version
+    field is what it shows."""
+    st, img = stock()
+    assert img[0x4013642e - DEV.main_load:][:10] == bytes.fromhex('2f3c000800004eb940136fc6')[:10]
+    assert word(img, 0x40124978 + 2) == 0x40136468
+    assert st.version == '1.17' and b'1.17' not in img
+
+
 if __name__ == '__main__':
     import traceback
     ok = skipped = failed = 0

@@ -80,6 +80,33 @@ below was found again in 1.17.
   - Not checked in the emulator: the bootstrap's own flash path (it serves
     the container to the OS's flash reads and boots the main OS directly).
     The unit above accepted a sealed build.
+- **What writes the flash** (tests/test_digitakt2.py checks each against
+  the stock file). The OS's SPI NOR driver writes through 0x40137cbe and
+  erases through 0x40137d3a/0x40137da4 (256 KB) and 0x401373e6 (64 KB). Its
+  only callers:
+  - the settings store, 0x380000-0x400000 (above);
+  - the in-OS upgrade, 0x4013ac54 (the route Transfer takes over USB): it
+    runs the validator 0x400d9fb0 (content checksum, the build floor,
+    the seal), then erases from 0x80000 block by block to cover the
+    container and writes it there. A container that ends below 0x380000
+    cannot make it erase past it: 0x380000 - 0x80000 is a whole number of
+    256 KB units;
+  - the factory console's upload (0x400caff0, "READY FOR OS" over the debug
+    UART), which writes a container to 0x80000 or another image to
+    0x40000-0x80000.
+  None of them writes anything from the main OS image: unlike the Analog
+  Rytm's, it holds no copy of the bootstrap to re-flash, and needs no
+  `protected` range. The bootstrap itself is section 2, which every build
+  keeps stock (version 0x0201: the bootstrap's own upgrade only runs for a
+  greater one). The bootstrap's MIDI upgrade (the STARTUP menu) writes the
+  container to 0x80000 too, and checks the content checksum and the seal
+  first.
+- **The version a unit reports** is its container's. The OS caches the
+  container's first 0x20 bytes from flash 0x80000 (0x4013641c) and reads
+  the build and version fields from there (0x40124978, the answer to
+  Transfer's version request; an exception report); there is no version
+  string in the main OS. So a build's 4-character version field is what
+  the unit shows, and the loader's default (`2.0a`) differs from stock's.
 - **Recovery.** The startup menu (FUNC at power-on), TRIG 4 for OS UPGRADE,
   over MIDI only (Elektron's readme). It is in the bootstrap, which no build
   changes, and checks only the content checksum and the seal.
