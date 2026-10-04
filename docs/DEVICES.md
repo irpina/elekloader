@@ -29,8 +29,8 @@ of its own that is only a boot copier.
 
 ## The Digitakt II (1.17)
 
-Experimental: whole builds only, and nothing has been run on a unit or in an
-emulator yet. digikit (https://github.com/m-dwyer/digikit,
+Experimental: whole builds only. They boot in digikit's emulator; nothing
+has been run on a unit yet. digikit (https://github.com/m-dwyer/digikit,
 docs/findings/01-container-and-patching.md) mapped 1.15C and 1.16. Each fact
 below was found again in 1.17.
 
@@ -67,6 +67,17 @@ below was found again in 1.17.
   `0x380000`: 3 MB for the container, of which stock takes 1.48 MB. The
   bootstrap's receive path has no size check of its own, so this limit is
   elekloader's alone.
+- **Checked in an emulator** (digikit's, `emu.checkpoint` from a cold
+  boot, then `tools/emucheck.py` to 600M instructions; 4 Oct 2026):
+  - Two elekloader builds, a repack of stock 1.17 (version `DT01`) and a
+    whole build with one data site (`DT02`), pass every stage as stock does:
+    the main screen, six tasks, the +Drive formatted, the same instruction
+    count. The repack's screen at 650M is identical to stock's.
+  - digikit's extractor reads both, and its checker passes their content
+    checksum, seal, framing count and every packet checksum.
+  - Not checked: the bootstrap's own flash path (the emulator serves the
+    container to the OS's flash reads and boots the main OS directly), and
+    any unit.
 - **Recovery.** The startup menu (FUNC at power-on), TRIG 4 for OS UPGRADE,
   over MIDI only (Elektron's readme). It is in the bootstrap, which no build
   changes, and checks only the content checksum and the seal.
