@@ -302,6 +302,7 @@ const MOTIFS = [
   { re: /sophie|percussion|metal/, motif: 'metal', hue: 0 },
   { re: /synth|\bfm\b/, motif: 'fm', hue: 10 },
   { re: /quantiz|scale/, motif: 'steps', hue: 28 },
+  { re: /digitables|pitch table/, motif: 'table', hue: 0 },
   { re: /repitch|turntable/, motif: 'record', hue: -36 },
   { re: /jump|chain/, motif: 'jump', hue: 40 },
   { re: /recorder|rlen|loop/, motif: 'loop', hue: -8 },
@@ -431,6 +432,21 @@ function drawMotif(motif, en, { add, rnd, line, faint, dot, pt }) {
       snapped.push([x, y], [Math.min(200, x + 14), y]);
     }
     poly(snapped);
+    return true;
+  }
+  case 'table': {                                  // a pitch table as its editor draws it: an
+    // arpeggio's steps around the zero line, and a strum whose ADD steps are hollow
+    const zero = 66, k = Math.floor(8 * rnd()), s = 1 + Math.floor(6 * rnd());
+    const arp = [0, 12, 7, 3, -5, 0, 5, 9];
+    const chord = [[0, 4, 7, 12], [0, 3, 7, 10], [0, 7, 12, 16]][Math.floor(3 * rnd())];
+    add('line', { ...faint, x1: 0, y1: zero, x2: 200, y2: zero });
+    for (let i = 0; i < 12; i++) {
+      const x = 6 + i * 16, j = i - s, adds = j > 0 && j < 4;
+      const h = 2 * Math.max(-13, Math.min(13, j >= 0 && j < 4 ? chord[j] : arp[(i + k) % 8]));
+      const y = h ? Math.min(zero, zero - h) : zero - 1, height = Math.max(2, Math.abs(h));
+      if (adds) add('rect', { ...line, 'stroke-width': 1.8, x: x + 0.9, y, width: 7.2, height });
+      else add('rect', { x, y, width: 9, height, fill: 'currentColor' });
+    }
     return true;
   }
   case 'record': {                                 // a turntable: the record, its grooves, the arm
@@ -634,6 +650,7 @@ function renderNext() {
 // ---- the library: the kinds in the sidebar, device chips, a shelf per kind ----
 
 const KIND_HUE = { Sampling: 196, Performance: 268, Framework: 24, 'Whole build': 140, Synthesis: 232,
+  Sequencer: 176,
   // octabam's kinds (elekloader.sdk.octabam takes its CATEGORY_TITLE)
   'Machines and the sequencer': 68, 'Parts, Kits and scenes': 104, 'MIDI and USB': 312, Fixes: 350 };
 
