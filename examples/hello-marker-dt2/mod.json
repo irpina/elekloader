@@ -1,0 +1,16 @@
+{
+ "id": "hello-marker",
+ "version": "1.0",
+ "title": "Hello marker",
+ "category": "Examples",
+ "license": "GPL-2.0-or-later",
+ "description": "Inverts a small square in the top-right corner of every screen: the smallest mod that runs code on the Digitakt II. A template to start from (docs/ADAPTING.md).",
+ "device": "digitakt-mk2",
+ "os": "1.17",
+ "sources": ["../hello-marker/hello.c"],
+ "cflags": ["-DFILLRECT_AT=0x401131ae", "-DMARKER_COLOUR=-1"],
+ "subscribe": [
+  {"event": "ev_draw", "fn": "hello_draw", "order": 60}
+ ],
+ "requires": ["core"]
+}

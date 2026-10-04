@@ -188,7 +188,7 @@ def test_linkable_mods_need_the_digitakt_ii_core():
     """The Digitakt II links format-2 mods in its own DDR area, with its own
     core (mods/core-dt2)."""
     assert DEV.linkable() and DEV.ddr == (0x47F00000, 0x47F40000)
-    assert not DEV.fast_table                      # no .fast copy table yet
+    assert DEV.fast_table == 'core_fast'           # core-dt2 declares and copies it
     addr, new = a_string_site()
     st, img = stock()
     o = addr - DEV.main_load
@@ -218,28 +218,68 @@ def test_the_areas_are_outside_what_the_os_clears_and_copies():
     assert DEV.areas['sram-tail'][0] >= second and DEV.areas['sram-tail'][1] == 0x80010000
 
 
-def test_core_builds_links_and_verifies():
-    """mods/core-dt2 built with the SDK, then a build with it alone."""
+def built(moddir, tmp):
+    """-> the .elemod mod.json in `moddir` builds to (needs the cross toolchain)."""
     import shutil
     from elekloader.sdk import build
     need(SYX)
     if not shutil.which(os.environ.get('ELEKLOADER_CROSS', DEV.toolchain['prefix']) + 'as'):
         raise Skip('no cross assembler (ELEKLOADER_CROSS)')
-    root = os.path.dirname(HERE)
+    return build.build(os.path.join(os.path.dirname(HERE), moddir), SYX, tmp)[0]
+
+
+CORE_SITES = ((0x40000538, '4eb9400019b0'), (0x40032ad4, '4eb94011bc60'),
+              (0x40032b3a, '4eb94011bc96'), (0x40033d94, '4eb940030bd0'),
+              (0x40033dde, '4eb940030b64'), (0x400a5eac, '205248780002'))
+
+
+def test_core_builds_links_and_verifies():
+    """mods/core-dt2 built with the SDK, then a build with it alone: its six
+    sites, and nothing else in the image below them changed."""
     with tempfile.TemporaryDirectory() as tmp:
-        core, m = build.build(os.path.join(root, 'mods', 'core-dt2'), SYX, tmp)
+        core = built(os.path.join('mods', 'core-dt2'), tmp)
         outputs, man = patch.build(SYX, [core], version='DT03', log=lambda *a: None)
     st, img = stock()
-    o = formats.parse(outputs['syx'], DEV)
-    new = formats.main_image(o, DEV)
-    for site, stock_bytes in ((0x40000538, '4eb9400019b0'), (0x40032ad4, '4eb94011bc60'),
-                              (0x40032b3a, '4eb94011bc96'), (0x40033d94, '4eb940030bd0'),
-                              (0x40033dde, '4eb940030b64')):
+    new = formats.main_image(formats.parse(outputs['syx'], DEV), DEV)
+    changed = [i for i in range(len(img)) if new[i] != img[i]]
+    for site, stock_bytes in CORE_SITES:
         a = site - DEV.main_load
         assert img[a:a + 6].hex() == stock_bytes
-        assert new[a:a + 2] == b'\x4e\xb9' and new[a + 2:a + 6] != img[a + 2:a + 6], hex(site)
-    assert new[:len(img)][:0x138] == img[:0x138]
+        assert new[a:a + 2] in (b'\x4e\xb9', b'\x4e\xf9') and new[a:a + 6] != img[a:a + 6], hex(site)
+    sites = [s - DEV.main_load for s, _ in CORE_SITES]
+    assert all(any(s <= i < s + 6 for s in sites) for i in changed), [hex(DEV.main_load + i)
+                                                                      for i in changed[:8]]
+    assert man['link']['layout']['ddr'][0] == DEV.ddr[0]
     assert man['output']['main']['inplace_min_gap'] > 0
+
+
+def test_the_example_links_with_core_and_fast_code_is_copied_by_core():
+    """examples/hello-marker-dt2 with core; then the same mod with its
+    handler moved to .fast: core_fast gets its entry, in the SRAM tail."""
+    import json
+    from elekloader import elemod
+    with tempfile.TemporaryDirectory() as tmp:
+        core = built(os.path.join('mods', 'core-dt2'), tmp)
+        hello = built(os.path.join('examples', 'hello-marker-dt2'), tmp)
+        outputs, man = patch.build(SYX, [core, hello], version='DT04', log=lambda *a: None)
+        assert man['link']['tables']['ev_draw']['entries'] == 1
+        with open(hello) as fh:
+            doc = json.load(fh)
+        doc['sections']['.fast'] = doc['sections'].pop('.run')
+        doc['relocs'] = [[('.fast' if r[0] == '.run' else r[0])] + r[1:] for r in doc['relocs']]
+        doc['symbols'] = {k: (['.fast', v[1]] if v[0] == '.run' else v)
+                          for k, v in doc['symbols'].items()}
+        doc['contribute'] = [dict(c, data=c['data'], relocs=[
+            [r[0], r[1], r[2], r[3]] for r in c['relocs']]) for c in doc['contribute']]
+        doc.pop('signature', None)
+        fast = os.path.join(tmp, 'hello-fast.elemod')
+        with open(fast, 'w') as fh:
+            json.dump(doc, fh)
+        outputs, man = patch.build(SYX, [core, fast], version='DT05', log=lambda *a: None)
+    t = man['link']['tables']['core_fast']
+    assert t['entries'] == 1 and t['entry'] == 16
+    lo, hi = man['link']['layout']['fast']
+    assert DEV.sram_code[0] <= lo < hi <= DEV.sram_code[1]
 
 
 if __name__ == '__main__':

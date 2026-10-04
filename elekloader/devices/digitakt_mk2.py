@@ -41,7 +41,8 @@ docs/findings/01-container-and-patching.md) as the map:
   - SRAM 0x80006E80-0x80008000 and 0x8000F100-0x80010000: past the data
     the reset copies into each half, which it zeroes; no decoded
     instruction names either.
-  There is no .fast copy table yet (fast_table): .fast code is refused.
+  .fast code goes to the tail; core-dt2 declares its copy table, core_fast,
+  and copies it on the first ev_tick (mods/core/fast.s).
 """
 from . import Device, Release
 
@@ -71,6 +72,7 @@ DEVICE = Device(
     },
     ddr=(0x47F00000, 0x47F40000),
     sram_code=(0x8000F100, 0x80010000),
+    fast_table='core_fast',                     # declared and copied by core-dt2 (fast.s)
     recovery=('hold FUNC while powering on for the STARTUP menu, press TRIG 4 (OS UPGRADE), '
               'then send the stock .syx over MIDI (not USB)'),
     toolchain={

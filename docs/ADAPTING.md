@@ -109,8 +109,11 @@ event (lower first; the shipped mods use 10-90).
 The events, their prototypes and their conventions are the same on every
 device; only the sites differ, and `ev_voice_on` exists on the Digitone
 only. The Digitakt II's core (mods/core-dt2 1.0) has `ev_tick`, `ev_draw`,
-`ev_key` and `ev_enc` only: its audio renders on the DSP, and its SETTINGS
-site is not found yet. The sites core owns (do not patch them):
+`ev_key`, `ev_enc` and `ev_settings`, and no render events: its audio
+renders on the DSP. It copies `.fast` code into SRAM itself, on the first
+`ev_tick` (`core_fast`): subscribe only `.run` code to `ev_key` and
+`ev_enc` there, since a key can come before that tick (`ev_draw` cannot:
+the tick site runs first). The sites core owns (do not patch them):
 - Digitakt mk1 1.53 and 1.54: 0x40000538, 0x4000a770, 0x4000a7d6,
   0x4000b770, 0x4000b7ba, 0x40058800, 0x40077428, 0x400784c8;
 - Digitone mk1 1.43: 0x40000538, 0x4001900c, 0x40019072, 0x40019d9c,
@@ -119,7 +122,7 @@ site is not found yet. The sites core owns (do not patch them):
 - Digitone mk1 1.44: the same, but 0x40072a54, 0x4009d128 and 0x4009e53c
   for the last three of the eight, and 0x4009e948;
 - Digitakt II 1.17: 0x40000538, 0x40032ad4, 0x40032b3a, 0x40033d94,
-  0x40033dde.
+  0x40033dde, 0x400a5eac.
 
 A firmware routine your mod calls has its own address on each device and
 each OS version: look it up for the release you target, and build one
