@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Everything comes from this site. The worker that runs Pyodide is not
+<!-- Everything comes from this site. The worker that runs the engine is not
      covered by this policy (a <meta> CSP never reaches a worker): it keeps
      itself to this site, see worker.js. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>elekloader</title>
-<meta name="description" content="Custom firmware for Elektron devices, built in your browser from your own stock OS file and the mods you choose. Nothing is uploaded.">
+<meta name="description" content="Build custom firmware for Elektron devices in your browser, from your own stock OS file and your own .elemod mods. Nothing is uploaded.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23f5cf45'/%3E%3Cpath d='M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z' fill='%23161616'/%3E%3C/svg%3E">
 <meta name="theme-color" content="#131316">
 <link rel="stylesheet" href="style.css">
@@ -18,17 +18,11 @@
 <body>
 <div class="app">
 
-<aside class="side" aria-label="Navigation">
-  <a class="brand" href="#library" aria-label="elekloader: the mods">
+<aside class="side" aria-label="Profiles">
+  <div class="brand">
     <span class="mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg></span>
-    <span class="brand-text"><strong>elekloader</strong><small>Elektron firmware mods</small></span></a>
+    <span class="brand-text"><strong>elekloader</strong><small>Elektron firmware builder</small></span></div>
   <nav class="side-nav">
-    <a class="nav-link" id="nav-library" href="#library">
-      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>Mods</a>
-    <a class="nav-link" id="nav-build" href="#build">
-      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg>Build<span class="badge" id="nav-count">0</span></a>
-    <h3 class="side-h">Categories</h3>
-    <ul class="side-list" id="nav-types"></ul>
     <h3 class="side-h">Profiles
       <button type="button" class="round" id="save-profile" title="New profile: a stock OS and its mods" aria-label="New profile">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></h3>
@@ -42,80 +36,41 @@
 </aside>
 
 <header class="topbar" id="topbar">
-  <label class="search"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
-    <input type="search" id="search" placeholder="Search mods" aria-label="Search mods" autocomplete="off"></label>
+  <span class="top-brand"><span class="mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg></span>elekloader</span>
+  <span class="top-status" id="top-status"></span>
   <span class="grow"></span>
-  <a class="btn outline" href="#build" id="cfg-btn">
-    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg>Build<span class="count" id="cfg-count">0</span></a>
+  <a class="btn outline" id="modwerk-link" href="https://modwerk.app/" rel="noreferrer" target="_blank">Find mods on Modwerk
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M17 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7H10"/></svg></a>
 </header>
 
 <main class="content" id="content">
-  <section class="view" id="view-library" aria-label="Mods">
-    <!-- the first visit: what this is, and the three steps (until a stock file is in) -->
-    <section class="welcome" id="welcome" aria-labelledby="welcome-title">
-      <p class="eyebrow">Get started</p>
-      <h1 id="welcome-title">Custom firmware for your Elektron box</h1>
-      <p class="sub">New machines and features for the Digitakt, Digitone and Octatrack, built here in your
-        browser from Elektron's own OS file. You flash the result like any OS update.</p>
-      <ul class="trust">
-        <li>Nothing is uploaded: it all happens in this tab</li>
-        <li>Only the main OS changes, so the stock OS always takes it back</li>
-        <li>Free and open source</li>
-      </ul>
-      <ol class="guide">
-        <li class="gstep" id="g-device">
-          <h2><span class="gnum">1</span>Pick your device</h2>
-          <div class="dev-tiles" id="dev-tiles" role="group" aria-label="Your device"></div>
-        </li>
-        <li class="gstep" id="g-stock">
-          <h2><span class="gnum">2</span>Add its stock OS file</h2>
-          <p class="gtext" id="g-stock-text"></p>
-          <div class="drop mini" id="start-drop" tabindex="0" role="button">
-            <svg class="drop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
-            <span id="start-drop-text"></span>
-          </div>
-          <p class="bad small" id="start-error" hidden></p>
-        </li>
-        <li class="gstep" id="g-mods">
-          <h2><span class="gnum">3</span>Add mods, then build</h2>
-          <p class="gtext">Press <strong>+ Add</strong> on the mods you want, below. Then <strong>Build</strong>
-            makes your custom OS: a <code>.syx</code> you send with Elektron Transfer, like any update.
-            <a href="https://github.com/irpina/elekloader#flash-it" rel="noreferrer" target="_blank">How to flash, and how to go back</a></p>
-        </li>
-      </ol>
-    </section>
-    <!-- with a stock file in: where you are, and what's next -->
-    <header class="page-head" id="lib-head" hidden>
-      <p class="eyebrow" id="lib-eyebrow">Library</p>
-      <h1 id="lib-title">Mods</h1>
-      <div class="next" id="next"></div>
-    </header>
-    <h2 class="list-h" id="list-title">Browse the mods</h2>
-    <div class="filters">
-      <span class="chips" id="device-buttons" role="group" aria-label="Device"></span>
-      <span class="grow"></span>
-      <label class="inline" for="f-sort">Sort</label>
-      <select id="f-sort">
-        <option value="collection">As listed</option>
-        <option value="name">Name</option>
-        <option value="device">Device</option>
-      </select>
-      <button type="button" class="btn outline small" id="add-mods">+ Add your own .elemod</button>
-      <input type="file" id="mod-files" accept=".elemod,.dtmod" multiple hidden>
+  <!-- before a stock file is in: what this is, and where the files come from -->
+  <section class="intro" id="intro" aria-labelledby="intro-title">
+    <h1 id="intro-title">Build custom firmware from your own mods</h1>
+    <p class="sub">Bring Elektron's stock OS file for your device and the <code>.elemod</code> files you have.
+      elekloader checks that they combine and builds the custom OS here, in your browser. You flash it like
+      any OS update.</p>
+    <ul class="trust">
+      <li>Nothing is uploaded: it all happens in this tab</li>
+      <li>Only the main OS changes, so the stock OS always takes it back</li>
+      <li>Free and open source</li>
+    </ul>
+    <div class="sources">
+      <a class="source" href="https://modwerk.app/" rel="noreferrer" target="_blank">
+        <strong>Need mods?</strong><small>Modwerk has them, with their files and how to use them</small></a>
+      <div class="source">
+        <strong>Need the stock OS?</strong>
+        <small>From Elektron: <span id="downloads"></span></small></div>
     </div>
-    <p class="device-note" id="device-note"></p>
-    <div class="shelves" id="lib-cards"></div>
-    <p class="muted small lib-foot">Every mod here comes from its author's release, checked by its sha256
-      against the site's list. Your own <code>.elemod</code> files appear here too, under Your files.</p>
   </section>
 
-  <section class="view" id="view-build" aria-labelledby="build-title" hidden>
-    <header class="page-head head-build">
+  <section class="view" id="view-build" aria-labelledby="build-title">
+    <header class="page-head head-build" id="build-head">
       <div class="tile" id="build-cover"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg></div>
       <div class="head-text">
         <p class="eyebrow" id="build-eyebrow">Build</p>
         <h1 id="build-title">Your firmware</h1>
-        <p class="sub" id="build-sub">Drop in your stock OS file, check the mods you ticked, and build.</p>
+        <p class="sub" id="build-sub">Drop in your stock OS file and your mods, check them, and build.</p>
       </div>
     </header>
     <div class="build-grid">
@@ -124,7 +79,7 @@
           <h2><span class="n">01</span>Your stock OS file</h2>
           <div class="drop" id="stock-drop" tabindex="0" role="button" aria-describedby="stock-hint">
             <svg class="drop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
-            <p class="big">Drop the stock OS file Elektron publishes for your device here, or
+            <p class="big" id="stock-drop-text">Drop the stock OS file Elektron publishes for your device here, or
               <span class="like-link">choose it</span>.</p>
             <p class="need" id="stock-need" hidden></p>
             <p class="muted small" id="stock-hint">A <code>.syx</code>, a <code>.bin</code> (Octatrack), or
@@ -152,15 +107,16 @@
               <th>Status</th><th class="num">RAM</th><th class="num">Order</th><th class="x"><span class="sr">Remove</span></th></tr></thead>
             <tbody id="mod-rows"></tbody>
           </table>
-          <!-- the two ways to add a mod: the library's, or a file of your own -->
+          <!-- your .elemod files: dropped here (or anywhere on the page), or chosen -->
           <div class="add-mods">
-            <a class="add-way" href="#library">
-              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
-              <span><strong>Add from the library</strong><small>The mods listed on this site</small></span></a>
             <div class="add-way drop" id="mods-drop" tabindex="0" role="button" aria-describedby="mods-drop-hint">
               <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
-              <span><strong>Add your own <code>.elemod</code></strong><small id="mods-drop-hint">A mod file you were sent or built: drop it
-                here, or <span class="like-link">choose it</span></small></span></div>
+              <span><strong>Add your <code>.elemod</code> files</strong><small id="mods-drop-hint">Drop them here (or
+                anywhere on the page), or <span class="like-link">choose them</span></small></span></div>
+            <a class="add-way" href="https://modwerk.app/" rel="noreferrer" target="_blank">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+              <span><strong>Find mods on Modwerk</strong><small>Download a mod's .elemod there, then add it here</small></span></a>
+            <input type="file" id="mod-files" accept=".elemod,.dtmod" multiple hidden>
           </div>
           <label class="remember"><input type="checkbox" id="show-other"> Show mods for other firmware</label>
           <aside class="details" id="details" aria-live="polite"></aside>
@@ -201,22 +157,7 @@
     </div>
   </section>
 </main>
-
-<nav class="tabbar" aria-label="Views">
-  <a class="tab" id="tab-library" href="#library">
-    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>Mods</a>
-  <a class="tab" id="tab-build" href="#build">
-    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3.5 6.5 13h5l-1 7.5 7-9.5h-5z"/></svg>Build<span class="badge" id="tab-count">0</span></a>
-  <button type="button" class="tab" id="tab-about">
-    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8v.01"/></svg>About</button>
-</nav>
 </div>
-
-<dialog class="sheet" id="mod-sheet" aria-labelledby="sheet-title">
-  <div class="sheet-h"><h2 id="sheet-title"></h2>
-    <button type="button" class="round" id="sheet-close" aria-label="Close">&times;</button></div>
-  <div class="sheet-body" id="sheet-body"></div>
-</dialog>
 
 <dialog class="sheet narrow" id="profile-sheet" aria-labelledby="ps-title">
   <div class="sheet-h"><h2 id="ps-title">New profile</h2>
@@ -246,15 +187,19 @@
     <button type="button" class="round" id="about-close" aria-label="Close">&times;</button></div>
   <div class="sheet-body">
     <p><strong>Nothing is uploaded.</strong> Your stock OS file and your mods stay in this browser tab;
-      the build runs here, in Python compiled to WebAssembly. <strong>No firmware is hosted on this
-      site</strong>: you bring Elektron's file. elekloader is an independent project, not affiliated with,
+      the build runs here, in elekloader's engine. <strong>No firmware is hosted on this site</strong>: you
+      bring Elektron's file, and your own mods. elekloader is an independent project, not affiliated with,
       endorsed by or supported by Elektron, and flashing custom firmware is at your own risk.</p>
+    <p>Mods are on <a href="https://modwerk.app/" rel="noreferrer">Modwerk</a>, which builds with this
+      same engine. Mod authors: <a href="https://github.com/irpina/elekloader/blob/main/docs/ADAPTING.md"
+      rel="noreferrer">how to write a mod</a>.</p>
     <p><a href="https://github.com/irpina/elekloader#flash-it" rel="noreferrer">How to flash, and how to recover</a>
       &middot; <a href="https://github.com/irpina/elekloader#readme" rel="noreferrer">README</a>
       &middot; <a href="https://github.com/irpina/elekloader" rel="noreferrer">Source</a></p>
     <p id="about" class="muted small"></p>
-    <p class="small">GPL-2.0-or-later: <a href="LICENSE.txt">LICENSE</a> &middot; <a href="NOTICE.txt">NOTICE</a>
-      &middot; <a href="pyodide/NOTICE.txt">Pyodide and Python's licences</a></p>
+    <p class="small">elekloader: GPL-2.0-or-later (<a href="LICENSE.txt">LICENSE</a> &middot;
+      <a href="NOTICE.txt">NOTICE</a>); its engine in this page: GPL-3.0-or-later
+      (<a href="engine/LICENSE.txt">LICENSE</a>)</p>
   </div>
 </dialog>
 </body>

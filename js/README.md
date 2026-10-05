@@ -8,7 +8,7 @@ elekloader's mod manager as a TypeScript package with no dependencies, for web p
 
 The Python package in this repository is the reference. For the same stock file and mods, this engine writes the same files byte for byte (the `.syx`, the `.bin`, the manifest, the symbol map). It refuses the same things with the same messages and says the same about each mod. `tools/parity.ts` checks all of that against the Python.
 
-It exists so a page can build firmware without Pyodide. That was a 9 to 13 MB download and a second or two of start-up before the first build; this is about 165 KB of JavaScript. It is also much faster: the packer runs in milliseconds, not seconds.
+It exists so a page can build firmware without Pyodide. elekloader's own page ([docs/WEB.md](../docs/WEB.md)) and [Modwerk](https://modwerk.app/) run it. Pyodide was a 9 to 13 MB download and a second or two of start-up before the first build; this is about 165 KB of JavaScript. It is also much faster: a Digitakt build takes under half a second, against 12 s in Pyodide.
 
 Licence: GPL-3.0-or-later (LICENSE). It is ported from elekloader's Python (GPL-2.0-or-later, used here under version 3). The ColdFire decoder comes from [modwerk](https://github.com/repeat98/modwerk) (GPL-3.0-or-later), which ported it from the same Python.
 

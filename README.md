@@ -27,14 +27,15 @@ file on your own machine, and you flash it the way you flash any OS update.
 ## Install
 
 **In your browser, nothing to install:** <https://irpina.github.io/elekloader/>.
-Drop in your stock OS file, add mods from its library or your own, tick them,
-build, and download the `.syx` (and, for the Octatrack, the `.bin`). The build runs in the page, in
-Python compiled to WebAssembly ([Pyodide](https://pyodide.org)), with
-elekloader's own code, unchanged. The page shows its version and commit, and
-whether that is the latest release's. Your files are never uploaded, the
-site hosts no firmware, and it fetches nothing from any other site. The
-latest release's core for your device is listed and ticked for you. See
-[docs/WEB.md](docs/WEB.md).
+Drop in your stock OS file and your own `.elemod` files, tick them, build,
+and download the `.syx` (and, for the Octatrack, the `.bin`). The mods are on
+[Modwerk](https://modwerk.app/), which builds with the same engine. The build
+runs in the page, in elekloader's own engine ([js/](js/README.md), the same
+results as the Python, byte for byte): under half a second for a Digitakt
+build. The page shows its version and commit. Your files are never uploaded,
+the site hosts no firmware and no mods, and it fetches nothing from any other
+site. The latest release's core for your device is listed and ticked for you.
+See [docs/WEB.md](docs/WEB.md).
 
 **Windows:** download `elekloader-<version>-windows.exe` from
 [Releases](https://github.com/irpina/elekloader/releases/latest) and run it.
@@ -305,7 +306,7 @@ ELEKLOADER_OT_SYX=... ELEKLOADER_OCTABAM=path/to/octabam python tests/test_octab
 ELEKLOADER_DN_SYX=Digitone_and_Digitone_Keys_OS1.43.syx python tests/test_digitone.py
 ELEKLOADER_DT2_SYX=Digitakt_II_OS1.17.syx python tests/test_digitakt2.py
 ELEKLOADER_STOCK=... ELEKLOADER_STOCK_154=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
-node tests/test_web.mjs build/site   # the web page's engine, in Pyodide (packaging/build_web.py first)
+node tests/test_web.mjs build/site   # the web page's engine, from the site (packaging/build_web.py first)
 ```
 
 A test whose input files are not given is skipped, not passed. Firmware

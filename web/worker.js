@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// elekloader's engine for the page: Pyodide (CPython compiled to WebAssembly)
-// running elekloader, in a worker so the page never blocks.
+// elekloader's engine for the page, in a worker so the page never blocks: the
+// TypeScript engine (js/, built into engine/ by packaging/build_web.py), the
+// same code and results as elekloader's Python, as plain JavaScript.
 //
 // Same origin only. The <meta> CSP in index.html does not reach a worker, and
 // GitHub Pages cannot send CSP headers, so this worker keeps itself to the
 // site: before anything loads, fetch and XMLHttpRequest refuse any URL that is
 // not this site's, and the other ways out (WebSocket, EventSource, ...) are
-// removed. Pyodide is told to take everything from ./pyodide/, packageBaseUrl
-// included, so it has no CDN to fall back on, and nothing here asks it for a
-// package.
+// removed.
 //
-// The files the page sends are written into Pyodide's in-memory file system
-// (/work, see bridge.py). They never leave this tab.
+// The files the page sends stay in this worker's memory (the engine's Store,
+// under /work). They never leave this tab.
 
 const SITE = self.location.origin;
 
@@ -38,7 +37,6 @@ for (const k of ['WebSocket', 'WebSocketStream', 'EventSource', 'WebTransport', 
   if (k in self) self[k] = undefined;
 }
 
-let py = null;
 let bridge = null;
 
 async function bytes(path) {
@@ -47,57 +45,33 @@ async function bytes(path) {
   return new Uint8Array(await r.arrayBuffer());
 }
 
-// What the browser fetched for the engine: each file, and what crossed the
-// network (0 when it came from the cache).
-function fetched() {
-  return performance.getEntriesByType('resource').map(e => ({
-    url: e.name, transferred: e.transferSize, size: e.decodedBodySize,
-    ms: Math.round(e.duration),
-  }));
-}
-
 async function init() {
   const t0 = performance.now();
-  const indexURL = new URL('./pyodide/', import.meta.url).href;
-  const { loadPyodide } = await import('./pyodide/pyodide.mjs');
-  py = await loadPyodide({ indexURL, packageBaseUrl: indexURL, env: { HOME: '/work' } });
+  const { Bridge } = await import('./engine/index.js');
+  bridge = new Bridge();
   const t1 = performance.now();
-  const [zip, src, cores, build] = await Promise.all([
-    bytes('elekloader.zip'), bytes('bridge.py'),
+  const [cores, build] = await Promise.all([
     fetch(new URL('core/index.json', import.meta.url)).then(r => r.json()),
     fetch(new URL('build.json', import.meta.url)).then(r => r.json()),
   ]);
-  py.unpackArchive(zip, 'zip', { extractDir: '/elek' });
-  py.FS.mkdirTree('/work');
-  py.FS.writeFile('/elek/bridge.py', src);
-  py.runPython("import sys; sys.path.insert(0, '/elek')");
-  bridge = py.pyimport('bridge');
-  for (const c of cores) {
-    const raw = await bytes('core/' + c.file);
-    call('add_core', { name: c.file, sha256: c.sha256 }, raw);
-  }
+  // the site's cores, each checked against the sha256 core/index.json gives
+  for (const c of cores) bridge.addCore({ name: c.file, sha256: c.sha256 }, await bytes('core/' + c.file));
   const t2 = performance.now();
   return {
-    info: call('info', {}), build, python: py.runPython('import sys; sys.version.split()[0]'),
-    pyodide: py.version, ms: { pyodide: Math.round(t1 - t0), elekloader: Math.round(t2 - t1) },
-    fetched: fetched(),
+    info: bridge.info(), build,
+    ms: { engine: Math.round(t1 - t0), cores: Math.round(t2 - t1) },
   };
-}
-
-// (undefined arrives in Python as None; null would arrive as JsNull)
-function call(name, args, data = undefined, progress = undefined) {
-  return JSON.parse(bridge.call(name, JSON.stringify(args), data, progress));
 }
 
 async function handle(id, cmd, args, data) {
   if (cmd === 'init') return init();
   if (!bridge) throw new Error('the engine is not loaded');
-  if (cmd !== 'build') return call(cmd, args, data);
+  if (cmd !== 'build') return bridge.call(cmd, args, data);
   const t0 = performance.now();
   const say = line => self.postMessage({ id, log: line, t: Math.round(performance.now() - t0) });
-  const r = call('build', args, undefined, say);
+  const r = await bridge.call('build', args, undefined, say);
   if (r.ok) {
-    for (const f of r.files) f.data = py.FS.readFile(f.path).buffer;
+    for (const f of r.files) f.data = f.data.buffer.slice(f.data.byteOffset, f.data.byteOffset + f.data.byteLength);
   }
   r.ms = Math.round(performance.now() - t0);
   return r;

@@ -266,8 +266,6 @@ below was found again in 1.17.
     mods (irpina/octabam2elemod v1.0) in seven groups, the last with all 19.
   - In the last build, the 15 mods it carried were tested in use, and all
     worked: the 14 non-USB mods but SCENES P2, and USB IO TRACKS MAIN CUE AB.
-    The shop's details sheet says, mod by mod, what has been checked
-    (`on_unit` in web/catalog.json).
   - Not yet run on an MKI.
 
 ## What a new device needs besides its profile
