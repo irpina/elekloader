@@ -26,48 +26,137 @@ What stays yours: your pages, their design, your accounts and your community. Th
 
 ## Put it on your site
 
-1. **Take the kit:** `elekloader-kit-<version>.zip` from an [elekloader release](https://github.com/irpina/elekloader/releases). Check it against the sha256 in the release notes.
-   - **No bundler:** serve `dist/` as it is, for example at `/elekloader/`.
-   - **With a bundler** (Vite, esbuild): import `src/kit/index.ts`. Start the worker with `new Worker(new URL('…/src/kit/worker.ts', import.meta.url), { type: 'module' })`.
-2. **Take the catalog:** `elekloader-catalog.json` from the same release. Copy its files to your site:
-   ```bash
-   node tools/kit.ts sync elekloader-catalog.json public/elekloader-catalog --device digitakt-mk1 --device digitone-mk1
-   ```
-   `sync` downloads each file from its author's release or commit and checks its sha256. It writes the catalog beside the files, keeping only the devices you name. Keep the catalog in its own folder, apart from the kit's files, so each is pinned on its own. To offer only some mods, or add your own, edit the catalog (format below) and run `sync` again.
-3. **Pin it:**
-   ```bash
-   node tools/kit.ts lock --kit public/elekloader --catalog public/elekloader-catalog > elekloader.lock.json
-   ```
-   Commit the lock file. In your CI, check that what you deploy is what you pinned:
-   ```bash
-   node tools/kit.ts verify public/elekloader-catalog --lock elekloader.lock.json --kit public/elekloader
-   ```
-   The check fails on a changed, missing or extra file, in the kit or in the catalog.
-4. **Call it from your page:**
-   ```js
-   import { createBuilder, parseCatalog, prepare, buildStep, buildLogText, describeBuilder } from '/elekloader/kit/index.js'
+### 1. Take the kit and a catalog
 
-   const builder = createBuilder({
-     base: '/elekloader-catalog/',                       // where catalog.json and its files are served
-     worker: () => new Worker('/elekloader/kit/worker.js', { type: 'module' }),
-   })
-   const catalog = parseCatalog(await (await fetch('/elekloader-catalog/catalog.json')).json())
-   const ready = await builder.load()                      // the catalog and its cores, checked
+- **The kit:** `elekloader-kit-<version>.zip` from an [elekloader release](https://github.com/irpina/elekloader/releases). Check it against the sha256 in the release notes. `kit.json` inside names the commit it was built from, the protocol, and every file's sha256.
+- **The catalog:** `elekloader-catalog.json` from the same release. Copy its files to your site:
+  ```bash
+  node tools/kit.ts sync elekloader-catalog.json <catalog dir> --device digitakt-mk1 --device digitone-mk1
+  ```
+  `sync` downloads each file from its author's release or commit, checks its sha256, and writes the catalog beside the files. It keeps only the devices you name. Keep the catalog in its own folder, apart from the kit's files, so each is pinned on its own.
 
-   // the owner's stock file (a File from an <input type="file">) and the mod ids they chose
-   const prepared = await prepare(builder, { catalog, device: 'digitakt-mk1', os: '1.53', stock: file, ids: ['digimono'] })
-   if (!prepared.ok) throw new Error(prepared.error)       // elekloader's words: conflicts, a wrong OS file, …
+### 2. Load it in your pages
 
-   let step = 'composing'                                  // then 'packing', 'verifying'
-   const built = await builder.build(prepared.enabled, '2.0a', 'custom.syx', line => { step = buildStep(line, step) })
-   // built.files: each output's name, sha256 and bytes (an ArrayBuffer) to offer as a download
-   const log = buildLogText({ title: 'Your site build log', builder: describeBuilder(ready), device: 'Digitakt mk1', os: '1.53', version: '2.0a', enabled: prepared.enabled, result: built })
-   ```
-   `examples/minimal/` does all of this in about a hundred lines.
-5. **Serve it right:**
-   - **A secure context:** https, or localhost.
-   - **The page's CSP** needs `worker-src 'self'` and `script-src 'self'`. No `'wasm-unsafe-eval'`: nothing runs WebAssembly.
-   - **The worker** keeps to your origin by itself. It needs no CSP header.
+**Without a bundler** (plain files), serve:
+- the zip's `dist/` as it is, at `/elekloader/`, say: `dist/kit/worker.js` is the worker, `dist/kit/index.js` the page's side;
+- the catalog folder at `/elekloader-catalog/`.
+
+**With a bundler** (Vite, esbuild, webpack), vendor the TypeScript and let the bundler build the worker with the engine. For example:
+
+```
+vendor/elekloader/kit/          the zip's src/, tools/kit.ts, LICENSE, NOTICE, README.md and kit.json, unchanged
+public/elekloader-catalog/      catalog.json and its files (a bundler's public folder is served and copied as it is)
+elekloader.lock.json            the lock (step 3)
+```
+
+- **Start the worker** with the URL written out in full, so the bundler finds and bundles it:
+  ```js
+  new Worker(new URL('../vendor/elekloader/kit/src/kit/worker.ts', import.meta.url), { type: 'module' })
+  ```
+- **Import the page's side** from `vendor/elekloader/kit/src/kit/index.ts`.
+- **TypeScript settings.** The kit's sources import each other with `.ts` extensions: they need `allowImportingTsExtensions` (with `noEmit`, or a bundler) and `"moduleResolution": "bundler"`. They type-check under `strict`, `noUnusedLocals`, `noUnusedParameters`, `erasableSyntaxOnly` and `verbatimModuleSyntax`.
+- **Lint:** leave `vendor/` out of your linter; it is upstream code.
+- **The catalog in the bundle (optional):** a page can import `catalog.json` and pass it to `parseCatalog`, to list the mods without a fetch.
+
+### 3. Pin it
+
+```bash
+node tools/kit.ts lock --kit <kit dir> --catalog <catalog dir> > elekloader.lock.json
+```
+
+Commit the lock file. In your CI, check that what you deploy is what you pinned:
+
+```bash
+node tools/kit.ts verify <catalog dir> --lock elekloader.lock.json --kit <kit dir>
+```
+
+The check fails on a changed, missing or extra file, in the kit or in the catalog. A bundler build can run the same check before it emits the catalog.
+
+### 4. Call it from your page
+
+```js
+import { createBuilder, parseCatalog, prepare, buildStep, buildLogText, describeBuilder, PROTOCOL } from '/elekloader/kit/index.js'
+
+const builder = createBuilder({
+  base: '/elekloader-catalog/',                       // where catalog.json and its files are served
+  worker: () => new Worker('/elekloader/kit/worker.js', { type: 'module' }),
+})
+const catalog = parseCatalog(await (await fetch('/elekloader-catalog/catalog.json')).json())
+const ready = await builder.load()                      // the catalog and its cores, checked
+if (ready.protocol !== PROTOCOL) throw new Error('another kit protocol')
+
+// the owner's stock file (a File from an <input type="file">) and the mod ids they chose
+const prepared = await prepare(builder, { catalog, device: 'digitakt-mk1', os: '1.53', stock: file, ids: ['digimono'] })
+if (!prepared.ok) throw new Error(prepared.error)       // elekloader's words: conflicts, a wrong OS file, …
+
+let step = 'composing'                                  // then 'packing', 'verifying'
+const built = await builder.build(prepared.enabled, '2.0a', 'custom.syx', line => { step = buildStep(line, step) })
+// built.files: each output's name, sha256 and bytes (an ArrayBuffer) to offer as a download
+const log = buildLogText({ title: 'Your site build log', builder: describeBuilder(ready), device: 'Digitakt mk1', os: '1.53', version: '2.0a', enabled: prepared.enabled, result: built })
+```
+
+- **`prepare`** does the whole selection:
+  - checks that the stock file is the device and OS chosen;
+  - adds each mod from the catalog, with the mods it requires;
+  - ticks the core the plan needs;
+  - runs the live check.
+- **`examples/minimal/`** does all of this, with downloads and the log, in about a hundred lines.
+
+### 5. Serve it right
+
+- **A secure context:** https, or localhost.
+- **The page's CSP** needs `worker-src 'self'` and `script-src 'self'`. No `'wasm-unsafe-eval'`: nothing runs WebAssembly.
+- **The worker** keeps to your origin by itself. It needs no CSP header and no special MIME types.
+
+## Your ids and the catalog's
+
+- **Devices** are the engine's keys: `digitakt-mk1`, `digitakt-mk2`, `digitone-mk1`, `octatrack`. `ready.info.devices` lists them, with their OS versions and their recovery text. If your site names machines its own way, map them to these.
+- **Mods** are the `.elemod`'s own `id`: `catalog.mods[].id`. One id has a file per OS version; `releases(catalog, device, id)` lists those versions.
+- **The OS version** is the stock file's, as the builder recognises it: `stock.os` from `setStock`, or the `os` your site already verified.
+
+## Saved selections
+
+Store the catalog's `revision` with any selection a user saves or exports. When your catalog changes, the revision changes, and an old selection can be shown for review rather than built silently with other files. An update to the kit alone keeps the revision, so it keeps saved selections valid.
+
+## Your own list of mods
+
+To offer mods that elekloader's catalog doesn't list, or to turn a list your site already keeps into a catalog, write the list and let `feed` read the files:
+
+```json
+{ "items": [
+  { "repo": "you/your-mod", "tag": "v1.0", "file": "your-mod-1.0.elemod", "sha256": "…", "device": "digitakt-mk1", "summary": "…" },
+  { "repo": "you/mods", "commit": "<the whole commit id>", "path": "elemods/other-1.0.elemod", "sha256": "…", "device": "digitakt-mk1" },
+  { "repo": "irpina/elekloader", "tag": "v0.4.0", "file": "core-2.1.elemod", "sha256": "…", "device": "digitakt-mk1", "kind": "core" }
+] }
+```
+
+```bash
+node tools/kit.ts feed --list list.json --files <folder with those files> --revision <your revision> --out catalog.json
+```
+
+`feed` reads each file with the engine for its id, version, OS, licence and requirements. It refuses a file whose sha256 or device is not the list's. A file that names no licence takes the item's `license`, if you give one.
+
+## Try it locally
+
+From an elekloader checkout (or the zip, whose `dist/` is the first command's output):
+
+```bash
+node js/tools/build.ts js/examples/minimal/elekloader
+node js/tools/kit.ts sync elekloader-catalog.json js/examples/minimal/catalog --device digitakt-mk1
+python -m http.server --directory js/examples/minimal 8000
+```
+
+Open http://localhost:8000, choose your own stock OS file, tick mods and build.
+
+## Checklist
+
+- [ ] The kit is vendored unchanged; the lock is committed; CI runs `verify --lock`.
+- [ ] The worker starts from your own origin; the page's CSP allows `worker-src 'self'`.
+- [ ] Stock files and builds never leave the browser.
+- [ ] The device's recovery text is shown before a download.
+- [ ] `LICENSE` and `NOTICE` ship with the site, with a link to the kit's source; each mod's licence is shown.
+- [ ] The page checks `PROTOCOL` in `init`'s reply.
+- [ ] Saved selections keep the catalog's `revision`.
 
 ## What a site must do
 
