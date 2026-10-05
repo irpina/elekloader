@@ -15,3 +15,6 @@ dist/
 out/
 mods/*/out/
 elekloader/bundled/
+
+# the TypeScript engine's build output
+js/dist/

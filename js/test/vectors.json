@@ -1,0 +1,625 @@
+{
+ "note": "Written by js/tools/vectors.py from elekloader's Python; synthetic inputs, no firmware.",
+ "aplib": [
+  {
+   "spec": {
+    "kind": "random",
+    "seed": 0,
+    "n": 0
+   },
+   "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "packed_sha256": "a977ed68343d487b04ef72b766c05507d5d2190007943ca7b27e37e2d6d0bad0",
+   "packed_len": 16,
+   "store_sha256": "a977ed68343d487b04ef72b766c05507d5d2190007943ca7b27e37e2d6d0bad0",
+   "packed": "000000080000018300000000000480ff"
+  },
+  {
+   "spec": {
+    "kind": "random",
+    "seed": 1,
+    "n": 1
+   },
+   "input_sha256": "dabd3aff769f07eb2965401eb029974ebba3407afd02b26ddb564ea5f8efae72",
+   "packed_sha256": "b8ab4b9fe3d9647bf763bcd288fb76a765d0550f544915822796733f3e4cf4cb",
+   "packed_len": 17,
+   "store_sha256": "b8ab4b9fe3d9647bf763bcd288fb76a765d0550f544915822796733f3e4cf4cb",
+   "packed": "00000009000001fd803c000000000240ff"
+  },
+  {
+   "spec": {
+    "kind": "random",
+    "seed": 2,
+    "n": 2
+   },
+   "input_sha256": "263d471daf29c520917085a8fef16978f074052bdc9e398220b7f7d708b56746",
+   "packed_sha256": "cd8d1e8293499bdcf11dc78bd7a3cb5d7dfdf167d0ba164c1e24cccd3b734fd8",
+   "packed_len": 18,
+   "store_sha256": "cd8d1e8293499bdcf11dc78bd7a3cb5d7dfdf167d0ba164c1e24cccd3b734fd8",
+   "packed": "0000000a00000291c03c75000000000120ff"
+  },
+  {
+   "spec": {
+    "kind": "random",
+    "seed": 3,
+    "n": 3
+   },
+   "input_sha256": "0040275ff6f0c231032f5ea0b1c89f7b357a41859cd12976dcba4d9f5cb3a761",
+   "packed_sha256": "23daad6db3f1596e863f8f0c14e32d4d7b983dcd861d5b32f49ae413d3423fb0",
+   "packed_len": 19,
+   "store_sha256": "23daad6db3f1596e863f8f0c14e32d4d7b983dcd861d5b32f49ae413d3423fb0",
+   "packed": "0000000b00000416e03c8cdf000000000090ff"
+  },
+  {
+   "spec": {
+    "kind": "random",
+    "seed": 4,
+    "n": 4
+   },
+   "input_sha256": "22e44e9ab4162e77d1514f0d9f75519f1430b07779a0bb988fa9ad216e44d8e9",
+   "packed_sha256": "ad7d66d445c887cf1ee8702b0375f48f27b6a5502fe940681f86f72e7899ed9e",
+   "packed_len": 20,
+   "store_sha256": "ad7d66d445c887cf1ee8702b0375f48f27b6a5502fe940681f86f72e7899ed9e",
+   "packed": "0000000c00000475f03ca48ed0000000000048ff"
+  },
+  {
+   "spec": {
+    "kind": "repeat",
+    "value": 0,
+    "n": 5000
+   },
+   "input_sha256": "7ca5bd879f393d9dd05b14f38add9c0fc6b67928f7f2d261b2e47a32ee8219e3",
+   "packed_sha256": "fee6fcda22242b5044301de64794f3e1e98aba1b36ce05b89e626d157b733920",
+   "packed_len": 25,
+   "store_sha256": "d68821ae6344454c229008b7dcb5c6652ebce2b92dd542078c7e36b9e5557e9b",
+   "packed": "000000110000043fb20000aaaa3600500420000000000090ff"
+  },
+  {
+   "spec": {
+    "kind": "repeat",
+    "value": 42,
+    "n": 20
+   },
+   "input_sha256": "b3ba5be573d7be7e9747e388741863648259b8ff483dba4ce5d4875cf739cb3a",
+   "packed_sha256": "5403b81da486bcaccaabac45e24f5195acb04345a3a91fc24bf24839aa039a1d",
+   "packed_len": 19,
+   "store_sha256": "4aef8fa49f9b8738f86f4d24c286e7ca40f4db5d75b37b6b3ccca8f70c654fdb",
+   "packed": "0000000b000001efb02a0004000000000012ff"
+  },
+  {
+   "spec": {
+    "kind": "phrase",
+    "text": "ab",
+    "n": 8000
+   },
+   "input_sha256": "4671240cf921ebceb9c675747f2ec24c0d433f6a8f80382d619a857b4c2f7011",
+   "packed_sha256": "6ce995e5aeac53d68c8071dd2e191a1948484f0a107af5541cd6d06dc749b08e",
+   "packed_len": 27,
+   "store_sha256": "a2bab3351be2a942c9547dad7191418914f2ab54d5c64d477f0e9966656ebefc",
+   "packed": "00000013000004a5d961620155551b012a0a8b00000000000480ff"
+  },
+  {
+   "spec": {
+    "kind": "phrase",
+    "text": "tape delay ",
+    "n": 3000
+   },
+   "input_sha256": "0ba497b6d335efc4625bb33e22f6603a3a1675b7b80ac303e44c05ab4ad6efba",
+   "packed_sha256": "cfded999f96a8b676ad606c5947e4defc5137b1966ab59ca27ffadeb9ebf37dc",
+   "packed_len": 32,
+   "store_sha256": "0c10091fe4e737378f38810a0ce94e7ed0da1bbeea7681a2ceda5cbd8e8b429d",
+   "packed": "000000180000076fff746170652064656cec6179200a2a2224000000000012ff"
+  },
+  {
+   "spec": {
+    "kind": "random",
+    "seed": 7,
+    "n": 500
+   },
+   "input_sha256": "c020385e921d12491d7c81b9bff4eb1064e32f391a2ed3f99ddde7dcdb3bb7f7",
+   "packed_sha256": "f85c538c47363952bfdc1427b3eab34a4aedff9c2f185e2abc7e452764c97cc0",
+   "packed_len": 578,
+   "store_sha256": "f85c538c47363952bfdc1427b3eab34a4aedff9c2f185e2abc7e452764c97cc0"
+  },
+  {
+   "spec": {
+    "kind": "random",
+    "seed": 8,
+    "n": 70000
+   },
+   "input_sha256": "c6c92f0b86e2e35a41237410cfbd9ab2e372467bddc88e82e86c1e41902c331e",
+   "packed_sha256": "f9735ce0ed8f40c08bf0ade19cccb846b2674c84b2007aa8d5948cb5ae747039",
+   "packed_len": 78753,
+   "store_sha256": "e3455c4954a089ec7f39d72566bb335bb4dd904095036a16075634be9eac507e"
+  },
+  {
+   "spec": {
+    "kind": "blocks",
+    "seed": 9,
+    "n": 40000
+   },
+   "input_sha256": "05bb04537bab607dfe57a10faa65babdd02e5d055a62ca0f72afd12b31c0df2b",
+   "packed_sha256": "6cbcfe59971b40dc4e5d02a1f632708458142768814ca3ef3707b9b2703ed961",
+   "packed_len": 39657,
+   "store_sha256": "bedae78c20dcb52b592da212c418ca1ed518eedc433a6dd08fa0f4f72c75da01"
+  },
+  {
+   "spec": {
+    "kind": "blocks",
+    "seed": 10,
+    "n": 300000
+   },
+   "input_sha256": "26c76ea4116fa921db0b80d820bc2e9e75a37b16e4d5e5573b8d6833c4328b1b",
+   "packed_sha256": "35a6e305ca5d454ab88d033387cf30caecc5707037a8d871dfbf7af7597f5409",
+   "packed_len": 296659,
+   "store_sha256": "a0bc805b21669c5e4df22017ad0cf54f02d7bd5d635a94b2f688cc80d68c5828"
+  },
+  {
+   "spec": {
+    "kind": "words",
+    "n": 200000
+   },
+   "input_sha256": "1d9fe1284ece701dcf2932092fb4a994970a3e4b9e36fabe0c032a51eb649dab",
+   "packed_sha256": "13ebc661da18a6687df7851ffb87e5d5eb8c4b3b0ef3a6510257bf94ddc46763",
+   "packed_len": 127710,
+   "store_sha256": "0bf71238ee3f962cbb5bbac7e95bd6be3eef218ca764ce7059be1a5abad741e9"
+  }
+ ],
+ "transport": {
+  "stream_seed": 11,
+  "stream_len": 542,
+  "framing": [
+   "f000203c0a007d000f010203000000f7",
+   "f000203c0a007f000f040506000000f7"
+  ],
+  "syx_sha256": "6dd042c163d32bfb0db9c7f0efc32b82e28ceb10153a2849ccdbd6fcdb18a50a",
+  "syx_len": 800,
+  "content_checksum": {
+   "seed": 12,
+   "len": 4099,
+   "value": 3208699942
+  }
+ },
+ "elek": {
+  "container_seed": 13,
+  "syx_sha256": "58f179d6e2e977e27099fbbada757fd4e425db81c15148a0a60823beec7c91ac",
+  "bin_sha256": "c5f8261d49ed7f32c8870bf7184aaafba1e7c1d9eded7bdc0f50a017b10ae959",
+  "bin_odd_sha256": "d415f02409dfe777d4534b2a7fc5b28ce74da03208deec786138c4a00d9c47e5"
+ },
+ "python": {
+  "json": [
+   {
+    "text": "{\"a\": 1}",
+    "value": "{\"a\": 1}",
+    "floats": []
+   },
+   {
+    "text": "{\"a\": 1.0, \"b\": -2.5e3, \"c\": NaN, \"d\": Infinity, \"e\": -Infinity}",
+    "value": "{\"a\": 1.0, \"b\": -2500.0, \"c\": NaN, \"d\": Infinity, \"e\": -Infinity}",
+    "floats": [
+     [
+      "/a",
+      "1.0"
+     ],
+     [
+      "/b",
+      "-2500.0"
+     ],
+     [
+      "/c",
+      "nan"
+     ],
+     [
+      "/d",
+      "inf"
+     ],
+     [
+      "/e",
+      "-inf"
+     ]
+    ]
+   },
+   {
+    "text": "[1, 2,]",
+    "error": "Illegal trailing comma before end of array: line 1 column 6 (char 5)"
+   },
+   {
+    "text": "{\"a\": 1,}",
+    "error": "Illegal trailing comma before end of object: line 1 column 8 (char 7)"
+   },
+   {
+    "text": "{\"a\" 1}",
+    "error": "Expecting ':' delimiter: line 1 column 6 (char 5)"
+   },
+   {
+    "text": "{\"a\": }",
+    "error": "Expecting value: line 1 column 7 (char 6)"
+   },
+   {
+    "text": "{a: 1}",
+    "error": "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"
+   },
+   {
+    "text": "",
+    "error": "Expecting value: line 1 column 1 (char 0)"
+   },
+   {
+    "text": "   ",
+    "error": "Expecting value: line 1 column 4 (char 3)"
+   },
+   {
+    "text": "x",
+    "error": "Expecting value: line 1 column 1 (char 0)"
+   },
+   {
+    "text": "{\"a\": 1} x",
+    "error": "Extra data: line 1 column 10 (char 9)"
+   },
+   {
+    "text": "{\"a\": \"b\\qc\"}",
+    "error": "Invalid \\escape: line 1 column 9 (char 8)"
+   },
+   {
+    "text": "{\"a\": \"b\u0001c\"}",
+    "error": "Invalid control character at: line 1 column 9 (char 8)"
+   },
+   {
+    "text": "{\"a\": \"abc",
+    "error": "Unterminated string starting at: line 1 column 7 (char 6)"
+   },
+   {
+    "text": "{\"a\": \"\\u00e9\\ud83d\\ude00\"}",
+    "value": "{\"a\": \"\\u00e9\\ud83d\\ude00\"}",
+    "floats": []
+   },
+   {
+    "text": "{\"a\": \"\\u12\"}",
+    "error": "Invalid \\uXXXX escape: line 1 column 9 (char 8)"
+   },
+   {
+    "text": "[1 2]",
+    "error": "Expecting ',' delimiter: line 1 column 4 (char 3)"
+   },
+   {
+    "text": "{\"a\": 1 \"b\": 2}",
+    "error": "Expecting ',' delimiter: line 1 column 9 (char 8)"
+   },
+   {
+    "text": "01",
+    "error": "Extra data: line 1 column 2 (char 1)"
+   },
+   {
+    "text": "-",
+    "error": "Expecting value: line 1 column 1 (char 0)"
+   },
+   {
+    "text": "{\"a\": [}",
+    "error": "Expecting value: line 1 column 8 (char 7)"
+   },
+   {
+    "text": "\n\n  {\"a\":\n  x}",
+    "error": "Expecting value: line 4 column 3 (char 12)"
+   },
+   {
+    "text": "{\"a\": tru}",
+    "error": "Expecting value: line 1 column 7 (char 6)"
+   },
+   {
+    "text": "\"\\/\"",
+    "value": "\"/\"",
+    "floats": []
+   },
+   {
+    "text": "{\"a\":1}\n",
+    "value": "{\"a\": 1}",
+    "floats": []
+   },
+   {
+    "text": "[\n1,\n2\n,]",
+    "error": "Illegal trailing comma before end of array: line 4 column 1 (char 7)"
+   },
+   {
+    "text": "\ufeff{}",
+    "error": "Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)"
+   }
+  ],
+  "utf8": [
+   {
+    "hex": "efbbbf7b7d",
+    "text": "\ufeff{}"
+   },
+   {
+    "hex": "7bff7d",
+    "error": "'utf-8' codec can't decode byte 0xff in position 1: invalid start byte"
+   },
+   {
+    "hex": "c0",
+    "error": "'utf-8' codec can't decode byte 0xc0 in position 0: invalid start byte"
+   },
+   {
+    "hex": "e282",
+    "error": "'utf-8' codec can't decode bytes in position 0-1: unexpected end of data"
+   },
+   {
+    "hex": "e2",
+    "error": "'utf-8' codec can't decode byte 0xe2 in position 0: unexpected end of data"
+   },
+   {
+    "hex": "e282417d",
+    "error": "'utf-8' codec can't decode bytes in position 0-1: invalid continuation byte"
+   },
+   {
+    "hex": "eda080",
+    "error": "'utf-8' codec can't decode byte 0xed in position 0: invalid continuation byte"
+   },
+   {
+    "hex": "f4908080",
+    "error": "'utf-8' codec can't decode byte 0xf4 in position 0: invalid continuation byte"
+   },
+   {
+    "hex": "f0808080",
+    "error": "'utf-8' codec can't decode byte 0xf0 in position 0: invalid continuation byte"
+   },
+   {
+    "hex": "22e2828c22",
+    "text": "\"\u208c\""
+   },
+   {
+    "hex": "7b22ce",
+    "error": "'utf-8' codec can't decode byte 0xce in position 2: unexpected end of data"
+   },
+   {
+    "hex": "f0",
+    "error": "'utf-8' codec can't decode byte 0xf0 in position 0: unexpected end of data"
+   }
+  ],
+  "int": [
+   {
+    "s": "16",
+    "value": 16
+   },
+   {
+    "s": "0x10",
+    "value": 16
+   },
+   {
+    "s": "0X1f",
+    "value": 31
+   },
+   {
+    "s": "0o17",
+    "value": 15
+   },
+   {
+    "s": "0b101",
+    "value": 5
+   },
+   {
+    "s": "010",
+    "value": null
+   },
+   {
+    "s": "0",
+    "value": 0
+   },
+   {
+    "s": "00",
+    "value": 0
+   },
+   {
+    "s": "-5",
+    "value": -5
+   },
+   {
+    "s": "+7",
+    "value": 7
+   },
+   {
+    "s": " 12 ",
+    "value": 12
+   },
+   {
+    "s": "1_000",
+    "value": 1000
+   },
+   {
+    "s": "0x_ff",
+    "value": 255
+   },
+   {
+    "s": "1__0",
+    "value": null
+   },
+   {
+    "s": "_1",
+    "value": null
+   },
+   {
+    "s": "",
+    "value": null
+   },
+   {
+    "s": "abc",
+    "value": null
+   },
+   {
+    "s": "1.5",
+    "value": null
+   },
+   {
+    "s": "0x",
+    "value": null
+   },
+   {
+    "s": "\u0663",
+    "value": 3
+   }
+  ],
+  "repr": [
+   {
+    "value": [
+     1,
+     "a",
+     null,
+     true
+    ],
+    "repr": "[1, 'a', None, True]"
+   },
+   {
+    "value": {
+     "k": [
+      1,
+      2
+     ],
+     "q": "it's"
+    },
+    "repr": "{'k': [1, 2], 'q': \"it's\"}"
+   },
+   {
+    "value": "a\"b",
+    "repr": "'a\"b'"
+   },
+   {
+    "value": "a'b",
+    "repr": "\"a'b\""
+   },
+   {
+    "value": "a\nb\\",
+    "repr": "'a\\nb\\\\'"
+   },
+   {
+    "value": "\u00e9",
+    "repr": "'\u00e9'"
+   },
+   {
+    "value": [
+     "x",
+     [
+      "y"
+     ]
+    ],
+    "repr": "['x', ['y']]"
+   }
+  ],
+  "float_repr": [
+   {
+    "value": 0.0,
+    "repr": "0.0"
+   },
+   {
+    "value": -0.0,
+    "repr": "-0.0"
+   },
+   {
+    "value": 1.0,
+    "repr": "1.0"
+   },
+   {
+    "value": 4.0,
+    "repr": "4.0"
+   },
+   {
+    "value": 1.5,
+    "repr": "1.5"
+   },
+   {
+    "value": 0.1,
+    "repr": "0.1"
+   },
+   {
+    "value": 1e+16,
+    "repr": "1e+16"
+   },
+   {
+    "value": 1000000000000000.0,
+    "repr": "1000000000000000.0"
+   },
+   {
+    "value": 123456789012345.6,
+    "repr": "123456789012345.6"
+   },
+   {
+    "value": 1e-05,
+    "repr": "1e-05"
+   },
+   {
+    "value": 0.0001,
+    "repr": "0.0001"
+   },
+   {
+    "value": 2.5e-07,
+    "repr": "2.5e-07"
+   },
+   {
+    "value": 1e+100,
+    "repr": "1e+100"
+   },
+   {
+    "value": -3.0,
+    "repr": "-3.0"
+   },
+   {
+    "value": 0.3333333333333333,
+    "repr": "0.3333333333333333"
+   },
+   {
+    "value": 5e-324,
+    "repr": "5e-324"
+   },
+   {
+    "value": 1.7976931348623157e+308,
+    "repr": "1.7976931348623157e+308"
+   }
+  ],
+  "dumps": {
+   "value": {
+    "b": 1,
+    "a": [
+     1,
+     "x\u00e9\u0001\"",
+     null,
+     true,
+     2.5,
+     {}
+    ],
+    "z": {},
+    "3": {
+     "k": []
+    },
+    "e": []
+   },
+   "indent1": "{\n \"b\": 1,\n \"a\": [\n  1,\n  \"x\\u00e9\\u0001\\\"\",\n  null,\n  true,\n  2.5,\n  {}\n ],\n \"z\": {},\n \"3\": {\n  \"k\": []\n },\n \"e\": []\n}",
+   "indent0": "{\n\"b\": 1,\n\"a\": [\n1,\n\"x\\u00e9\\u0001\\\"\",\nnull,\ntrue,\n2.5,\n{}\n],\n\"z\": {},\n\"3\": {\n\"k\": []\n},\n\"e\": []\n}",
+   "flat": "{\"b\": 1, \"a\": [1, \"x\\u00e9\\u0001\\\"\", null, true, 2.5, {}], \"z\": {}, \"3\": {\"k\": []}, \"e\": []}"
+  },
+  "zip": {
+   "hex": "504b03041400000000000946455d000000000000000000000000040000006469722f504b030414000000000000002100afe722612c0100002c0100000a00000073746f7265642e62696e3e2e3271615265e130c9531e20dfcd4deca1a744095c79c07a8b91b87518ae47991c5600986fd8a49bc45880c3256e038cf42d37f5ddaf3faf567408bf9423b749198b9d7738f3b1b74509cfb8400f4ee0280ea137632711e9cb61d2e55770f3417b61f45fa03704fe64c01db6734da3873612207ba33d4589e22e5b26a54cc04a5c5b14c79e593c3d7a4d6409867b9cf1daf6b682567e8b47d824cf5a48250b009aed703a2d429d9529f38090c59ef466946ac72138ae392e2f003bea8f19e1d2d884e0574a0f0f7c526931c0ff718d00a7131c4009c44a9eabf492d44afd75067c7d9fcff9111eb91cdc1ba088606bac1d88e3dc8feb5b4856a5a9a8ce581fb4ae2b4b6b40ccfa6bf3eac6cb378fb72dc058ae059182ae367d2d3c8ef66759c75fd3e90429fa760385a7a0504b03041400000008000946455dd43f391ccd130000282300000c0000006465666c617465642e737978edc1e5231c0e030060dddda78769a69be9ae697753a7f9e9d34ccc34c738dd7913637ababbbb99e91826260eef9ff17ef13c32ca3b81b8247363f5cb4313d47398fda4a5576cada76fe732105c414a4d4a6e49cd6da710b9ce1163f801a1f9dbf99e656d735294d20078f97e6fb52d33f3564e8fd2b2f46ebe30c9b996e53b6a62a662295ef96c83e3c908bfeb8d7f4ccf7b606289b3eeb705efd791493e9e1b2e1b4762206d12d4e44103b99ec193f4efd423cb337545fb9da7e6510130eb18455491b4c688b117c5d347bd9d282618258eee6a59da00395fb0d8395a4263882f029fc7539999193f238dd02e360140615cf5617fc205a928d32d55b2cb830ca6856d56f84d33fefb23ca47b25c423d188c0397d59312f99e1929f504162b36243286ffa70c2c0b16a0459338c07d44983f98780740592f67b36cd03cf52fc438b3fcd42bad96f7717f959f7c56fbd51e7cbfc9a21545364288ab23018f32a49eb4e43dc9e40d0fc083b4223e5d1d28dd14c0c6fbbfa228deab43d04215520a5fbe91a80d26bcecff47f705732d139de881685c959fbda302ecd65720867d823e0a07313d7294795228313b25f12ac16ef0989a0c4b8b86269bd0f09edbeb222082301fef24cbd3caa048d5189c01c3cf88447f478df263fff019fcbb725d33cfbedcd87de18ad2106ff7c8e2c39619c8a98938405aff40d730834bc64f7ed1dd077e08714df7ca420f9caa3db04d9a8aa3db0e8fe825bf59cdfab1210310d12290326bf619ab6de62085fac5b2d28ef24ee549e016eb76ae9fff9877f71ba5b914beef700c13577ef67d6cf8e98cbe305ebfaf522cfeaf512bf4197040fdfb0d472f09a666a4db7f23ed98a45d8deb894860571664b3b374795cbe94edd1c5356b7bd9385429b1973fa32e621a3962e3782302bd1d81394b57cc450c08a787bb8b7b703d30f339e1c1acbac563a4217d86d3e3b37ef25976078f4fa2dc59b5e970691ae899f5bb61163a063dfce90fcf0aa05a864948b7fd8d2db484ca4c9be2f391e24238d24f8d22b6b0a351ace8279d90ef721eb13f87fb966000ed258540cb4cd203b3550a4aecc7bd38aa39ce6ad4ac1055bb0f05282ef6379964b1d7e8b2eb7f470fef65c88ee2fb9c848d83291c1edd620896902c7046360691db261dbe7113715989f2e887b539ff622be1574a8f26ae34453289a98e5510c4eb978ded07fee63e45b14f1792ba9101adff0bd0f0931ca653acda8cc5d8744c25ea8eb68c61b64a045e98466788f7e70b4771ed02b13d886a22dcefdd39774ddf0c7d3fe79d5ae45fd21be0e058f8c6f6988d644bb0069fda3a41f79d70200f8f9b0aff42c986515a90f5738f89873236fe72c977546f6f0dc79da2f43edb32ed1fa865d3aa7637cb1b38f6fd8b2d4f1f50b3db8ed2982ce3867d56b5288e2e82e95cda2854601e5e5e2e9fcbe5f82470e689c4384b9aaaf55c41a3a63a9095bb46ca7b2ed95eab4a430b38e9da4bccdae42592e0be156727238a6c50c8208761e96feb56e70dae6acca3dcf569ae326de8e49e5636a889b722ccda3a00035145722bbdca2e4bf98a5e164a710b5386d5e5d1c46c0aa15e5849793f1a18a72f1a3de6058651a83abed1ab05c8f8e93233e3ef734c6c10d47ef342103da818d45a05760969040abeaf098e072f5f0b6e7101914c19d060959bb3ebdec2976082f5c7ce4709516552c6eef253ce7105b93e573dfb2b3f5ef4808fc6055bb2883ad754766b838d6d3cd3b4298e654519eb67eec42e77391bf93d45696f153ada0aafc3a8c32a43ec2d4d91133d90c3d2008a7f862779a5c828b502c10b54b0c6deac20abba625c9c2dc434bdfb09bd5e1d573646b04e91ea18fe15d9a9ea2aa5b3d6c9d00fabc1dc1a579af96abbda55dccebd06e8b27d39db788584e1949c7f887eb351b7d8b37a9d57929a70d70c93f17d8cdde984d1c2fec1e1aab668d91158b750479fb350c680d902233ca94a878695c9ffbc3a1d795b0334468871e4bf06b0de6b17407248bd921b447f52b371c151ec24bf3fd2f86cd45f2837bc51f27d27b7f9d372e978f586ef42d6edcacbecd2d7557487f7886f9e5937df3e510d418c295c48b69ee380f8c456ecc57b26a1202672ba1a828404a75b59a532ddd7a595612f738b3349a199db695ebb3eb4b4d6568ca93379feef2aa09a214e1b8e6af99d12db5f4084dc07d3ec0e2654b1c0d3fbe1f7bae3bfdf7bb0a236c327221c5426586d3cb83f7ed82f0ad52adfe539b144cd83aed4b3415e4b9e61bbf56b97948b3d8be9396aa005165ace5ca565591c9a964ea2bc3329186374d329377ddbd42a2ee5d795a32a0d2df737fd94b217f1c77aa99cf60f00be72de068cf0c0f8b6159ea9e0d16d19cf5c3c115a43c3ccbe62d45cac19ac1eee1ce2c02c6ca8c6426d9df612657facdb03d85db6cec7d51ef0e07f18b97fe6383f2dbc954681c63f54cb79de71f0be86b9a4b2981f7bc93f2c26a894b1c50adaef8369fb411dc319e5f20de53e54df3af1ce1c418b04b34059b87de46cef5fb51a124f6035421654f749b97bf62efc202cc9b41c2a3f9a3a20ba8af02e2ba6e610134b1804e1e8c6bb47c5b50ceecfc19e5ad2f9e02f65f7523df824796e75d45730b712d79c8c1615382326f3c0626d188a4b2f32bdd86cc9fe01f07d50e6cf457492bbf4d4fbde3439d0dbe2810dbc2e0c7012910f72842d47c67e06f2475c2f4bf6ae197e480997b200745207f1c3e642af39ae754cb31c3f348d8786268fa844b4999086ce145bf312a3b86e93770aff0f351daab7dd50bb61e2cd585458d945a69d10906ec72141049accd89d423edb6a613d7e4969fcc22808ba3951d98b0b26a302d52ad61ddc7a85d4407c11f3f817177f554a685464f865ad1831b9d77f8f475fb04545aef9c80e812cae90a7c81f35da924df0e096beb76de9e629ee25e64a3a07cd2d50fd0161a4c012c3a269cf3f13cfe1c6ab71e28aa9fa4ebbf70e1628848efb5a938154b85686d5abda64b8aa8253103371c0a9bde5d974b6c67736877762ec61680229cf6f89ead81f63645bcdcd22eafb9ab5f07da1cda7e6c3336444b769bd0a04b3628b561b09d7153a390cc4f86fe86c8140f287d176dd75e9345f138d467944a3d1ced7758cf26109d1ef4eaea5507fa37d50a878a9d51e916722abc33b90b88d5376e8b63a1c7368b4fc11db1d3d67a44d0ba7f9fab6b6eecd2f2952c958a0d2bd586e5e6795455834b6b3d23ec17810709e2ca83a735b87101cef09f050c444cc9d7f0885e634a48942e20b364dc31a5bab1423ae8f1773ed010d9226c259bf9c081b2d742d204477bb5ace5a47ec4275bedabfd7a811f4f0676c55d656c1986d2efc2d629a3434bf8207b545084e9d4e95d9916c82f8ba825d098d73b3a6fa033abd1800d0e8a59c83e39aa58a1c8a43f5d341467898f46772579fb175d1a9cd5f7ec339088fa1d1ee3ff98f183c163200de3da2e5caabf3c5b4881e35a19aca35b2e5497aa6d4e774599b88928b68ee62dc2c2ae292c277d94e734caaeaf272b254a4edab0184f7070ec5f44e97e577322cdeabda5242ac1621a08c14e7b14f7ca40410b9cd7407ea6bf4d51bba954af469aa9799aed6fd1ff44ffbf536bb59fa1651971ded5713f1eebd38a2050dfcdf4e560c6aa5057f8ba48cb887a96435fe5a3ed14b56d920aa7452857b5fc8005de67b471762536ee1bcd8b23c0eae33f01dcbd529087ad083b7988e4aefdf5576b764ef17993ef31925617471b0d13c8e65c7b9d5335e37219bedfb1c926e7565e6666857635e1b8cef992884a83dfaa9239116191c7d01a35e0536d2e3b10eaf83bc8208ff91ee6b281bb3a504e5e0ec9312cbfd460fd7389be37aeb543df91edba8c48d2f696ae21f8b579dde61a1b6a66c5e4414b21eaa42cfda52c79fa8853cd101780f53bb43e6efe2abeb41c2a0fd8e0e54cab382d25e35496c26a8bf12e9fb7c2c6e20ee7e26ca30b1bd8eec2acf5ee408133f2127b942a7da415fcda6b50d8352f1b25e2258c821729dcf43967e54a2e59eb5b4f0b83338b4909fe60bbeaef131802faec9c1a29a7928768056824722bc81768af7fa5e70f7ed4d722d3938c040f994789c36df06e7f7b5bc47740cc10f2e0310c6b1a32c2a347fd819b562a7a93c12ae7baf8054cfe53337978c6955f0841e04f9f213de2dc36f6ebcf3079722d0c36b39603ced7007aae4028e410a8d078e2d45f491682fb0cc96c957c074060911788cd75b2371bc9a8884a26d832777f9a2caac51114970cc1b111c15fc0fadfc708f628991cbd6e059b62c8a1b29901ca82bacc7385b638cd9f0127bbebcd33af8eafe5b0d03befefc98cb26e12d635c6edc55cc2fdbba819cf6eb83070048d94d487d26cdc18b3b08369ac69cd3aa42b991033255df8a24c0362786b70edef8f7d320ce2cabd597d8287b3edb5121c5459b9164ca27a0a458716d6e80d9ce4ac53828fdb6afe663ca9c30809a3465d3d6eaef26624ec9169d09079dbf67139073583569a39fce0f7424f1151264c74fab7e9ff7cbcdf3a6d073b3bd7fe6cf7b12d8c75be56b1235cac0e6e1e2013bc651a08dbac8b50fb10dda06bf789fab94df10dfac61fe9ec93cc224ca3ae73125a9790a5e0c9a817a3c74fd9d444c50b85238fdb1f1f43509ddf7267230af5d4b780841f065ad0b9e973d8f47be6f0eea93aea75acf3bb34d563b8dde564d9e15d92e7ad4e2f880cc8f612a4e579da0cd4db92ef18210f0dbd3eef8c7f4dee9cb47bdfa593d04050770a535d622906540d600bf634d1e7ec5d97cf6cc9c35520096130a6ee68aee6606770a1e152a85565714d52c3830d1148e0ad855780a0874942c67a913f9b42f39b68cf3ac557d1298e6e82daa3aa579f3e10160584a53f3e01debceadc18c3092a826f38463b19646d8686827f622936658b37e5d3c3b6daab3dd9deb54912129313e9ed146923bffa2a9243ebfd803f194eb2a77c2642bb16cfb8c9184cf46fec8a22f3ec7f9889b81a3451e39f16e49905eb232bee339ee3371d01e0f99dc3d85a8ff7f686407b8914fa5c77f7b30ac9a05c9e338f4214a6c0c259b8aeeb77f3ed894237948df93d2fc142081bfdf1b33f53ac5b842bfec01ce79fe1c82a7b7c489e85abad2c47d64470f95fea4a6658d0809ff61852c8bc2ab8592f8a7c5a486fd046398941c2418b6d6ea96a05f868bf6a3ebbaca3189a1f537e9a810a15e272124424b3a26fa0ec9a9e1895f455cdc8cb41a77ce002207a0c5e1354e0ab3adf22b9b8b1dcc6408a1d849c5fb2c74eb691f889131be0b776c3e9f02a50c36ffd17521b720f613dc865808a2ae546c8930068d864e49954f94fc4715b5bb6ba686fb54b057e43e89a57bc82d13ff958dc1969570f183448933d66cbf6dcfe7e446a78265cc52a1e2ad8a6d366e9381d4b7a46496e5a2c8005749b2ddc14d7e96eadf3d5710a915ef0ff51a0c418e289f065b31e887408034b4b1b1ad366b337fbec2ab87e280253a9dd9056b16abe339b4dc8de0d104d7760b7f01d79c938f51bda1c763230ef8d19325a3e96606e814368d855f70a0da0acd121c39685fecd69c493f51efa2b6370dded2fe2899ec005d5607919653b8dc2a8b088dcf36a6a736155439d74bc4b40b8d59215a472db444f63a17c3277fd56b8c06d473789edbd5bf81015aff06f75302e700c5ad0c1c2a9ecbfab2066cff61460d03ddd9f4336f143ee9cba3a163f910eade574490f4b4d0807734a5e8d97b04e3e9f41ae331531ca7a98d24afd68ca34d7741e10201c520ca9a793c6cd481c1f59a4e17c5379c704aa521d3a0c2910c729fa8500bed529bf9d6316928a7e57fae640700fc93e531b4607612f1d95565cd5c852ee0d82faabce5bdf76ddb7bd179654a7f418ff23a2e72b3f8ec8f85e32e3947ff46481e89b26b72214f4195d52ec4c9dfa23e41edd476b78f2a3a84b263f1c8744457e8d2293af905d81df1ca828dc7c163424eb78db1824211e37506268be5b6244ed7df83f44bfabd58ec5c2827c5ead4dd5133afdeb942b62e2526f9250635aa8beab1c129adf601f274c26c741fcb3000f839f6850f8cead897e46463ab5f64ae0809427c5e74a41cd2aca5e4d13a8f2abb51b3c250cb1ad05e1c0a3d920936ade5d62a47ba8b68f4a4a1b150e9d32ed1e57031657f5bafc3af62f4766bfaf17118ef0fb908037f4d84441ec1cd32442d5223482508ebe4c65778bd25ce84b9320b3b8d887a0f9a3ba6d517a2eef2f641cd6c0c81320b921b582cc2d3b238613a4b4932bd90231eaa520217ff134da5bb1849ef4779dc9d8f400ea8454ab618ca65210e28dc57e42840ca9bd1d0ae267551552f8cfa0b4d1e4ea889c7eedbcd9c8e64d57182604eed090f23b70c163be63fd19465f1767cb82605380701c0fdacf8faaa9597a5be00c64fd4b52081049ea2039555faa149c618c1feeb4d8b324221223c9a672053c3838347786c35f7a4265682195d0386eb0140997e7dd2a480d0c6fac97f74c478cfbe76ce808baf7148be5139eb9d7666bbed3fb9c806eac87bbae9eee2dd82698fa3c913ae1f4e6f3d736b43ed39438040b35ff17c5f2fa04656303f4f83bf25ef12edc1831df177fccbc94374d085608aa01f6110f34e3a6c2c6abcfc0e578726ae36162629fe74679bd45a80e4d5ae8ae7cffb77e13aacc1398712df9ad8060b47ab21412973a8780ea4f9fe88cdcf1a8ce70c61ab7a82f9e6b5c93323b090c4b2810393ccb9e9cf9d4953cc992fe0f0fc338fe91620785b5ed187de3bd58641e09d6d70a6efdb81ab1aed8e61e63c5df18bde819d351bd18b2c46536eab8f089236ee1bfddd4e153589e746b140077a975549ad64be10bafe896c628322ab49fa8d09a27b8e63cc26fa3489a85c7493337ec30c8fcc04e804ed4886eac7cf4a36553c56c222899f779df26535c227dc0b197ed195892008a68fcdd08c1e7749dfee7ee966dc64ec16d0f70bc58be65e29f1404ee9271c2f54eadce2edd1693b5bd8032ba9af562bd60ae9792bbb95e2296671dfcde3c3668ce4ab9a3ae3f492e8ebcbf45a06e768de22bd7af5ead5ab57af5ebd7af5ead5ab57af90fedffe07504b03041400000800000946455d86a6103605000000050000000d0000006ee2949ce28c906d652e74787468656c6c6f504b010214001400000000000946455d000000000000000000000000040000000000000000001000fd41000000006469722f504b0102140014000000000000002100afe722612c0100002c0100000a000000000000000000000080012200000073746f7265642e62696e504b010214001400000008000946455dd43f391ccd130000282300000c00000000000000000000008001760100006465666c617465642e737978504b010214001400000800000946455d86a6103605000000050000000d000000000000000000000080016d1500006ee2949ce28c906d652e747874504b05060000000004000400df0000009d1500000000",
+   "members": [
+    {
+     "filename": "dir/",
+     "size": 0,
+     "dir": true,
+     "sha256": null
+    },
+    {
+     "filename": "stored.bin",
+     "size": 300,
+     "dir": false,
+     "sha256": "833c6e1b37b556fb897086a0525fbca6ad8cddfd11ec413bde37d98ac32ac5ab"
+    },
+    {
+     "filename": "deflated.syx",
+     "size": 9000,
+     "dir": false,
+     "sha256": "04b7cb2c02570473b080865ed712642ec139001316fa72a628a2554f271e7ed4"
+    },
+    {
+     "filename": "n\u251c\u2310me.txt",
+     "size": 5,
+     "dir": false,
+     "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    }
+   ]
+  },
+  "cp437": "\u00c7\u00fc\u00e9\u00e2\u00e4\u00e0\u00e5\u00e7\u00ea\u00eb\u00e8\u00ef\u00ee\u00ec\u00c4\u00c5\u00c9\u00e6\u00c6\u00f4\u00f6\u00f2\u00fb\u00f9\u00ff\u00d6\u00dc\u00a2\u00a3\u00a5\u20a7\u0192\u00e1\u00ed\u00f3\u00fa\u00f1\u00d1\u00aa\u00ba\u00bf\u2310\u00ac\u00bd\u00bc\u00a1\u00ab\u00bb\u2591\u2592\u2593\u2502\u2524\u2561\u2562\u2556\u2555\u2563\u2551\u2557\u255d\u255c\u255b\u2510\u2514\u2534\u252c\u251c\u2500\u253c\u255e\u255f\u255a\u2554\u2569\u2566\u2560\u2550\u256c\u2567\u2568\u2564\u2565\u2559\u2558\u2552\u2553\u256b\u256a\u2518\u250c\u2588\u2584\u258c\u2590\u2580\u03b1\u00df\u0393\u03c0\u03a3\u03c3\u00b5\u03c4\u03a6\u0398\u03a9\u03b4\u221e\u03c6\u03b5\u2229\u2261\u00b1\u2265\u2264\u2320\u2321\u00f7\u2248\u00b0\u2219\u00b7\u221a\u207f\u00b2\u25a0\u00a0"
+ }
+}

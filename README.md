@@ -240,6 +240,14 @@ PERFORM without [FUNC]. Building code needs the device's cross toolchain;
 for the Digitakt mk1 and the Digitakt II that is m68k binutils and gcc (Homebrew's `m68k-elf-*` work, with
 `ELEKLOADER_CROSS=m68k-elf-`).
 
+## In TypeScript
+
+[js/](js/README.md) is the same engine in TypeScript, for web pages: the OS
+files, the mod checks, the linker and the build, with no dependencies and no
+Python. For the same stock file and mods it writes the same files, byte for
+byte, and refuses the same things with the same messages; its tools compare
+it with the Python on your own files. It is GPL-3.0-or-later.
+
 ## The Windows app
 
 `packaging/build_windows.py --core core-2.1.elemod [core-dn1-2.0a.elemod ...]` builds
