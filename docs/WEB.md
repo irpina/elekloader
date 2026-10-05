@@ -121,8 +121,9 @@ every OS's file, and the list shows the one that fits once you drop in your
 stock file.
 
 - **The list** is `web/catalog.json`, committed and edited by hand. Each
-  item names a file of a GitHub release (`repo`, `tag`, `file`), its
-  `sha256`, its `device`, and optionally:
+  item names a file of a GitHub release (`repo`, `tag`, `file`), or a file
+  in a repository at a commit (`repo`, `commit`, `path`), its `sha256`, its
+  `device`, and optionally:
   - `needs_core`: the oldest core version it links with;
   - a `summary`;
   - `on_unit`: what has been checked on real hardware. The details sheet shows
@@ -130,7 +131,7 @@ stock file.
   - a `license`, when the file names none. `"kind": "core"` marks a core the listed mods need: it joins the
   site's cores.
 - **The files** are not committed. The pages workflow downloads each from
-  its author's release, and `build_web.py` puts it on the site only if it
+  its author's release or commit, and `build_web.py` puts it on the site only if it
   is the file the catalog pins (by sha256), made for the device the catalog
   says, and under a licence that allows passing it on (`SHOP_LICENCES`). A
   file that cannot be downloaded (a draft release) is listed as not
@@ -143,7 +144,10 @@ stock file.
 To add a mod to the shop, publish its `.elemod` in a GitHub release, add an
 item to `web/catalog.json` with the asset's sha256 (the release page shows
 it, or `gh release view --json assets`), and merge: the next deploy takes
-it. A mod with a file for each OS version gets an item per file; the page
+it. A mod whose author keeps its `.elemod` files in their repository
+instead (as digi1_mods does) is pinned to a commit: the whole commit id,
+the file's path, and its sha256. A shop mod that requires another shop mod
+(Digi Mono needs digichain) brings it when it is added. A mod with a file for each OS version gets an item per file; the page
 shows them as one card (the same repository, mod, version and device).
 
 ## What stays private, and how
@@ -199,8 +203,8 @@ then build and run the checks below.
 1. runs `tests/test_units.py`;
 2. takes the `core-*.elemod` files of the latest release
    (`gh release download`), and fetches that release's tag;
-3. downloads the shop's files, each from its author's release (one it
-   cannot get is a warning, and the shop lists it as not released yet);
+3. downloads the shop's files, each from its author's release or commit
+   (one it cannot get is a warning, and the shop lists it as not available);
 4. downloads the pinned Pyodide core tarball;
 5. assembles the site (`build_web.py` checks the tarball's sha256, and
    the shop's files against the catalog);

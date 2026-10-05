@@ -57,14 +57,21 @@ jobs:
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "core-*.elemod" --dir build/core
           # the tag, so the page can say whether its package is that release's
           git fetch --depth=1 --no-tags origin "refs/tags/$tag:refs/tags/$tag"
-      - name: The mod shop's files, from their authors' releases
+      - name: The mod shop's files, from their authors' releases and commits
         run: |
           # web/catalog.json pins each file's sha256 (build_web.py checks them); one that
           # cannot be fetched (a draft release) is listed in the shop as not available
           mkdir -p build/shop
-          python packaging/build_web.py --catalog-list web/catalog.json | while read -r repo tag file; do
-            gh release download "$tag" --repo "$repo" --pattern "$file" --dir build/shop --clobber \
-              || echo "::warning::$repo $tag $file: not downloadable; the shop lists it as not available"
+          python packaging/build_web.py --catalog-list web/catalog.json | while read -r how repo ref path; do
+            if [ "$how" = commit ]; then
+              out="build/shop/${path##*/}"
+              gh api "repos/$repo/contents/$path?ref=$ref" -H "Accept: application/vnd.github.raw" > "$out.part" \
+                && mv "$out.part" "$out" \
+                || { rm -f "$out.part"; echo "::warning::$repo $ref $path: not downloadable; the shop lists it as not available"; }
+            else
+              gh release download "$ref" --repo "$repo" --pattern "$path" --dir build/shop --clobber \
+                || echo "::warning::$repo $ref $path: not downloadable; the shop lists it as not available"
+            fi
           done
       - name: Pyodide, the pinned release
         run: curl -fsSL --retry 3 --create-dirs -o build/pyodide-core.tar.bz2 "$(python packaging/build_web.py --pyodide-url)"
