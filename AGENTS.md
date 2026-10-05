@@ -37,6 +37,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 | `mods/core-ot/` | the Octatrack's core: its RAM reserve and `.boot`, and from 0.2 its own hook bus (`bus.s`, with the draw site's gate in `gate.s`) |
 | `packaging/`, `.github/workflows/windows-build.yml`, `macos-build.yml` | the apps: `elekloader-<version>-windows.exe`, and `elekloader-<version>-macos.dmg` (signed and notarized), with core built in (`elekloader/bundled`, never committed) |
 | `js/` | the engine in TypeScript (GPL-3.0-or-later; js/README.md): the formats, the checks, the linker, the build and the web bridge, ported from the Python and matching it byte for byte, messages included (`js/tools/parity.ts` checks with your stock files) |
+| `js/src/kit/`, `js/tools/kit.ts`, `js/examples/minimal/`, `packaging/build_kit.py` | the kit for websites (docs/INTEGRATING.md): the builder worker, the page's client, the catalog format and elekloader's curated catalog, the lock and its checks. It names no website |
 | `web/`, `packaging/build_web.py`, `.github/workflows/pages.yml` | the web page (GitHub Pages): elekloader in Pyodide, in a worker; `bridge.py` is its only Python, a thin layer over `gui.LoaderModel` and `patch`; `catalog.json` is its mod shop's curated list (docs/WEB.md). Everything it loads comes from the site itself |
 
 Tests:
@@ -73,6 +74,10 @@ Rules:
   the Python accepts, writes or says needs the same change in its js/ port,
   and `node --test "js/test/*.test.ts"` and the parity run (js/README.md) to
   pass.
+- **The kit stays site-agnostic.** Nothing in js/src/kit names a website,
+  its pages or its accounts. A change to a call or a reply raises `PROTOCOL`
+  (js/src/kit/protocol.ts); a change to the catalog format raises
+  `CATALOG_SCHEMA`. docs/INTEGRATING.md changes with them.
 - **A change to the file format** needs docs/FORMAT.md, docs/ADAPTING.md and
   tests updated with it. Keep reading older files: the legacy `.dtmod`
   extension and `"dtmod"` key are still accepted.
