@@ -245,7 +245,9 @@ below was found again in 1.17.
     `.boot` to have run.
   - `elekloader.sdk.octabam` converts octabam's ColdFire-only modules to
     such mods, and whole remixes, which is how USB AUDIO IN converts
-    (docs/ADAPTING.md, 4b).
+    (docs/ADAPTING.md, 4b). With `--bus`, the hooks the bus serves (TUNER,
+    CC FEEDBACK, CC MAP, USB AUDIO OUT's producer) subscribe to its events
+    instead of patching their sites.
 - **Free space inside the image** (`image_free`, octabam's measured zero
   runs): `0x400c45b0-0x400c4702`, `0x400d24d0-0x400d2ce0` and
   `0x400d64e0-0x400d7c3c`. octabam pins code in these runs, and `fixed`

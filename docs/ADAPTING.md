@@ -607,6 +607,48 @@ python -m elekloader.sdk.octabam --octabam octabam --stock OCTATRACK_OS1.40C.syx
   of that, each module gets the usual checks above.
 - Like a bridge, a remix mod conflicts with each of its modules alone.
 
+**On the hook bus** (`--bus`): the hooks the Octatrack core's bus serves
+(core-ot 0.2) subscribe to its events instead of patching their sites.
+- **Which hooks.** The converter's `BUS` table names them, each read from
+  its module's own source:
+
+  | module | its hook | the bus event |
+  |---|---|---|
+  | TUNER | frame_isr's tail (0x4000d99a) | `ev_frame` |
+  | TUNER | the UI task's loop head (0x40056c72) | `ev_tick` |
+  | CC FEEDBACK | the key-repeat task's loop (0x4005595c, 120 Hz) | `ev_tick`, two sweeps a tick, so its rate stays the same |
+  | CC MAP | the CC entry of the MIDI dispatch (0x400d64a0) | `ev_midi`: it takes CC 62-73 and passes the rest on |
+  | USB AUDIO OUT, every layout and every `usb-io-*` remix | the per-block producer (0x4000d9a0) | `ev_frame` |
+
+  TUNER's TEMPO opener and the USB modules' other hooks are not bus events,
+  so they stay sites, as without `--bus`.
+- **What changes.** The hook's site is left stock. Generated glue
+  (`glue/ob_<name>_bus.s`) subscribes to the event and keeps the C
+  convention. It calls the hook's own code:
+  - CC FEEDBACK's `cf_sweep` already keeps the C convention, and is called
+    as it is;
+  - TUNER's and USB's stubs take every register as free and end by jumping
+    back to the firmware. Their one jump back is rewritten in the source to
+    reach the glue;
+  - CC MAP's cave passes a CC on through its `CC_NEXT`. The glue defines
+    `CC_NEXT`, instead of the stock handler's address.
+- **Versions.** Such a mod is versioned `<commit>-bus` and needs core-ot 0.2
+  or newer. With core 0.1 the linker refuses it (*"adds to table ev_frame,
+  which no given mod declares"*). Every other module converts exactly as
+  without `--bus`.
+- **The check also proves the bus hooks.** For each one:
+  - its site is stock in the linked image, and its glue is in the event's
+    table;
+  - a stub entered past its replay of the displaced instruction starts with
+    that instruction;
+  - a rewritten source assembles to octabam's bytes but for its jumps back
+    to the firmware, whose relocations name the glue;
+  - CC MAP's cave equals octabam's link (and its ratified bytes) but for
+    its `CC_NEXT` operand.
+
+  In a remix, the hook's 6 bytes octabam's build writes are the only other
+  bytes allowed to differ, and only while they are stock.
+
 What does not convert, and why:
 - **DSP code.** Modules with DSP code or an FX menu entry are out of scope,
   but for hook-only DSP code in a remix (above).

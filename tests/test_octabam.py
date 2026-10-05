@@ -619,6 +619,83 @@ def test_real_usb_io_remix_equals_octabams_build():
     assert any('equals octabam\'s build of %s' % name in x for x in lines), lines
 
 
+def convert_bus(names, tamper=None):
+    """Real modules converted with bus=True, written, built and checked -> {name: (plan, mod,
+    lines)}. `tamper(plan)` may change a plan before it is written."""
+    ob, img = real(), stock()
+    tools()
+    out = tempfile.mkdtemp()
+    done = {}
+    for n in names:
+        plan = octabam.convert(ob, n, img, DEV, bus=True)
+        if tamper:
+            tamper(plan)
+        path, mod = build.build(octabam.write(ob, plan, out), SYX, out)
+        lines = octabam.check(ob, plan, path, core(out), SYX, os.path.join(out, n + '.check'))
+        done[n] = (plan, mod, lines)
+    return done
+
+
+def test_real_modules_on_the_bus():
+    """--bus: TUNER, CC FEEDBACK, CC MAP and USB AUDIO OUT's producer subscribe to core-ot's
+    events through generated glue, with their hook sites left stock, and pass the check; a
+    module the bus does not serve converts exactly as without it."""
+    ob, img = real(), stock()
+    if not octabam.bare_metal(DEV):
+        raise Skip('the configured assembler is not bare metal (ELEKLOADER_CROSS=m68k-elf-)')
+    done = convert_bus(['tuner', 'cc-feedback', 'cc-map', 'usb-audio-out-main', 'quantizer'])
+    events = {'tuner': ['ev_frame', 'ev_tick'], 'cc-feedback': ['ev_tick'],
+              'cc-map': ['ev_midi'], 'usb-audio-out-main': ['ev_frame']}
+    for n, ev in events.items():
+        plan, mod, lines = done[n]
+        assert mod.version == ob.commit + '-bus', mod.version
+        assert [s['event'] for s in plan['json']['subscribe']] == ev, n
+        at = {s['addr'] for s in mod.sites}
+        assert not at & {h['site'] for h in plan['bus']}, n          # left stock
+        assert all(any('0x%08x (%s): left stock' % (h['site'], h['entry']) in x for x in lines)
+                   for h in plan['bus']), lines
+    assert any('but for 2 jump(s) back to 0x4000d9a0, 0x40056c78' in x
+               for x in done['tuner'][2]), done['tuner'][2]
+    assert any('but for 1 jump(s) back to 0x4000d9a6' in x
+               for x in done['usb-audio-out-main'][2]), done['usb-audio-out-main'][2]
+    assert 'CC_NEXT' not in done['cc-map'][0]['json'].get('defsym', {})
+    assert {s['addr'] for s in done['tuner'][1].sites} == {0x40059ef0}   # its TEMPO opener
+    plan0 = octabam.convert(ob, 'quantizer', img, DEV)
+    assert not done['quantizer'][0]['bus']
+    assert (plan0['json'], plan0['files']) == (done['quantizer'][0]['json'],
+                                               done['quantizer'][0]['files'])
+
+
+def test_real_bus_glue_is_checked():
+    """The check proves a source rewritten for the bus differs from octabam's only at its
+    jumps back to the firmware, and that a stub entered past its replay starts with it:
+    any other change, or a stub that does not, is refused."""
+    real()
+    if not octabam.bare_metal(DEV):
+        raise Skip('the configured assembler is not bare metal (ELEKLOADER_CROSS=m68k-elf-)')
+
+    def slower(plan):
+        (f,) = plan['bus_sources']
+        assert b'UPDATE_FRAMES, 400' in plan['files'][f]
+        plan['files'][f] = plan['files'][f].replace(b'UPDATE_FRAMES, 400', b'UPDATE_FRAMES, 401')
+    try:
+        convert_bus(['tuner'], slower)
+    except octabam.CheckError as e:
+        assert 'is not a jump back to the firmware' in str(e), str(e)
+    else:
+        raise AssertionError('a source changed beyond its jumps back passed')
+    spec = octabam.BUS[(0x4000D9A0, 'audio_frame_shim')]
+    spec['skip'] = True                             # its replay is at its end, not its start
+    try:
+        convert_bus(['usb-audio-out-main'])
+    except octabam.CheckError as e:
+        assert 'does not start with its replay' in str(e), str(e)
+    else:
+        raise AssertionError('a stub entered past a replay it does not start with passed')
+    finally:
+        spec['skip'] = False
+
+
 def test_real_overlapping_claims_do_not_combine():
     """octabam's ledger refuses MIDI SCENES with SCENES P2 (their Part-window
     claims overlap); so does the linker, by the claims' block names."""

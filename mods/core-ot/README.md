@@ -63,6 +63,11 @@ So the 34 mods of irpina/octabam2elemod v1.0 link with 0.2 as they did with
 0.1. Their code moves up by the size of core's own (216 bytes, rounded to
 their alignment), and the linker relocates it.
 
+`elekloader.sdk.octabam --bus` converts those modules' hooks onto the bus
+instead (docs/ADAPTING.md, 4b): TUNER, CC FEEDBACK, CC MAP, and USB AUDIO
+OUT's producer in every layout and `usb-io-*` remix. Those mods
+(`<commit>-bus`) need 0.2.
+
 ## Build
 
 Build it with the SDK (it needs m68k binutils):
