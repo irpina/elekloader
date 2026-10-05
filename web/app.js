@@ -150,6 +150,9 @@ const lib = { device: S.libDevice || (S.profiles.find(p => p.id === S.current) |
 const OWN = '\u0000own';                         // the "Your files" kind
 const cmpVer = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
 const shopItem = d => shop.items.find(e => e.available && e.sha256 === d.sha256);
+// why a shop file is not on the site: its release is not out, or its commit's file could not be fetched
+const unpublished = e => (e.commit ? `Its file at ${e.commit.slice(0, 7)} could not be fetched.`
+  : `Its release (${e.tag}) is not published yet.`);
 const owned = e => st.mods.find(d => !d.builtin && d.sha256 === e.sha256);
 
 // One card per mod: its files for each OS version of a device (a mod's ports)
@@ -298,6 +301,12 @@ function seeded(s) {                               // a small deterministic gene
 // a mod with none is drawn from its kind. `hue` nudges the kind's colour, so a
 // shelf of one kind still varies.
 const MOTIFS = [
+  { re: /digichain/, motif: 'kind', hue: 0 },     // its kind's drawing (Framework: a bus with taps)
+  { re: /digimono|digi mono/, motif: 'osc', hue: 0 },
+  { re: /digipoly|digi poly/, motif: 'chord', hue: 16 },
+  { re: /digimatrix|mod matrix/, motif: 'grid', hue: -14 },
+  { re: /digieq|master eq/, motif: 'eq', hue: -28 },
+  { re: /digiutils|digi utilities/, motif: 'scope', hue: 0 },
   { re: /tuner/, motif: 'needle', hue: -20 },
   { re: /sophie|percussion|metal/, motif: 'metal', hue: 0 },
   { re: /synth|\bfm\b/, motif: 'fm', hue: 10 },
@@ -574,6 +583,44 @@ function drawMotif(motif, en, { add, rnd, line, faint, dot, pt }) {
     add('rect', { x: 124, y: y + 15, width: 11, height: 11, fill: 'currentColor' });
     return true;
   }
+  case 'osc': {                                    // a voice's waveforms, two periods each: sine, saw, pulse
+    const p = 200 / 6, amp = 20 + 6 * rnd(), duty = 0.3 + 0.3 * rnd(), pts = [];
+    for (let x = 0; x <= 200; x++) {
+      const shape = Math.min(2, Math.floor(x / (2 * p))), t = (x % p) / p;
+      pts.push([x, 66 - amp * (shape === 0 ? Math.sin(2 * Math.PI * t) : shape === 1 ? 1 - 2 * t : t < duty ? 1 : -1)]);
+    }
+    poly(pts);
+    return true;
+  }
+  case 'chord': {                                  // chords in a piano roll: stacked notes on each trig
+    const chords = [[0, 4, 7], [0, 3, 7, 10], [0, 5, 9], [0, 4, 7, 11]];
+    for (let i = 0; i < 4; i++) {
+      const c = chords[Math.floor(rnd() * chords.length)], root = Math.floor(rnd() * 4), x = 8 + i * 48;
+      for (const n of c) add('rect', { x, y: 92 - 4 * (root + n), width: 28 + 8 * rnd(), height: 4, rx: 1, fill: 'currentColor' });
+    }
+    return true;
+  }
+  case 'eq': {                                     // a 4-band EQ's response, a handle on each band
+    const zero = 66, bands = [0.12, 0.36, 0.62, 0.88].map(f => [f * 200 + 10 * (rnd() - 0.5), 44 * (rnd() - 0.45), 14 + 16 * rnd()]);
+    const gain = x => Math.max(-28, Math.min(28, bands.reduce((s, [c, h, w]) => s + h * Math.exp(-(((x - c) / w) ** 2)), 0)));
+    add('line', { ...faint, x1: 0, y1: zero, x2: 200, y2: zero });
+    const pts = [];
+    for (let x = 0; x <= 200; x += 2) pts.push([x, zero - gain(x)]);
+    poly(pts);
+    for (const [c] of bands) dot(c, zero - gain(c), 3.5);
+    return true;
+  }
+  case 'scope': {                                  // a scope's graticule, and the live wave across it
+    for (let x = 25; x < 200; x += 50) add('line', { ...faint, x1: x, y1: 36, x2: x, y2: 96 });
+    add('line', { ...faint, x1: 0, y1: 66, x2: 200, y2: 66 });
+    const f = 2 + 2 * rnd(), ph = 6 * rnd(), pts = [];
+    for (let x = 0; x <= 200; x += 2) {
+      const a = 2 * Math.PI * f * x / 200;
+      pts.push([x, 66 - 19 * Math.sin(a) - 7 * Math.sin(3 * a + ph)]);
+    }
+    poly(pts);
+    return true;
+  }
   case 'din': {                                    // a MIDI DIN socket
     const cx = 100, cy = 66;
     add('circle', { ...line, cx, cy, r: 27 });
@@ -650,7 +697,7 @@ function renderNext() {
 // ---- the library: the kinds in the sidebar, device chips, a shelf per kind ----
 
 const KIND_HUE = { Sampling: 196, Performance: 268, Framework: 24, 'Whole build': 140, Synthesis: 232,
-  Sequencer: 176,
+  Sequencer: 176, Sound: 290, Utilities: 48,
   // octabam's kinds (elekloader.sdk.octabam takes its CATEGORY_TITLE)
   'Machines and the sequencer': 68, 'Parts, Kits and scenes': 104, 'MIDI and USB': 312, Fixes: 350 };
 
@@ -762,7 +809,7 @@ function card(en) {
           button),
         el('p', { class: 'summary' }, en.summary),
         s.otherOs ? el('p', { class: 'note' }, `Made for OS ${pick.os}; your stock file is OS ${st.stock.os}.`) : '',
-        !en.available && en.shop ? el('p', { class: 'note' }, `Its release (${en.shop[0].tag}) is not published yet.`) : ''),
+        !en.available && en.shop ? el('p', { class: 'note' }, unpublished(en.shop[0])) : ''),
       el('div', { class: 'card-foot' },
         el('span', {}, en.available && sites != null ? `${sites} patch sites` : ''),
         el('span', { class: 'links' },
@@ -794,7 +841,7 @@ function openSheet(en) {
       el('h4', {}, en.shop.length > 1 ? 'Files' : 'File'),
       el('p', { class: 'muted mono' }, en.shop.filter(x => x.available)
         .map(x => `${x.file}${en.shop.length > 1 ? ` (OS ${x.os})` : ''}\nsha256 ${x.sha256}`).join('\n')
-        || `Its release (${e.tag}) is not published yet.`),
+        || unpublished(e)),
     ];
   }
   // what has been checked on real hardware (the catalog's on_unit), under the description
@@ -822,9 +869,19 @@ async function shopAdd(files, btn) {
   btn.disabled = true;
   btn.textContent = 'Adding…';
   const e = files[0];
+  // the shop mods these need besides the core (digichain for Digi Mono), for the same OS: added first, so
+  // ticking finds them
+  const needs = new Set(files.flatMap(x => (x.requires || []).filter(r => r !== 'core')));
+  const best = new Map();
+  for (const i of shop.items.filter(i => i.available && needs.has(i.id) && !owned(i)
+    && files.some(x => x.device === i.device && x.os === i.os))) {
+    const k = i.id + '|' + i.os, was = best.get(k);
+    if (!was || cmpVer(i.version, was.version) > 0) best.set(k, i);
+  }
+  const extra = [...best.values()];
   try {
     let ticked = false;
-    for (const x of files) {
+    for (const x of [...extra, ...files]) {
       const r0 = await fetch(new URL('shop/' + x.file, import.meta.url));
       if (!r0.ok) throw new Error(`${x.file}: ${r0.status} ${r0.statusText}`);
       const r = await addMod(x.file, await r0.arrayBuffer(), false, x.sha256);
@@ -837,7 +894,8 @@ async function shopAdd(files, btn) {
     }
     remember();
     changed();
-    toast(`${e.title} ${e.version} added` + (ticked ? ' and ticked.' : files.length > 1
+    const also = extra.length ? ` with ${[...new Set(extra.map(x => x.title))].join(', ')}, which it needs,` : '';
+    toast(`${e.title} ${e.version} added` + also + (ticked ? ' and ticked.' : files.length > 1
       ? ` to your mods, for OS ${files.map(x => x.os).join(' and ')}.` : ' to your mods.'));
   } catch (err) {
     note('Not added: ' + err.message);

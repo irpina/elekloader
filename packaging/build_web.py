@@ -17,11 +17,12 @@ The site holds:
   - core/: the core mods given (the release's), and the cores the catalog
     lists, with core/index.json;
   - shop/: the mod shop: each mod web/catalog.json lists, taken from its
-    author's release (the workflow downloads them into --catalog-dir),
-    checked against the sha256 the catalog pins, and listed in
-    shop/index.json with what its file says about it. A mod goes in only
-    under a licence that allows passing it on (SHOP_LICENCES); one whose
-    file is not there (a draft release) is listed as not available;
+    author's release or from their repository at a commit (the workflow
+    downloads them into --catalog-dir), checked against the sha256 the
+    catalog pins, and listed in shop/index.json with what its file says
+    about it. A mod goes in only under a licence that allows passing it on
+    (SHOP_LICENCES); one whose file is not there (a draft release) is listed
+    as not available;
   - pyodide/: the pinned Pyodide's runtime, five files from its core
     tarball, which is checked against its sha256 first;
   - LICENSE.txt, NOTICE.txt, pyodide/NOTICE.txt, and build.json (what went in).
@@ -36,6 +37,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -139,13 +141,34 @@ def cores(paths):
 
 
 def read_catalog(path):
+    """The catalog's items. Each names its file one of two ways: an asset of a
+    GitHub release (`tag`, `file`), or a file in the repository at a commit
+    (`commit`, `path`), whose `file` is then the path's last part."""
     with open(path, encoding='utf-8') as fh:
         doc = json.load(fh)
+    names = set()
     for it in doc['items']:
-        for k in ('repo', 'tag', 'file', 'sha256', 'device'):
+        at = 'commit' in it
+        for k in ('repo', 'sha256', 'device') + (('commit', 'path') if at else ('tag', 'file')):
             if not it.get(k):
                 sys.exit('%s: an item has no "%s"' % (path, k))
+        if at:
+            if 'file' in it or 'tag' in it:
+                sys.exit("%s: %s: a commit's file is named by its path alone" % (path, it['path']))
+            if (not re.fullmatch('[0-9a-f]{40}', it['commit'])
+                    or not re.fullmatch(r'[\w.-]+(/[\w.-]+)*', it['path']) or '..' in it['path'].split('/')):
+                sys.exit('%s: %s at %s: the whole commit id, and a plain path in the repository'
+                         % (path, it['path'], it['commit']))
+            it['file'] = it['path'].rsplit('/', 1)[-1]
+        if it['file'] in names:              # they are all downloaded into one folder
+            sys.exit('%s: two items named %s' % (path, it['file']))
+        names.add(it['file'])
     return doc['items']
+
+
+def source(it):
+    """Where a catalog item's file comes from, in a few words."""
+    return it['repo'] + ' ' + (it['commit'][:7] if it.get('commit') else it['tag'])
 
 
 def shop(path, folder):
@@ -155,14 +178,17 @@ def shop(path, folder):
     for it in read_catalog(path):
         f = it['file']
         base = {'file': f, 'sha256': it['sha256'], 'device': it['device'], 'repo': it['repo'],
-                'tag': it['tag'], 'homepage': 'https://github.com/' + it['repo'],
-                'release_url': 'https://github.com/%s/releases/tag/%s' % (it['repo'], it['tag']),
+                'tag': it.get('tag'), 'commit': it.get('commit'),
+                'homepage': 'https://github.com/' + it['repo'],
+                'release_url': ('https://github.com/%s/blob/%s/%s' % (it['repo'], it['commit'], it['path'])
+                                if 'commit' in it else
+                                'https://github.com/%s/releases/tag/%s' % (it['repo'], it['tag'])),
                 'summary': it.get('summary', ''), 'needs_core': it.get('needs_core'),
                 'on_unit': it.get('on_unit', '')}
         p = os.path.join(folder, f) if folder else ''
         if not p or not os.path.exists(p):
-            print('WARNING: %s (%s %s) is not there: the shop lists it as not available'
-                  % (f, it['repo'], it['tag']))
+            print('WARNING: %s (%s) is not there: the shop lists it as not available'
+                  % (f, source(it)))
             if it.get('kind') != 'core':
                 out.append((dict(base, available=False, title=it.get('title', f),
                                  version=it.get('version', '')), None))
@@ -183,7 +209,7 @@ def shop(path, folder):
                 sys.exit('%s is listed as a core but is %r' % (f, m.id))
             cs.append(({'file': f, 'sha256': it['sha256'], 'id': m.id, 'version': m.version,
                         'device': m.dev.key, 'os': m.rel.version,
-                        'from': it['repo'] + ' ' + it['tag']}, raw))
+                        'from': source(it)}, raw))
             continue
         v2 = isinstance(m, link.Mod2)
         out.append((dict(base, available=True, id=m.id, version=m.version,
@@ -207,7 +233,8 @@ def main(argv=None):
     ap.add_argument('--catalog', help="the mod shop's curated list (web/catalog.json)")
     ap.add_argument('--catalog-dir', help='where its files were downloaded')
     ap.add_argument('--catalog-list', metavar='CATALOG',
-                    help='print each item as "repo tag file", for the download')
+                    help='print each item as "release repo tag file" or "commit repo '
+                         'commit path", for the download')
     ap.add_argument('--out', help='the site folder to write (emptied first)')
     a = ap.parse_args(argv)
     if a.pyodide_url:
@@ -215,7 +242,8 @@ def main(argv=None):
         return 0
     if a.catalog_list:
         for it in read_catalog(a.catalog_list):
-            print(it['repo'], it['tag'], it['file'])
+            print(*(('commit', it['repo'], it['commit'], it['path']) if 'commit' in it
+                    else ('release', it['repo'], it['tag'], it['file'])))
         return 0
     if not a.pyodide or not a.out:
         ap.error('--pyodide and --out are required')
@@ -268,7 +296,7 @@ def main(argv=None):
         'pyodide': PYODIDE_VERSION, 'pyodide_tarball_sha256': PYODIDE_SHA256,
         'cores': [c for c, _ in cs],
         'shop': [{'file': e['file'], 'sha256': e['sha256'], 'available': e['available'],
-                  'from': e['repo'] + ' ' + e['tag']} for e, _ in items],
+                  'from': source(e)} for e, _ in items],
         'files': {n: sha(b) for n, b in sorted(site.items())},
     }, indent=1).encode()
     for n, b in site.items():
