@@ -36,6 +36,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 | `mods/core/`, `mods/core-dn1/`, `mods/core-dt2/` | the core mod (the hook bus every format-2 mod needs): one `core.s` (with `settings.s`, `render.s` and `fast.s` where the device uses them), each device's addresses and sites in its `mod.json`, each further OS version's in its `ports` |
 | `mods/core-ot/` | the Octatrack's core: its RAM reserve and `.boot`, and from 0.2 its own hook bus (`bus.s`, with the draw site's gate in `gate.s`) |
 | `packaging/`, `.github/workflows/windows-build.yml`, `macos-build.yml` | the apps: `elekloader-<version>-windows.exe`, and `elekloader-<version>-macos.dmg` (signed and notarized), with core built in (`elekloader/bundled`, never committed) |
+| `js/` | the engine in TypeScript (GPL-3.0-or-later; js/README.md): the formats, the checks, the linker, the build and the web bridge, ported from the Python and matching it byte for byte, messages included (`js/tools/parity.ts` checks with your stock files) |
 | `web/`, `packaging/build_web.py`, `.github/workflows/pages.yml` | the web page (GitHub Pages): elekloader in Pyodide, in a worker; `bridge.py` is its only Python, a thin layer over `gui.LoaderModel` and `patch`; `catalog.json` is its mod shop's curated list (docs/WEB.md). Everything it loads comes from the site itself |
 
 Tests:
@@ -68,6 +69,10 @@ Rules:
 - **Device-specific facts belong in `devices/`**, not in the code paths.
   A new device needs its profile, a writer that reproduces its stock files
   byte for byte, and tests (docs/DEVICES.md).
+- **The TypeScript engine (js/) changes with the Python.** A change to what
+  the Python accepts, writes or says needs the same change in its js/ port,
+  and `node --test "js/test/*.test.ts"` and the parity run (js/README.md) to
+  pass.
 - **A change to the file format** needs docs/FORMAT.md, docs/ADAPTING.md and
   tests updated with it. Keep reading older files: the legacy `.dtmod`
   extension and `"dtmod"` key are still accepted.

@@ -23,6 +23,15 @@ under the GNU GPL version 2 or (at your option) any later version. Each file nam
                                  dt2/build.py, by Em D; changes by irpina
   elekloader/isa/coldfire.py     emu/cfisa.py, by irpina
 
+The TypeScript engine
+---------------------
+js/ is elekloader ported to TypeScript, under the GNU GPL version 3 or (at
+your option) any later version (js/LICENSE): the files above, ported there,
+are used under version 3. js/src/isa/coldfire.ts comes from modwerk
+(https://github.com/repeat98/modwerk, src/engine/elektron/coldfire-isa.ts,
+GPL-3.0-or-later, by repeat98), which ported it from
+elekloader/isa/coldfire.py; changes by irpina.
+
 Firmware formats
 ----------------
 The ELE3 container, the SysEx transport and the packing format were first
