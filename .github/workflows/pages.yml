@@ -49,7 +49,9 @@ jobs:
           node-version: "24"
           package-manager-cache: false
       - name: Unit tests
-        run: python tests/test_units.py
+        run: |
+          python tests/test_units.py
+          node --test "js/test/*.test.ts"
       - name: The core mods, from the latest release
         run: |
           tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)

@@ -248,6 +248,11 @@ Python. For the same stock file and mods it writes the same files, byte for
 byte, and refuses the same things with the same messages; its tools compare
 it with the Python on your own files. It is GPL-3.0-or-later.
 
+Any website can build firmware in its visitors' browsers with it: the kit
+gives a site the builder worker, a client for its pages, and elekloader's
+curated catalog of cores and mods, each pinned by sha256. See
+[docs/INTEGRATING.md](docs/INTEGRATING.md).
+
 ## The Windows app
 
 `packaging/build_windows.py --core core-2.1.elemod [core-dn1-2.0a.elemod ...]` builds
