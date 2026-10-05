@@ -51,18 +51,22 @@ the Digitone needs it. On its own it changes nothing the unit does.
   hold first. The four UI sites go to `core_dn_tick`, `core_dn_draw`,
   `core_dn_key` and `core_dn_enc`, which see to the menu and go on to
   core.s's (docs/ADAPTING.md, "The Mod Menu").
+- **From 2.3, the menu is a grid of icons:** tiles two across and two down,
+  each an entry's 16 x 16 icon over its label, with a scroll bar; the
+  arrows move by tile and row. A descriptor may add the tag `0x49434F4E`
+  ("ICON") and an icon after its `open`; one without (2.2's) gets a chip.
 - **OS 1.44:** every site has its port (`ports` in mod.json): the same
   code, moved, and RAM 0x1000 further on.
 
 Build it with the SDK (it needs m68k binutils):
 
 ```bash
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-2.2.elemod
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-2.2-os1.44.elemod
-python -m elekloader.lint mods/core-dn1/out/core-2.2-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-2.3.elemod
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-2.3-os1.44.elemod
+python -m elekloader.lint mods/core-dn1/out/core-2.3-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
 ```
 
-A release names them `core-dn1-2.2.elemod` and `core-dn1-2.2-os1.44.elemod`.
+A release names them `core-dn1-2.3.elemod` and `core-dn1-2.3-os1.44.elemod`.
 
 Checked by cold-booting it in digikit's emulator against stock (docs/DEVICES.md):
 - every stage passes, and every screen is identical;

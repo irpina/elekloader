@@ -293,18 +293,44 @@ the template copy of slot -1's load (by jsr).
 
 Holding a track key (T1-T4) on its own, about half a second, is core's: it
 calls the handlers of `ev_hold` first, and when none takes it, it opens the
-Mod Menu, a screen listing what mods contributed to the table `core_menu`.
+Mod Menu, a screen of what mods contributed to the table `core_menu`.
 Each entry is a pointer to a descriptor:
 
 | offset | field | |
 |---|---|---|
-| +0 | name | its line in the menu, about 20 characters |
+| +0 | name | its label in the menu, 14 characters (core-dn1 2.2's list showed about 20) |
 | +4 | open | `void open(void *brain, void *event, int track)`: picked. `event` is the key's that picked it, `track` the one held (0-3); with them a mod can open its page (`core_page_open`) or a screen of its own |
+| +8 | tag | from core-dn1 2.3, optional: `0x49434F4E` ("ICON") when an icon follows |
+| +12 | icon | 16 rows of 16 pixels, an `unsigned short` each: the top row first, bit 15 the left pixel. 0 for core's own |
 
-In the menu UP and DOWN or any knob move the selection, YES or trig key N
-picks, NO or holding a track key again closes it, and a page key (TRIG ...
-LFO) closes it and goes on to its page; PLAY, STOP, FUNC and the track keys
-work as ever. A mod takes the hold from `ev_hold` when it has a better use
+From core-dn1 2.3 the menu is a grid of tiles like an old PDA's launcher,
+two across and two down with a scroll bar beside them. A tile has the
+entry's icon over its label and, in its corner, the trig key that picks it;
+the selected tile is drawn inverted, and a slot past the last entry shows
+only its corners. An entry without an icon (a 2.2 descriptor of eight
+bytes, or 0 at +12) gets core's own, a chip. Core 2.2 reads only +0 and
++4, so a descriptor with an icon works with either core; core 2.3 reads
+the four bytes after a 2.2 descriptor too, and takes an icon only when
+they are the exact tag. digitables' TABLES, in C:
+
+```c
+static const unsigned short digitables_icon[16] = {    /* table 1 as bars */
+    0x0000, 0x0e00, 0x0e00, 0x0e00, 0x0e00, 0x0ee0, 0x0ee0, 0x0ee0,
+    0x0eee, 0x0eee, 0x0eee, 0xeeee, 0xeeee, 0x0000, 0xffff, 0x0000
+};
+
+const struct {
+    const char *name;
+    void (*open)(void *brain, void *ev, int track);
+    unsigned long tag;                  /* 0x49434F4E, "ICON": an icon follows */
+    const unsigned short *icon;
+} digitables_menu = { "TABLES", digitables_menu_open, 0x49434F4EUL, digitables_icon };
+```
+
+In the menu the arrows or any knob move the selection (UP and DOWN a row,
+LEFT, RIGHT and the knobs a tile), YES or trig key N picks, NO or holding a
+track key again closes it, and a page key (TRIG ... LFO) closes it and goes
+on to its page; PLAY, STOP, FUNC and the track keys work as ever. A mod takes the hold from `ev_hold` when it has a better use
 for it where it is: the macro mod lists TABLES (its TBL page) in the menu,
 and opens its table editor when the hold comes with the TBL page on screen.
 
