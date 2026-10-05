@@ -129,7 +129,7 @@ export class Mod2 implements AnyMod {
         const [a, b] = unpack(ab, 2)
         return [int(a, what), int(b, what)] as [number, number]
       })
-      if (!('to' in c)) throw new KeyError(repr('to'))
+      if (!isDict(c) || !('to' in c)) throw new KeyError(repr('to'))
       this.contribute.push({ to: str(c.to), order: int(get(c, 'order', 50), what), data, relocs: rel, claims, i })
     })
     this.copied = iter(get(doc, 'copied', [])).map(c => {
