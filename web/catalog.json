@@ -42,6 +42,18 @@
       "summary": "SYSTEM INFO shows CPU, DSP and free RAM in the top bar."
     },
     {
+      "repo": "irpina/digitables", "tag": "v1.3", "file": "core-dn1-2.2.elemod", "kind": "core",
+      "device": "digitone-mk1",
+      "sha256": "29e41968bc4789c0082b4387c1ccdde9bc36f1db5d87f5777a56f383328e5f21"
+    },
+    {
+      "repo": "irpina/digitables", "tag": "v1.3", "file": "digitables-1.3.elemod",
+      "device": "digitone-mk1", "needs_core": "2.2",
+      "sha256": "a9a2335d0f0c80c17103062bb731a3560af5aca3b05b1b4650713dd273ca5511",
+      "summary": "Pitch tables for every note: arpeggios, trills and riffs from one trig, and ADD steps that strum chords.",
+      "on_unit": "Tested on a Digitone mk1 (3-4 Oct 2026): the TBL page, the table editor, the fast speeds, the Mod Menu and ADD steps. Not yet checked: the tables restored at power-up, and the arpeggiator with tables."
+    },
+    {
       "repo": "irpina/digineighbor", "tag": "v0.6", "file": "digineighbor-0.6.elemod",
       "device": "digitakt-mk1", "needs_core": "2.1", "title": "digineighbor", "version": "0.6",
       "sha256": "380837f86c05cf6d0aba2dfc930a4309cc6b2e99b2e8c6a450f0abe6e844dccd",
