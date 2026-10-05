@@ -1,8 +1,8 @@
 {
- "id": "core", "version": "2.2",
+ "id": "core", "version": "2.3",
  "license": "GPL-2.0-or-later",
  "title": "core", "category": "Framework", "author": "irpina",
- "description": "The boot copier and the hook bus for the Digitone mk1 and Digitone Keys: every other mod needs it. From 2.1 also the voice note-on event, parameter slots, mod pages and project data, and from 2.2 the Mod Menu (hold a track key). On its own it changes nothing the unit does.",
+ "description": "The boot copier and the hook bus for the Digitone mk1 and Digitone Keys: every other mod needs it. From 2.1 also the voice note-on event, parameter slots, mod pages and project data, from 2.2 the Mod Menu (hold a track key), and from 2.3 its grid of icons. On its own it changes nothing the unit does.",
  "device": "digitone-mk1", "os": "1.43",
  "sources": ["../core/core.s", "../core/settings.s", "../core/render.s", "voice.s", "params.s", "pages.s", "projdata.s", "menu.s"],
  "defsym": {
