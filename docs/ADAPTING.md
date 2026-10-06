@@ -678,7 +678,8 @@ python -m elekloader.sdk.octabam --octabam octabam --stock OCTATRACK_OS1.40C.syx
     `P:0x88`;
   - SPATIALIZER's dispatch on payload A pointed at the null stub;
   - the FX1 and FX2 choosers without SPATIALIZER, and their row tables.
-  So these mods take SPATIALIZER off both FX menus, as the remixes do.
+  So these mods take SPATIALIZER off both FX menus, as the remixes do. With
+  `--bus`, the DSP bus does that instead (below).
 - **The check** links the mod with the core and requires the OS image to
   equal octabam's build in every byte. The only exceptions are the address
   operands of our placed code and the descriptor served from a copy. On top
@@ -726,6 +727,23 @@ python -m elekloader.sdk.octabam --octabam octabam --stock OCTATRACK_OS1.40C.syx
 
   In a remix, the hook's 6 bytes octabam's build writes are the only other
   bytes allowed to differ, and only while they are stock.
+- **The DSP bus too.** USB AUDIO IN's RX inject hooks payload A's P:0x88,
+  which the DSP bus serves (`mods/dspbus-ot`, `ev_dsp_rx`), and every
+  `usb-io-*` remix gives up SPATIALIZER, as the bus does. So with `--bus`:
+  - the remix's mod leaves the hook, the FX menus and SPATIALIZER's words to
+    the bus. Its inject source is assembled into the mod (`"dsp"`, with
+    octabam's dsp_asm: set `ELEKLOADER_DSP_ASM`), and subscribes to
+    `ev_dsp_rx` past its replay of the displaced instruction
+    (`"addend": 2`, the instruction's two words);
+  - it requires the DSP bus (`"requires": ["core", "dspbus"]`);
+  - the check links it with the bus (built from `mods/dspbus-ot`, or
+    `--dspbus`). The image must equal octabam's build but for the hook's
+    jump and the bus's table, so the inject is where octabam placed it and
+    the menus are what its build writes. The inject must begin with the
+    instruction its hook displaces.
+
+  A remix that gives up another effect, or a DSP hook elsewhere, is refused
+  with `--bus`.
 
 What does not convert, and why:
 - **DSP code.** Modules with DSP code or an FX menu entry are out of scope,
