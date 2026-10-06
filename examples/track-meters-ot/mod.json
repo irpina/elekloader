@@ -1,0 +1,17 @@
+{
+ "id": "track-meters",
+ "version": "1.0",
+ "title": "Track meters",
+ "category": "Examples",
+ "license": "GPL-2.0-or-later",
+ "description": "Eight live track meters (post-FX, pre-fader) in the screen's bottom-right corner, over every page. A demo of the Octatrack core's hook bus: it reads the audio in the frame interrupt beside TUNER and the USB audio mods, and draws over the screen beside any other mod that does.",
+ "device": "octatrack",
+ "os": "1.40C",
+ "sources": ["meters.c"],
+ "subscribe": [
+  {"event": "ev_frame", "fn": "meters_frame", "order": 60},
+  {"event": "ev_tick", "fn": "meters_tick", "order": 60},
+  {"event": "ev_draw", "fn": "meters_draw", "order": 70}
+ ],
+ "requires": ["core"]
+}

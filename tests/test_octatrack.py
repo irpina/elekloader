@@ -460,6 +460,32 @@ def test_cc_who_runs_before_and_after():
         (ln.map['ccwho_first'], ln.map['ccwho_last'], 0)
 
 
+def test_two_mods_draw_over_the_screen():
+    """examples/track-meters-ot and cc-who-ot together: both draw (ev_draw lists the meters,
+    then CC WHO, by order), and both count ticks; the meters read the audio frame."""
+    import shutil
+    from elekloader.sdk import build
+    need(SYX)
+    if not shutil.which(os.environ.get('ELEKLOADER_CROSS', DEV.toolchain['prefix']) + 'gcc'):
+        raise Skip('no m68k cross compiler')
+    st, img = stock()
+    with tempfile.TemporaryDirectory() as tmp:
+        core, _m = build.build(os.path.join(ROOT, 'mods', 'core-ot'), SYX, tmp)
+        meters, _m = build.build(os.path.join(ROOT, 'examples', 'track-meters-ot'), SYX, tmp)
+        who, _m = build.build(os.path.join(ROOT, 'examples', 'cc-who-ot'), SYX, tmp)
+        ln = link.link([elemod.load_any(p) for p in (core, meters, who)], img)
+    counts = {t: ln.tables[t][1] for t in ln.tables}
+    assert counts == {'ev_draw': 2, 'ev_enc': 0, 'ev_frame': 1, 'ev_key': 0, 'ev_midi': 2,
+                      'ev_tick': 2}, counts
+
+    def table(ev):
+        at, n, _w = ln.tables[ev]
+        o = ln.layout['run_load'] + (at - DEV.ddr[0]) - DEV.main_load
+        return struct.unpack('>%dI' % (n + 1), ln.image[o:o + 4 * (n + 1)])
+    assert table('ev_draw') == (ln.map['meters_draw'], ln.map['ccwho_draw'], 0)
+    assert table('ev_frame') == (ln.map['meters_frame'], 0)
+
+
 def test_mkmod_diff_round_trip():
     st, img = stock()
     blob = bytes(range(200))
