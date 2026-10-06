@@ -83,6 +83,14 @@ A format-2 mod is a relocatable object:
    - The core's `boot` copies the RAM image and zeroes `.bss`, using the
      symbols the linker defines: `__run_load`, `__run_start`,
      `__run_words`, `__bss_start`, `__bss_end`, `__bss_words`.
+   - On a device whose RAM for mods is taken from the OS (the profile's
+     `reserve`: the Octatrack's sample memory), a core may take only what
+     the mods use. When a mod imports one of the profile's reserve
+     symbols, and none exports one, the linker counts n, the units the
+     mods' RAM fills (at least one), and defines each symbol as a + b·n;
+     the layout then says `reserve: {units, end}`. The Octatrack's are
+     `arena_base`, `__arena_pages`, `__arena_fill` and `__arena_clear`
+     (core-ot 0.3). The RAM budget is still the device's `ddr`.
 3. **Builds the tables.** Each table's entries are sorted by (`order`, mod
    id), followed by one zero entry. A table defines two symbols: `NAME` (its
    address) and `NAME_n` (its count). Each `.fast` section is added to the

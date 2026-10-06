@@ -71,6 +71,12 @@ function plan(configPath: string, casesPath: string) {
   for (const m of ob) add(`ot octabam ${m}`, 'ot', [f('octabam', 'core-0.1.elemod'), f('octabam', m)])
   add('ot octabam all', 'ot', [f('octabam', 'core-0.1.elemod'), ...ob.map(m => f('octabam', m))])
   add('ot core-ot 0.1 + tuner', 'ot', [f('release', 'core-ot-0.1.elemod'), f('octabam', 'octabam-tuner-363861e.elemod')])
+  // a core that sizes its RAM reserve to the mods (optional: files.slimcore, core-ot 0.3)
+  if (cfg.files.slimcore) {
+    add('ot sized core alone', 'ot', [cfg.files.slimcore])
+    for (const m of ob) add(`ot sized core + ${m}`, 'ot', [cfg.files.slimcore, f('octabam', m)])
+    add('ot sized core + octabam all', 'ot', [cfg.files.slimcore, ...ob.map(m => f('octabam', m))])
+  }
 
   // broken copies of a real mod: every refusal must read the same
   const scratch = cfg.scratch
