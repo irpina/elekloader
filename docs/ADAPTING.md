@@ -393,6 +393,7 @@ small square in the top-right corner of every screen. For the Digitakt II,
 | `sites` | patches to the stock image: `{"addr", "stock", "op", "target" or "new"}` (below) |
 | `collections`, `contribute` | tables you declare, and entries you add to others' ([FORMAT.md](FORMAT.md)) |
 | `weak` | names you import that may be missing; they then read as zero |
+| `dsp`, `subscribe_dsp` | DSP code, on a device whose OS runs some (below, "DSP code") |
 | `resources`, `requires`, `conflicts` | rules 9 and 11 |
 | `ports` | the same mod for other OS versions of the device: per OS, the keys that differ there (3.10) |
 
@@ -410,9 +411,10 @@ entry. `stock` is the hex of the whole stock instruction(s) at `addr`;
 | `keep2` | the stock opcode word, then `target`'s address (a `jsr.l`/`lea.l` you redirect) |
 | `ptr` | `target`'s address (4 bytes of data, e.g. a vtable entry) |
 | `bytes` | `new`, in hex; add `"kind": "code"` if they are instructions |
+| `dsp_jsr` | `jsr >target` over one two-word DSP instruction (6 bytes) in a DSP payload |
 
 A site with a `target` may also give `"addend": N`: the address used is the
-target's plus N bytes.
+target's plus N bytes (N words for `dsp_jsr`).
 
 The routine a `jsr` site calls must do the displaced instruction's work
 and keep every register the surrounding code relies on.
@@ -432,6 +434,40 @@ This assembles `page.s` for that address.
   loads in any elekloader that loads format 2.
 - Use it when other code must find the code at a known address. Otherwise
   put code in `.run`.
+
+**DSP code (the Octatrack).** The Octatrack's main OS uploads code to its
+two DSP56300 cores at boot (payload A runs on core 0, B on core 1). A mod
+can carry DSP code too. It is placed in P memory that another mod frees:
+the profile lists those areas (`dsp_areas`), and the mod that frees one
+claims its name, for example `dsp:harvest:SPATIALIZER` (payload A's 261
+words at P:0xaa8, the SPATIALIZER effect's code). Without that mod, yours is
+refused.
+
+```json
+ "dsp": [{"source": "inject.asm", "payload": "A"}],
+ "subscribe_dsp": [{"event": "ev_dsp_rx", "fn": "inject", "order": 20}]
+```
+
+- The SDK assembles each source with octabam's `dsp_asm` (its
+  `vendor/dsp56300` build). Point `ELEKLOADER_DSP_ASM` at it, or put it on
+  the `PATH`. The syntax is dsp_asm's: one instruction a line, `;`
+  comments, `label:`.
+- Your labels become symbols of the mod, at DSP word addresses, so
+  `subscribe_dsp`, sites and other mods can name them.
+- The SDK assembles each source at two origins. A word that moves with the
+  origin holds an address in your code, so it becomes a relocation, and the
+  linker writes the address where the code lands. A short or packed address
+  (one that is not a whole word) cannot be moved, and the build refuses it.
+  Branches (`bra`, `bsr`, `bcc`) are relative and need nothing.
+- `subscribe_dsp` adds `jsr >fn` (plus `addend` words) to a DSP table, in
+  `order`. A DSP table is declared as `{"entry": 6, "space": "dsp.A",
+  "head": hex, "end": hex}` under `collections`: its words are the head,
+  the entries, then the end (FORMAT.md, "DSP code").
+- `dsp_jsr` hooks one two-word instruction of a payload: its `stock` is
+  those 6 bytes (24-bit little-endian words, as the payload holds them).
+  What it calls must do the displaced instruction's work.
+- Test DSP code under a DSP emulator before any hardware: octabam's
+  `ot_emu --dsp` runs both cores.
 
 **3.5 Build it.**
 
@@ -747,6 +783,11 @@ Some differences from an octabam build, by design:
 | `PC-relative, inside ... copied block` | a site in FAST AUDIO's block branches relatively | use an absolute `jmp`/`jsr` |
 | `both claim N` | two mods use the same named resource | pick another SysEx id, row name or path |
 | `is a whole build: it cannot be combined` | a format-1 mod was mixed with format-2 mods | use one or the other; see section 4 |
+| `has DSP code for payload A, which needs a mod that frees DSP memory there` | nothing frees P memory for DSP code | add the mod that claims the name the message gives |
+| `the DSP code for payload A needs P words to ...` | the DSP code and tables do not fit in the freed words | shrink your DSP code |
+| `holds an address the linker cannot place` (SDK) | a label used as a short or packed operand | use a form that takes the address as a whole word (`>`); branches are relative |
+| `is a DSP reference to a ColdFire address` (or the reverse) | a `dsp24` relocation names a ColdFire symbol, or a ColdFire one a DSP label | name the right symbol; DSP labels are word addresses on the DSP |
+| `dsp_asm is not installed` | the SDK needs octabam's DSP assembler | build octabam's `vendor/dsp56300` and set `ELEKLOADER_DSP_ASM` |
 
 ## 6. Definition of done
 

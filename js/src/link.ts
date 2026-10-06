@@ -6,11 +6,18 @@
 // it defines and exports, what it imports (some weakly), relocations, sites with relocations of their own, the tables
 // it declares and the entries it adds to other mods' tables, and its resources. A relocation target is "sym:NAME"
 // (its own symbol, else another mod's export, else, if the import is weak, core_zero), "sec:NAME" or "abs".
+//
+// On a device with DSP code in its main OS (the profile's dspPayloads), a mod may also carry DSP56300 code, `.dsp.<payload>`
+// sections of 24-bit little-endian words, and declare DSP tables (a collection with "space": "dsp.<payload>"). They are
+// placed in the P words of that payload a mod frees by claiming the area's name (the profile's dspAreas); a symbol there
+// is a DSP word address, and a `dsp24` relocation writes one as three little-endian bytes.
 import { concat, sha } from './bytes.ts'
 import { type Device, type Release, imageEnd, linkable } from './devices.ts'
+import { pSpan } from './dsp.ts'
 import {
-  type AnyMod, type Part, type Region, type Site, type Span, COMMON, ModError, commonChecks, formatOf, get, hexBytes, insnCheck,
-  int, isDict, iter, overlaps, parseParts, parseResources, parseSites, partsBytes, partsLen, pyEq, resolveTarget, summarize, unpack,
+  type AnyMod, type Part, type Region, type Site, type Span, COMMON, ModError, RSIZE, commonChecks, formatOf, get, hexBytes,
+  insnCheck, int, isDict, iter, overlaps, parseParts, parseResources, parseSites, partsBytes, partsLen, pyEq, resolveTarget,
+  summarize, unpack,
 } from './elemod.ts'
 import { PCREL, decodeColdFire, readerAt } from './isa/coldfire.ts'
 import { AttributeError, KeyError, PyException, ValueError, hex8, pyType, repr, str } from './py.ts'
@@ -20,12 +27,20 @@ export class StructError extends PyException {}
 
 export const FORMAT2 = 2
 const SECTIONS = ['.boot', '.run', '.fast', '.bss']
-const RTYPES = ['abs32', 'pc32', 'pc16']
+const RTYPES = ['abs32', 'pc32', 'pc16', 'dsp24']
+const DSP = '.dsp.'                         // a DSP section: '.dsp.' + its payload's tag
 const FAST_ENTRY = 16                       // a .fast copy entry: src, dst, len, 0
 const MAX_ALIGN = 4096                      // a section's alignment: a power of two up to this
 const LINKER_SYMS = new Set(['__run_load', '__run_start', '__run_words', '__bss_start', '__bss_end', '__bss_words'])
 
 const align = (v: number, a: number) => Math.ceil(v / a) * a
+const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+const hexw = (v: number, w: number) => v.toString(16).padStart(w, '0')
+
+/** The payload tag of a DSP section name, or null. */
+function dspTag(dev: Device, sec: string): string | null {
+  return sec.startsWith(DSP) && Object.hasOwn(dev.dspPayloads, sec.slice(DSP.length)) ? sec.slice(DSP.length) : null
+}
 
 /** d.items() of a JSON dict, or Python's AttributeError. */
 function items(d: unknown): [string, any][] {
@@ -54,6 +69,7 @@ export class Mod2 implements AnyMod {
   relocs: [string, number, string, string, number][]
   sites: Site[]
   collections: Map<string, number>
+  dspTables: Map<string, [string, Uint8Array, Uint8Array]>   // name -> [payload tag, head, end]
   contribute: Contribution[]
   copied: [number, number, number][]
   regions: Region[]
@@ -76,7 +92,15 @@ export class Mod2 implements AnyMod {
     ;[this.dev, this.rel] = resolveTarget(doc, name)
     this.sections = new Map()
     for (const [sec, d] of items(doc.sections)) {
-      if (!SECTIONS.includes(sec)) throw new ModError(`${name}: unknown section ${sec}`)
+      const tag = dspTag(this.dev, sec)
+      if (!SECTIONS.includes(sec) && tag === null) throw new ModError(`${name}: unknown section ${sec}`)
+      if (tag !== null) {                      // DSP words: no alignment, whole words
+        const parts = parseParts(get(d, 'parts', []), name + ' ' + sec, this.dev, this.rel)
+        const n = partsLen(parts)
+        if (n !== int(get(d, 'len', n), name) || n % 3) throw new ModError(`${name} ${sec}: ${n} bytes, not whole 24-bit DSP words`)
+        this.sections.set(sec, { align: 1, parts, len: n })
+        continue
+      }
       const al = int(get(d, 'align', 4), name)
       if (al < 1 || al & (al - 1) || al > MAX_ALIGN) throw new ModError(`${name} ${sec}: alignment ${al} (a power of two up to ${MAX_ALIGN})`)
       if (sec === '.bss') {
@@ -94,6 +118,7 @@ export class Mod2 implements AnyMod {
       if (!Array.isArray(v) || v.length !== 2) throw new ModError(`${name}: symbol ${nm}`)
       if (v[0] !== 'abs' && !this.sections.has(v[0])) throw new ModError(`${name}: symbol ${nm} in a section it lacks (${str(v[0])})`)
       this.symbols.set(nm, [v[0], int(v[1], name)])
+      if (dspTag(this.dev, v[0]) && this.symbols.get(nm)![1] % 3) throw new ModError(`${name}: DSP symbol ${nm} is not at a whole word`)
     }
     this.exports = iter(get(doc, 'exports', [])).map(x => str(x))
     for (const x of this.exports) if (!this.symbols.has(x)) throw new ModError(`${name}: exports ${x}, which it does not define`)
@@ -109,9 +134,19 @@ export class Mod2 implements AnyMod {
     }
     this.sites = parseSites(doc, name, this.dev, this.rel, true)
     this.collections = new Map()
+    this.dspTables = new Map()
     for (const [c, d] of items(get(doc, 'collections', {}))) {
       const e = int(get(d, 'entry'), name)
-      if (e <= 0 || e % 4) throw new ModError(`${name}: table ${c} entry size ${e}`)
+      const space = get(d, 'space')
+      if (space === null) {
+        if (e <= 0 || e % 4) throw new ModError(`${name}: table ${c} entry size ${e}`)
+      } else {
+        const tag = dspTag(this.dev, '.' + str(space))
+        if (tag === null) throw new ModError(`${name}: table ${c} in space ${repr(space)}, which the ${this.dev.name} lacks`)
+        const head = hexBytes(get(d, 'head', ''), name), end = hexBytes(get(d, 'end', ''), name)
+        if (e <= 0 || e % 3 || head.length % 3 || end.length % 3) throw new ModError(`${name}: DSP table ${c} is not whole 24-bit words`)
+        this.dspTables.set(c, [tag, head, end])
+      }
       this.collections.set(c, e)
     }
     this.contribute = []
@@ -122,7 +157,8 @@ export class Mod2 implements AnyMod {
       for (const r of iter(get(c, 'relocs', []))) {
         const [off0, typ, tgt, add] = unpack(r, 4)
         const off = int(off0, what)
-        if (!RTYPES.includes(typ as string) || off < 0 || off + 4 > data.length) throw new ModError(`${what}: bad relocation ${repr(r)}`)
+        if (!RTYPES.includes(typ as string) || off < 0 || off + (typ === 'dsp24' ? 3 : 4) > data.length)
+          throw new ModError(`${what}: bad relocation ${repr(r)}`)
         rel.push([off, typ as string, tgt as string, int(add, what)])
       }
       const claims = iter(get(c, 'claims', [])).map(ab => {
@@ -144,7 +180,9 @@ export class Mod2 implements AnyMod {
   private relocOk(sec: unknown, off: number, typ: unknown, tgt: unknown) {
     if (typeof sec !== 'string' || !this.sections.has(sec) || sec === '.bss') throw new ModError(`${this.name}: relocation in ${str(sec)}`)
     if (!RTYPES.includes(typ as string)) throw new ModError(`${this.name}: relocation type ${str(typ)}`)
-    if (off < 0 || off + (typ === 'pc16' ? 2 : 4) > this.sections.get(sec)!.len!) throw new ModError(`${this.name}: relocation at ${sec}+${off} is outside it`)
+    if ((typ === 'dsp24') !== Boolean(dspTag(this.dev, sec)) || (typ === 'dsp24' && off % 3))
+      throw new ModError(`${this.name}: a ${str(typ)} relocation in ${sec}`)
+    if (off < 0 || off + RSIZE.get(typ as string)! > this.sections.get(sec)!.len!) throw new ModError(`${this.name}: relocation at ${sec}+${off} is outside it`)
     if (tgt !== 'abs' && typeof tgt !== 'string') throw new AttributeError(`'${pyType(tgt)}' object has no attribute 'startswith'`)
     if (!(tgt === 'abs' || tgt.startsWith('sym:') || tgt.startsWith('sec:'))) throw new ModError(`${this.name}: relocation target ${repr(tgt)}`)
   }
@@ -160,12 +198,40 @@ export class Mod2 implements AnyMod {
 
 // ---- checks ----
 
+type Area = [number, number, number, Mod2, string]   // lo, hi, main OS address of P:lo, the mod, the area's name
+
+/** The DSP areas the mods free, by the name a mod claims: payload tag -> area. One area a payload, the first claimed. */
+export function dspAreas(mods: Mod2[], image: Uint8Array): Map<string, Area> {
+  const dev = mods[0].dev, out = new Map<string, Area>()
+  for (const [tag, lo, hi, nm] of dev.dspAreas) {
+    const owner = mods.find(m => m.names.includes(nm))
+    if (owner !== undefined && !out.has(tag)) out.set(tag, [lo, hi, pSpan(image, dev, tag, lo, hi), owner, nm])
+  }
+  return out
+}
+
+/** The payload tags a mod's DSP sections and DSP tables need an area in. */
+function dspNeeds(m: Mod2): Set<string> {
+  const out = new Set<string>()
+  for (const s of m.sections.keys()) if (dspTag(m.dev, s)) out.add(dspTag(m.dev, s)!)
+  for (const [t] of m.dspTables.values()) out.add(t)
+  return out
+}
+
 /** Static checks that need no layout. -> problems. */
 export function check(mods: Mod2[], image: Uint8Array): string[] {
   const spans: Span<AnyMod>[] = []
   for (const m of mods) {
     for (const s of m.sites) spans.push([s.addr, s.addr + s.len, m, `site ${hex8(s.addr)}`])
     for (const c of m.contribute) for (const [a, b] of c.claims) spans.push([a, b, m, `${c.to} entry (claims ${hex8(a)}-${hex8(b)})`])
+  }
+  let areas = new Map<string, Area>()
+  if (mods[0].dev.dspAreas.length && new Set(mods.map(m => m.dev.key + '\0' + m.rel.version)).size === 1) {
+    areas = dspAreas(mods, image)
+    for (const tag of [...areas.keys()].sort(cmp)) {
+      const [lo, hi, at, owner, nm] = areas.get(tag)!
+      spans.push([at, at + 3 * (hi - lo), owner, `DSP area ${nm} (payload ${tag} P:0x${hexw(lo, 4)}-0x${hexw(hi - 1, 4)})`])
+    }
   }
   const bad = commonChecks(mods, image, spans)
   if (bad.length && bad[0].startsWith('the mods are for different firmware')) return bad
@@ -196,9 +262,22 @@ export function check(mods: Mod2[], image: Uint8Array): string[] {
     for (const c of m.contribute) {
       if (!tables.has(c.to)) bad.push(`${m.label()} adds to table ${c.to}, which no given mod declares`)
       else if (c.data.length % tables.get(c.to)![1]) bad.push(`${m.label()}: an entry for ${c.to} is not ${tables.get(c.to)![1]} bytes`)
+      else {
+        const inDsp = tables.get(c.to)![0].dspTables.has(c.to)
+        for (const [o, t] of c.relocs) {
+          if ((t === 'dsp24') !== inDsp || (inDsp && o % 3))
+            bad.push(`${m.label()}: an entry for ${c.to} has a ${t} relocation at +${o}; `
+              + (inDsp ? "a DSP table's entries take dsp24, at whole words" : 'dsp24 is for DSP tables'))
+        }
+      }
     }
     if (m.size('.fast') && (!dev.fastTable || !tables.has(dev.fastTable)))
       bad.push(`${m.label()} has .fast code, which needs the mod that declares ${dev.fastTable || 'a .fast copy table'}`)
+    for (const tag of [...dspNeeds(m)].filter(t => !areas.has(t)).sort(cmp)) {
+      const free = dev.dspAreas.filter(a => a[0] === tag).map(a => a[3])
+      bad.push(`${m.label()} has DSP code for payload ${tag}, which needs a mod that frees DSP memory there (one that claims `
+        + `${free.join(' or ') || `an area the ${dev.name} does not have`})`)
+    }
   }
   const regs: Span<AnyMod>[] = mods.flatMap(m => m.regions.map(g => [g.lo, g.hi, m, 'region ' + g.name] as Span<AnyMod>))
   if (dev.sramCode[1] > dev.sramCode[0]) regs.push([dev.sramCode[0], dev.sramCode[1], null, 'the .fast area'])
@@ -241,9 +320,14 @@ function copiedRules(mods: Mod2[], patched: Uint8Array, dev: Device): string[] {
 
 // ---- the link ----
 
+export type DspLayout = {
+  area: [number, number]; used: [number, number]; name: string; sections: Record<string, number>; tables: Record<string, number>
+}
+
 export type Layout = {
   boot: [number, number]; run_load: number; ddr: [number, number]; bss: [number, number]; fast: [number, number]
   blob_len: number; sections: Record<string, number>; ddr_spare: number; fast_spare: number; ddr_size: number; fast_size: number
+  dsp?: Record<string, DspLayout>              // words: P addresses of each payload's area
 }
 
 export type Linked = {
@@ -276,10 +360,18 @@ export function link(mods: Mod2[], image: Uint8Array): Linked {
   for (const list of entries.values()) {
     list.sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) || a[2] - b[2])
   }
+  const dspTables = new Map<string, [string, Uint8Array, Uint8Array]>()
+  for (const m of order) for (const [c, t] of m.dspTables) dspTables.set(c, t)
   const tableLen = (c: string) => {
     let n = entries.get(c)!.reduce((k, e) => k + e[4].data.length, 0)
+    const dt = dspTables.get(c)
+    if (dt) return dt[1].length + n + dt[2].length   // a DSP table: its head, its entries, its end
     if (c === dev.fastTable) n += FAST_ENTRY * fastMods.length
     return n + tables.get(c)![1]               // the zero entry
+  }
+  const tableCount = (c: string) => {
+    const n = entries.get(c)!.reduce((k, e) => k + e[4].data.length, 0)
+    return dspTables.has(c) ? Math.floor(n / tables.get(c)![1]) : Math.floor(tableLen(c) / tables.get(c)![1]) - 1
   }
 
   // layout
@@ -297,6 +389,7 @@ export function link(mods: Mod2[], image: Uint8Array): Linked {
   }
   const tabAt = new Map<string, number>()
   for (const c of [...tables.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
+    if (dspTables.has(c)) continue
     at = align(at, 4)
     tabAt.set(c, at)
     at += tableLen(c)
@@ -326,24 +419,60 @@ export function link(mods: Mod2[], image: Uint8Array): Linked {
   if (fastAt > fastEnd) throw new ModError(`.fast code needs SRAM to ${hex8(fastAt)}, past ${hex8(fastEnd)}`)
   const runLoad = align(end + bootLen, 16)
 
-  // symbols
+  // DSP: each payload's sections, then its tables, in the P words a mod frees (in words)
+  const areas = dev.dspAreas.length ? dspAreas(order, image) : new Map<string, Area>()
+  const dspAt = new Map<string, number>()
+  for (const [tag, a] of areas) dspAt.set(tag, a[0])
+  const dspSecs = new Map<string, string>()   // `${mod id}\0${section}` -> payload tag
+  for (const m of order) {
+    for (const sec of m.sections.keys()) {
+      const tag = dspTag(dev, sec)
+      if (tag) {
+        if (!dspAt.has(tag)) throw new KeyError(repr(tag))
+        base.set(key(m.id, sec), dspAt.get(tag)!)
+        dspSecs.set(key(m.id, sec), tag)
+        dspAt.set(tag, dspAt.get(tag)! + Math.floor(m.size(sec) / 3))
+      }
+    }
+  }
+  for (const c of [...dspTables.keys()].sort(cmp)) {
+    const tag = dspTables.get(c)![0]
+    if (!dspAt.has(tag)) throw new KeyError(repr(tag))
+    tabAt.set(c, dspAt.get(tag)!)
+    dspAt.set(tag, dspAt.get(tag)! + Math.floor(tableLen(c) / 3))
+  }
+  for (const [tag, [lo, hi, , , nm]] of areas) {
+    const used = dspAt.get(tag)!
+    if (used > hi) throw new ModError(`the DSP code for payload ${tag} needs P words to 0x${hexw(used, 5)}, past the ${hi - lo} `
+      + `words ${nm} frees (${used - hi} over)`)
+  }
+
+  // symbols (a DSP one is a word address: its section's base + its byte offset / 3)
   const addr = new Map<string, number>()       // `${mod id}\0${name}` -> address
   const glob = new Map<string, number>()
+  const dspSym = new Set<string>()             // `${mod id}\0${name}`, or `\0${name}` for a global
   for (const m of order) {
     for (const [nm, [sec, off]] of m.symbols) {
       let v = off
-      if (sec !== 'abs') {
+      if (m.sections.has(sec) && dspTag(dev, sec)) {
+        v = base.get(key(m.id, sec))! + Math.floor(off / 3)
+        dspSym.add(key(m.id, nm))
+      } else if (sec !== 'abs') {
         const b = base.get(key(m.id, sec))
         if (b === undefined) throw new KeyError(`(${repr(m.id)}, ${repr(sec)})`)
         v = b + off
       }
       addr.set(key(m.id, nm), v)
-      if (m.exports.includes(nm)) glob.set(nm, v)
+      if (m.exports.includes(nm)) {
+        glob.set(nm, v)
+        if (dspSym.has(key(m.id, nm))) dspSym.add('\0' + nm)
+      }
     }
   }
   for (const c of tables.keys()) {
     glob.set(c, tabAt.get(c)!)
-    glob.set(c + '_n', Math.floor(tableLen(c) / tables.get(c)![1]) - 1)
+    glob.set(c + '_n', tableCount(c))
+    if (dspTables.has(c)) dspSym.add('\0' + c)
   }
   for (const [k, v] of [['__run_load', runLoad], ['__run_start', ddrBase], ['__run_words', Math.floor((runEnd - ddrBase) / 4)],
     ['__bss_start', runEnd], ['__bss_end', bssEnd], ['__bss_words', Math.floor((bssEnd - runEnd) / 4)]] as [string, number][]) glob.set(k, v)
@@ -365,9 +494,32 @@ export function link(mods: Mod2[], image: Uint8Array): Linked {
     throw new ModError(`${m.label()}: ${where} refers to ${nm}, which nothing defines`)
   }
 
+  /** Is a relocation's target a DSP word address? null for "abs". */
+  const isDsp = (m: Mod2, tgt: string): boolean | null => {
+    if (tgt === 'abs') return null
+    const colon = tgt.indexOf(':')
+    if (colon < 0) throw new ValueError('not enough values to unpack (expected 2, got 1)')
+    const kind = tgt.slice(0, colon), nm = tgt.slice(colon + 1)
+    if (kind === 'sec') return Boolean(dspTag(dev, nm))
+    if (addr.has(key(m.id, nm)) && m.symbols.has(nm)) return dspSym.has(key(m.id, nm))
+    return dspSym.has('\0' + nm)
+  }
+
+  const place = (m: Mod2, buf: Uint8Array, off: number, typ: string, tgt: string, add: number, p: number, where: string) => {
+    const d = isDsp(m, tgt)
+    if (d !== null && d !== (typ === 'dsp24'))
+      throw new ModError(`${m.label()}: ${where} is a ${typ === 'dsp24' ? 'DSP' : 'ColdFire'} reference to a ${d ? 'DSP' : 'ColdFire'} address`)
+    put(buf, off, typ, resolve(m, tgt, where) + add, p, where)
+  }
+
   const put = (buf: Uint8Array, off: number, typ: string, value: number, p: number, where: string) => {
     const v = new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
-    if (typ === 'abs32') {
+    if (typ === 'dsp24') {                     // a DSP word, little-endian, as the payloads hold it
+      if (!(value >= 0 && value <= 0xffffff)) throw new ModError(`${where}: a DSP address out of range (0x${value.toString(16)})`)
+      buf[off] = value & 0xff
+      buf[off + 1] = (value >> 8) & 0xff
+      buf[off + 2] = value >> 16
+    } else if (typ === 'abs32') {
       v.setUint32(off, ((value % 2 ** 32) + 2 ** 32) % 2 ** 32)
     } else if (typ === 'pc32') {
       const d = value - p
@@ -382,26 +534,29 @@ export function link(mods: Mod2[], image: Uint8Array): Linked {
 
   const content = new Map<string, Uint8Array>()
   for (const m of order) {
-    for (const sec of ['.boot', '.run', '.fast']) {
-      if (m.size(sec)) content.set(key(m.id, sec), partsBytes(m.sections.get(sec)!.parts!, image, dev).slice())
+    for (const sec of m.sections.keys()) {
+      if (sec !== '.bss' && m.size(sec)) content.set(key(m.id, sec), partsBytes(m.sections.get(sec)!.parts!, image, dev).slice())
     }
     for (const [sec, off, typ, tgt, add] of m.relocs) {
       const where = `${sec}+0x${off.toString(16)}`
-      put(content.get(key(m.id, sec))!, off, typ, resolve(m, tgt, where) + add, base.get(key(m.id, sec))! + off, where)
+      place(m, content.get(key(m.id, sec))!, off, typ, tgt, add, base.get(key(m.id, sec))! + off, where)
     }
   }
   const tab = new Map<string, Uint8Array>()
   for (const c of tables.keys()) {
-    const parts: Uint8Array[] = []
-    let len = 0
+    const dt = dspTables.get(c)
+    const parts: Uint8Array[] = dt ? [dt[1]] : []
+    let len = dt ? dt[1].length : 0
     for (const [, , , m, e] of entries.get(c)!) {
       const d = e.data.slice()
-      for (const [off, typ, tgt, add] of e.relocs) {
-        const where = `an entry of ${c}`
-        put(d, off, typ, resolve(m, tgt, where) + add, tabAt.get(c)! + len + off, where)
-      }
+      for (const [off, typ, tgt, add] of e.relocs) place(m, d, off, typ, tgt, add, tabAt.get(c)! + len + off, `an entry of ${c}`)
       parts.push(d)
       len += d.length
+    }
+    if (dt) {
+      parts.push(dt[2])
+      tab.set(c, concat(parts))
+      continue
     }
     if (c === dev.fastTable) {
       for (const m of fastMods) {
@@ -420,19 +575,22 @@ export function link(mods: Mod2[], image: Uint8Array): Linked {
     if (m.size('.run')) ddr.set(content.get(key(m.id, '.run'))!, base.get(key(m.id, '.run'))! - ddrBase)
     if (fload.has(m.id)) ddr.set(content.get(key(m.id, '.fast'))!, fload.get(m.id)! - ddrBase)
   }
-  for (const c of tables.keys()) ddr.set(tab.get(c)!, tabAt.get(c)! - ddrBase)
+  for (const c of tables.keys()) if (!dspTables.has(c)) ddr.set(tab.get(c)!, tabAt.get(c)! - ddrBase)
   const boot = content.get(key(core.id, '.boot'))
   if (!boot) throw new KeyError(`(${repr(core.id)}, '.boot')`)
   const blob = concat([boot, new Uint8Array(runLoad - end - boot.length), ddr])
   const img = new Uint8Array(image.length + blob.length)
   img.set(image)
+  const dspPut = (tag: string, word: number, data: Uint8Array) => {   // P words of a payload's area: main OS bytes
+    const [lo, , at] = areas.get(tag)!
+    img.set(data, at + 3 * (word - lo) - dev.mainLoad)
+  }
+  for (const [k, tag] of dspSecs) dspPut(tag, base.get(k)!, content.get(k) ?? new Uint8Array(0))
+  for (const [c, [tag]] of dspTables) dspPut(tag, tabAt.get(c)!, tab.get(c)!)
   for (const m of order) {
     for (const s of m.sites) {
       const nw = s.new.slice()
-      for (const [off, typ, tgt, add] of s.relocs) {
-        const where = `site ${hex8(s.addr)}`
-        put(nw, off, typ, resolve(m, tgt, where) + add, s.addr + off, where)
-      }
+      for (const [off, typ, tgt, add] of s.relocs) place(m, nw, off, typ, tgt, add, s.addr + off, `site ${hex8(s.addr)}`)
       img.set(nw, s.addr - dev.mainLoad)
     }
   }
@@ -459,14 +617,27 @@ export function link(mods: Mod2[], image: Uint8Array): Linked {
   }
   for (const [nm, vs] of uniq) if (vs.size === 1 && !map.has(nm)) map.set(nm, [...vs][0])
   const outTables = new Map<string, [number, number, number]>()
-  for (const c of tables.keys()) outTables.set(c, [tabAt.get(c)!, Math.floor(tableLen(c) / tables.get(c)![1]) - 1, tables.get(c)![1]])
+  for (const c of tables.keys()) outTables.set(c, [tabAt.get(c)!, tableCount(c), tables.get(c)![1]])
   const sections: Record<string, number> = {}
   for (const [k, v] of [...base].map((kv, i) => [kv, i] as const).sort((a, b) => a[0][1] - b[0][1] || a[1] - b[1]).map(([kv]) => kv))
-    sections[k.replace('\0', ' ')] = v
+    if (!dspSecs.has(k)) sections[k.replace('\0', ' ')] = v
   const layout: Layout = {
     boot: [end, end + bootLen], run_load: runLoad, ddr: [ddrBase, runEnd], bss: [runEnd, bssEnd], fast: [fastBase, fastAt],
     blob_len: blob.length, sections, ddr_spare: ddrEnd - bssEnd, fast_spare: fastEnd - fastAt, ddr_size: ddrEnd - ddrBase,
     fast_size: fastEnd - fastBase,
+  }
+  if (areas.size) {
+    const dspOut: Record<string, DspLayout> = {}
+    for (const tag of [...areas.keys()].sort(cmp)) {
+      const [lo, hi, , , nm] = areas.get(tag)!
+      const secs: Record<string, number> = {}
+      const byKey = [...dspSecs].filter(([, t]) => t === tag).map(([k]) => k.split('\0') as [string, string])
+      for (const [id, sec] of byKey.sort((a, b) => cmp(a[0], b[0]) || cmp(a[1], b[1]))) secs[`${id} ${sec}`] = base.get(key(id, sec))!
+      const tabs: Record<string, number> = {}
+      for (const c of [...dspTables.keys()].sort(cmp)) if (dspTables.get(c)![0] === tag) tabs[c] = tabAt.get(c)!
+      dspOut[tag] = { area: [lo, hi], used: [lo, dspAt.get(tag)!], name: nm, sections: secs, tables: tabs }
+    }
+    layout.dsp = dspOut
   }
   return { image: img, order: order.map(m => m.label()), map, tables: outTables, layout }
 }

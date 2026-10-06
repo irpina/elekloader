@@ -23,6 +23,8 @@ mod.json:
      "subscribe": [{"event": "ev_draw", "fn": "my_draw", "order": 60}],
      "collections": {"my_table": 8},                  tables you declare (entry size)
      "contribute": [{"to", "order", "data", "relocs", "claims"}],
+     "dsp": [{"source": "my.asm", "payload": "A"}],   optional: DSP56300 code (see below)
+     "subscribe_dsp": [{"event", "fn", "addend", "order"}],   jsr >fn in a DSP table
      "weak": ["name"], "copied": [...],
      "resources": {"regions": [...], "names": [...]},
      "requires": ["core"], "conflicts": [...],
@@ -41,8 +43,20 @@ A site's "op" says how its new bytes are made:
 | `keep2` | the stock opcode word + target's address (a `jsr.l` or `lea.l` whose operand you redirect) |
 | `ptr` | target's address (4 bytes of data, e.g. a vtable entry) |
 | `bytes` | `new`, given in hex; `"kind": "code"` if they are instructions |
+| `dsp_jsr` | `jsr >target` over one two-word DSP instruction in a payload (6 bytes) |
 
-With a target, `"addend": N` (optional) adds N bytes to its address.
+With a target, `"addend": N` (optional) adds N bytes to its address (N words
+for `dsp_jsr`).
+
+On a device whose OS uploads DSP code (the profile's `dsp_payloads`), "dsp"
+assembles DSP56300 sources with octabam's dsp_asm ($ELEKLOADER_DSP_ASM) into
+one `.dsp.<payload>` section a payload; their labels become the mod's
+symbols. Each source is assembled at two origins, and the words that move
+with the origin become `dsp24` relocations. A DSP table is a collection given
+as {"entry": 6, "space": "dsp.A", "head": hex, "end": hex}: its words are the
+head, the entries in order, then the end. The linker places DSP code and
+tables in the P words a mod frees (`dsp_areas`), so a mod with either needs
+the mod that frees them.
 
 A `fixed` source is placed at `addr` inside the stock image. It must be
 inside one of the device's free image areas (`image_free`, zero in stock).
@@ -54,6 +68,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -94,6 +109,54 @@ def run(cmd):
     if r.returncode:
         raise BuildError('%s\n%s%s' % (' '.join(cmd), r.stdout, r.stderr))
     return r.stdout
+
+
+DSP_JSR = b'\x80\xf0\x0b'                    # jsr >xxxx (0x0bf080, little-endian); its address follows
+DSP_ORGS = (0x100000, 0x200000)             # a DSP source is assembled at both
+
+
+def dsp_assemble(src, work):
+    """A DSP56300 source -> (its words, {label: word}, [(word, the word it addresses)]).
+
+    Assembled with octabam's dsp_asm ($ELEKLOADER_DSP_ASM, default dsp_asm on the PATH) at
+    two origins: a word that differs by exactly their distance holds an address in the code,
+    which becomes a relocation; any other difference is an address the linker cannot place
+    (a short or packed operand), and is refused. Branches (bra, bsr, bcc) are relative, so
+    they do not move. Both origins are above 16 bits, so every address takes its long form."""
+    asm = os.environ.get('ELEKLOADER_DSP_ASM', 'dsp_asm')
+    if not (os.path.isfile(asm) or shutil.which(asm)):
+        raise BuildError('%s is not installed: DSP code is assembled with octabam\'s dsp_asm '
+                         '(set ELEKLOADER_DSP_ASM; docs/ADAPTING.md)' % asm)
+    stem = os.path.join(work, 'dsp-' + os.path.splitext(os.path.basename(src))[0])
+    got = []
+    for k, org in enumerate(DSP_ORGS):
+        blob, sym = '%s.%d.bin' % (stem, k), '%s.%d.sym' % (stem, k)
+        run([asm, '-in', src, '-org', '%x' % org, '-out', blob, '-sym', sym])
+        with open(blob, 'rb') as fh:
+            b = fh.read()
+        labels = {}
+        with open(sym) as fh:
+            for line in fh:
+                if line.strip():
+                    nm, a = line.split()
+                    labels[nm] = int(a, 16) - org
+        got.append(([b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) for i in range(0, len(b), 3)],
+                    labels))
+    (words, labels), (w2, l2) = got
+    if len(words) != len(w2) or labels != l2:
+        raise BuildError('%s: assembles to different code at two origins' % src)
+    delta, rels = DSP_ORGS[1] - DSP_ORGS[0], []
+    for i, (a, b) in enumerate(zip(words, w2)):
+        if a == b:
+            continue
+        if b - a != delta or not 0 <= a - DSP_ORGS[0] <= len(words):
+            raise BuildError('%s: word %d (+0x%x) holds an address the linker cannot place '
+                             '(0x%06x at P:0x%x, 0x%06x at P:0x%x); use an instruction that '
+                             'takes it as a whole word' % (src, i, i, a, DSP_ORGS[0], b,
+                                                           DSP_ORGS[1]))
+        rels.append((i, a - DSP_ORGS[0]))
+        words[i] = 0
+    return words, labels, rels
 
 
 PORT_FIXED = ('id', 'version', 'device', 'os', 'ports')   # which mod it is: no port changes them
@@ -153,7 +216,8 @@ def build(mdir, stock_path, out_dir=None, extra=None):
             fh.write('        .section .run, "ax"\n        .globl  str_name\n'
                      'str_name: .asciz "%s %s"\n        .balign 2\n' % (mod['name_string'], version))
         srcs.append(p)
-    if not srcs and not mod.get('sites') and not extra.get('sites') and not mod.get('fixed'):
+    if not srcs and not mod.get('sites') and not extra.get('sites') and not mod.get('fixed') \
+            and not mod.get('dsp'):
         raise BuildError('mod.json names no sources and no sites: nothing to build')
     defs = []
     for k, v in mod.get('defsym', {}).items():
@@ -265,6 +329,34 @@ def build(mdir, stock_path, out_dir=None, extra=None):
             else:
                 relocs.append([sec, off, elf.RNAMES[typ], tgt, a])
 
+    dsrcs = []
+    for ds in mod.get('dsp', []):            # DSP56300 code, one section a payload
+        tag = ds.get('payload')
+        if tag not in dev.dsp_payloads:
+            raise BuildError('dsp %s: payload %r; the %s has %s' % (
+                ds.get('source'), tag, dev.name,
+                ', '.join(sorted(dev.dsp_payloads)) or 'no DSP code in its OS'))
+        src = os.path.join(mdir, ds['source'])
+        dsrcs.append(src)
+        words, labels, rels = dsp_assemble(src, work)
+        sec = '.dsp.' + tag
+        raw = secs.get(sec, {}).get('raw', b'')
+        at = len(raw) // 3                  # this source's first word in the section
+        for nm, w in labels.items():
+            if nm in symbols:
+                raise BuildError('%s: label %s is also a symbol of the mod' % (ds['source'], nm))
+            symbols[nm] = [sec, 3 * (at + w)]
+        for i, w in rels:                   # word i holds the section's word w: its address
+            relocs.append([sec, 3 * (at + i), 'dsp24', 'sec:' + sec, at + w])
+        secs[sec] = {'raw': raw + b''.join(bytes((x & 0xFF, (x >> 8) & 0xFF, x >> 16))
+                                           for x in words)}
+    for sec in [s for s in secs if s.startswith('.dsp.')]:
+        raw = secs[sec]['raw']
+        parts = stock_parts(raw, image, STOCK_MIN, dev.main_load)
+        secs[sec] = {'len': len(raw), 'parts': [['hex', p[1].hex()] if p[0] == 'hex'
+                                                else ['stock', '0x%08x' % p[1], p[2]]
+                                                for p in parts]}
+
     sites = []
     for idx, s in sorted(fsec.items()):
         at, src = fixed[s.name]
@@ -289,8 +381,9 @@ def build(mdir, stock_path, out_dir=None, extra=None):
                              % (addr, image[o:o + len(stockb)].hex(), s['stock']))
         op, rel_ = s['op'], []
         add = int(s.get('addend', 0))
-        if add and op not in OPS and op not in ('keep2', 'ptr'):
-            raise BuildError('site 0x%08x: an addend needs a target (jsr, jmp, keep2 or ptr)' % addr)
+        if add and op not in OPS and op not in ('keep2', 'ptr', 'dsp_jsr'):
+            raise BuildError('site 0x%08x: an addend needs a target (jsr, jmp, keep2, ptr or '
+                             'dsp_jsr)' % addr)
         if op in OPS:
             if len(stockb) < 6 or len(stockb) % 2:
                 raise BuildError('site 0x%08x: a jsr/jmp needs 6 or more (even) bytes' % addr)
@@ -308,8 +401,22 @@ def build(mdir, stock_path, out_dir=None, extra=None):
         elif op == 'bytes':
             new = bytes.fromhex(s['new'])
             kind = s.get('kind', 'data')
+        elif op == 'dsp_jsr':                # two DSP words of a payload: jsr >target
+            if not any(at <= addr and addr + len(stockb) <= at + n
+                       for at, n in dev.dsp_payloads.values()):
+                raise BuildError('site 0x%08x: a dsp_jsr goes in the DSP code the %s\'s OS '
+                                 'uploads (%s)' % (addr, dev.name, ', '.join(
+                                     '0x%08x +0x%x' % v for v in dev.dsp_payloads.values())
+                                     or 'it has none'))
+            if len(stockb) != 6:
+                raise BuildError('site 0x%08x: a dsp_jsr replaces one two-word DSP '
+                                 'instruction (6 bytes)' % addr)
+            new = DSP_JSR + bytes(3)
+            rel_ = [[3, 'dsp24', 'sym:' + s['target'], add]]
+            kind = 'data'
         else:
-            raise BuildError('site 0x%08x: op %r (jsr, jmp, keep2, ptr or bytes)' % (addr, op))
+            raise BuildError('site 0x%08x: op %r (jsr, jmp, keep2, ptr, bytes or dsp_jsr)'
+                             % (addr, op))
         if len(new) != len(stockb):
             raise BuildError('site 0x%08x: the new bytes are not as long as the stock ones' % addr)
         if kind == 'code':
@@ -327,6 +434,11 @@ def build(mdir, stock_path, out_dir=None, extra=None):
     for sub in mod.get('subscribe', []):
         contrib.append({'to': sub['event'], 'order': sub.get('order', 50), 'data': '00000000',
                         'relocs': [[0, 'abs32', 'sym:' + sub['fn'], 0]], 'claims': []})
+    for sub in mod.get('subscribe_dsp', []):    # an entry of a DSP table: jsr >fn (+addend words)
+        contrib.append({'to': sub['event'], 'order': sub.get('order', 50),
+                        'data': (DSP_JSR + bytes(3)).hex(),
+                        'relocs': [[3, 'dsp24', 'sym:' + sub['fn'], int(sub.get('addend', 0))]],
+                        'claims': []})
     for c in mod.get('contribute', []) + list(extra.get('contribute', [])):
         contrib.append({'to': c['to'], 'order': c.get('order', 50), 'data': c['data'],
                         'relocs': c.get('relocs', []), 'claims': c.get('claims', [])})
@@ -346,11 +458,13 @@ def build(mdir, stock_path, out_dir=None, extra=None):
         'sections': secs, 'symbols': symbols, 'exports': sorted(exports),
         'imports': sorted(imports - set(symbols)), 'weak': sorted(weak),
         'relocs': relocs, 'sites': sites,
-        'collections': {k: {'entry': v} for k, v in mod.get('collections', {}).items()},
+        'collections': {k: dict(v) if isinstance(v, dict) else {'entry': v}
+                        for k, v in mod.get('collections', {}).items()},
         'contribute': contrib, 'copied': mod.get('copied', []),
         'resources': mod.get('resources', {}),
         'requires': mod.get('requires', []), 'conflicts': mod.get('conflicts', []),
-        'build': {'sources': {os.path.basename(s): sha(open(s, 'rb').read()) for s in srcs}},
+        'build': {'sources': {os.path.basename(s): sha(open(s, 'rb').read())
+                              for s in srcs + dsrcs}},
         'signature': None,
     }
     raw = (json.dumps(doc, indent=1) + '\n').encode()

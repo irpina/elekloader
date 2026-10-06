@@ -191,6 +191,39 @@ def test_devices():
         raise AssertionError('accepted an unknown target')
 
 
+def test_dsp_payload_walk():
+    """dsp.records on a made-up payload: records, two-word directives anywhere, the end; and
+    the profiles' DSP areas lie inside their payloads' tags."""
+    import dataclasses
+    from elekloader import dsp
+    from elekloader.elemod import ModError
+
+    def w(*ws):
+        return b''.join(bytes((x & 0xFF, (x >> 8) & 0xFF, x >> 16)) for x in ws)
+    ot = [d for d in devices.devices() if d.key == 'octatrack'][0]
+    body = w(3, 0x3000, 4, 0, 0, 0x10, 2, 0x111111, 0x222222, 1, 0x20, 1, 0x333333, 3, 0x3000)
+    lo = ot.main_load + 0x10
+    image = bytes(0x10) + body + w(0x123456)
+    dev = dataclasses.replace(ot, dsp_payloads={'T': (lo, len(body))})
+    assert dsp.records(image, dev, 'T') == [(0, 0x10, 2, lo + 6 * 2 + 9), (1, 0x20, 1, lo + 27 + 9)]
+    assert dsp.p_span(image, dev, 'T', 0x11, 0x12) == lo + 21 + 3
+    for bad, what in ((w(0, 0x10, 5, 1), 'does not parse at +0x0'), (w(3, 1, 0), 'at +0x6')):
+        d = dataclasses.replace(ot, dsp_payloads={'T': (lo, len(bad))})
+        try:
+            dsp.records(bytes(0x10) + bad, d, 'T')
+        except ModError as e:
+            assert what in str(e), str(e)
+        else:
+            raise AssertionError('parsed %s' % bad.hex())
+    early = w(0, 0x10, 1, 7, 5, 0xFFFFFF)                   # a word above 4 ends it
+    d = dataclasses.replace(ot, dsp_payloads={'T': (lo, len(early))})
+    assert dsp.records(bytes(0x10) + early, d, 'T') == [(0, 0x10, 1, lo + 9)]
+    for d in devices.devices():
+        for tag, a, b, nm, _what in d.dsp_areas:
+            assert tag in d.dsp_payloads and a < b and nm.startswith('dsp:'), (d.key, nm)
+    assert [d.key for d in devices.devices() if d.dsp_payloads] == ['octatrack']
+
+
 def test_each_release_is_known_by_its_own_hash():
     """Every release of every profile is identified as itself, and its .elemod
     target names it alone."""
