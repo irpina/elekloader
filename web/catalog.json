@@ -2,25 +2,25 @@
   "about": "The mod shop's curated list. The pages workflow takes each file from its author's GitHub release (repo, tag, file), or from their repository at a commit (repo, commit, path), checks it against the sha256 here, and puts it on the site; nothing here is committed but this list. Only mods whose licence allows passing them on. kind 'core': a core the listed mods need, added to the site's cores. needs_core: the oldest core version the mod links with. on_unit: what has been checked on real hardware, shown in the details sheet. license: only for a file that names none (then the repository's licence).",
   "items": [
     {
-      "repo": "irpina/digislicer", "tag": "v2.1", "file": "core-2.1.elemod", "kind": "core",
+      "repo": "irpina/digislicer", "tag": "v2.2", "file": "core-2.1.elemod", "kind": "core",
       "device": "digitakt-mk1",
       "sha256": "f38b0c193677a060b3fdb28fe71b9332be8a5e7d36ecaf91a3c86a61bab558eb"
     },
     {
-      "repo": "irpina/digislicer", "tag": "v2.1", "file": "core-2.1-os1.54.elemod", "kind": "core",
+      "repo": "irpina/digislicer", "tag": "v2.2", "file": "core-2.1-os1.54.elemod", "kind": "core",
       "device": "digitakt-mk1",
       "sha256": "8c1fe78ccd1427d6a93f181eaad9f064efb65cf6dd683192dbcc33e83dc548b9"
     },
     {
-      "repo": "irpina/digislicer", "tag": "v2.1", "file": "digislicer-2.1.elemod",
+      "repo": "irpina/digislicer", "tag": "v2.2", "file": "digislicer-2.2.elemod",
       "device": "digitakt-mk1", "needs_core": "2.1",
-      "sha256": "351bfb3a7c8bbbc8f925e085d77ee136114ad7edb90beeed9a6ea351f2cde51f",
+      "sha256": "20cfd79492c40289653c62667003e4a60eda7cc4ceed7abdb7fbde9e051a3527",
       "summary": "A slicing machine with a slice editor: cut a sample where you want, and play the slices from the trig keys and the keyboard."
     },
     {
-      "repo": "irpina/digislicer", "tag": "v2.1", "file": "digislicer-2.1-os1.54.elemod",
+      "repo": "irpina/digislicer", "tag": "v2.2", "file": "digislicer-2.2-os1.54.elemod",
       "device": "digitakt-mk1", "needs_core": "2.1",
-      "sha256": "b484401eac741c72dbc334e11dd7e0df6b799237cafd9581d020b43e06a0a277",
+      "sha256": "c660a7232a5986a677696d61a18688256cfe208510d146c3ea876df50c738c27",
       "summary": "A slicing machine with a slice editor: cut a sample where you want, and play the slices from the trig keys and the keyboard."
     },
     {
