@@ -262,7 +262,8 @@ below was found again in 1.17.
   (`0x400e2324`, 0x136cb bytes) to DSP core 0 and B (`0x400f59ef`, 0x12d05
   bytes) to core 1 at boot. Payload A's P memory is full, so the one area
   for mods' DSP code is SPATIALIZER's code, P:0xaa8-0xbac (261 words), freed
-  by the mod that claims `dsp:harvest:SPATIALIZER`.
+  by the mod that claims `dsp:harvest:SPATIALIZER`: the DSP bus,
+  `mods/dspbus-ot`.
 - **Checked in an emulator** (octabam's `ot_emu`): with core and a mod that
   puts a marker in `.run`, the boot reaches the RTOS handoff as stock does,
   `.boot` runs once, and the marker is in the reserve after boot.

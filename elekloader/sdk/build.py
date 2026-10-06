@@ -68,6 +68,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -127,6 +128,17 @@ def dsp_assemble(src, work):
     if not (os.path.isfile(asm) or shutil.which(asm)):
         raise BuildError('%s is not installed: DSP code is assembled with octabam\'s dsp_asm '
                          '(set ELEKLOADER_DSP_ASM; docs/ADAPTING.md)' % asm)
+    with open(src) as fh:
+        text = [line.split(';')[0] for line in fh.read().splitlines()]
+    labels = [t.split(':')[0].strip() for t in text if ':' in t and ',' not in t]
+    for n, t in enumerate(text, 1):             # dsp_asm puts label addresses into the text
+        for nm in labels:
+            for m in re.finditer(re.escape(nm), t):
+                if re.match(r'\w', t[m.end():m.end() + 1]) or (
+                        m.start() and re.match(r'\w', t[m.start() - 1])):
+                    raise BuildError('%s:%d: the label %s is part of a longer word here, and '
+                                     'dsp_asm replaces labels wherever their text appears; '
+                                     'rename it' % (src, n, nm))
     stem = os.path.join(work, 'dsp-' + os.path.splitext(os.path.basename(src))[0])
     got = []
     for k, org in enumerate(DSP_ORGS):

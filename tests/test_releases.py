@@ -123,6 +123,9 @@ def test_each_core_builds_and_lints_for_each_release_it_names():
         tc = dev.toolchain
         if not shutil.which(os.environ.get('ELEKLOADER_CROSS', tc.get('prefix', '')) + 'as'):
             raise Skip('no cross assembler for the %s' % dev.name)
+        # the cores first: a mod beside them (mods/dspbus-ot) is linted with its device's core
+        dirs.sort(key=lambda d: json.load(open(os.path.join(d, 'mod.json'))).get('id') != 'core')
+        cores = []
         for d in dirs:
             with tempfile.TemporaryDirectory() as tmp:
                 out, m = build.build(d, path, tmp)
@@ -133,9 +136,17 @@ def test_each_core_builds_and_lints_for_each_release_it_names():
                     primary = json.load(fh).get('os') == rel.version
                 assert os.path.basename(out) == '%s-%s%s.elemod' % (
                     m.id, m.version, '' if primary else '-os' + rel.version)
+                if m.id == 'core':
+                    with open(out, 'rb') as fh:
+                        cores.append((os.path.basename(out), fh.read()))
+                withs = []
+                for name, data in cores if m.id != 'core' else ():
+                    withs += ['--with', os.path.join(tmp, name)]
+                    with open(withs[-1], 'wb') as fh:
+                        fh.write(data)
                 buf = io.StringIO()
                 with contextlib.redirect_stdout(buf):
-                    rc = lint.main([out, '--stock', path, '--json'])
+                    rc = lint.main([out, '--stock', path, '--json'] + withs)
                 r = json.loads(buf.getvalue())
                 assert rc == 0, (d, rel.version, r['problems'])
                 built += 1
