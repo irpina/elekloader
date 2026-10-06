@@ -1282,6 +1282,11 @@ def check(ob, plan, mod_path, core_path, stock_path, work):
         moved = {a + i for r in plan['relocs'] for a, w in r['pokes'] for i in range(len(w))}
         cores = {a for s in core.sites for a in range(s['addr'], s['addr'] + s['len'])
                  if ref[a - base] == image[a - base]}      # only where octabam's build is stock
+        if 'reserve' in ln.layout:          # a core sized to the mods (0.3): its arena writes
+            sized = set(dev.reserve[1])     # follow the pages they take, octabam's its 1,707
+            cores |= {s['addr'] + o + i for s in core.sites
+                      for o, _t, tgt, _a in s.get('relocs', ()) if tgt[4:] in sized
+                      for i in range(4)}
         bused = {a for h in plan.get('bus', ()) for a in range(h['site'], h['site'] + h['len'])
                  if ln.image[a - base] == image[a - base]}   # its hooks the bus serves: stock
         diff = [base + i for i in _changed(ln.image[:len(image)], ref)]
