@@ -438,6 +438,28 @@ def test_the_example_subscribes_to_the_bus():
     assert struct.unpack('>II', ln.image[o:o + 8]) == (ln.map['hello_draw'], 0)
 
 
+def test_cc_who_runs_before_and_after():
+    """examples/cc-who-ot subscribes to ev_midi twice: at order 10 and 90, so the table
+    lists its first handler, then its last, with room for any mod's in between."""
+    import shutil
+    from elekloader.sdk import build
+    need(SYX)
+    if not shutil.which(os.environ.get('ELEKLOADER_CROSS', DEV.toolchain['prefix']) + 'gcc'):
+        raise Skip('no m68k cross compiler')
+    st, img = stock()
+    with tempfile.TemporaryDirectory() as tmp:
+        core, _m = build.build(os.path.join(ROOT, 'mods', 'core-ot'), SYX, tmp)
+        ex, m = build.build(os.path.join(ROOT, 'examples', 'cc-who-ot'), SYX, tmp)
+        ln = link.link([elemod.load_any(core), elemod.load_any(ex)], img)
+    counts = {t: ln.tables[t][1] for t in ln.tables}
+    assert counts == {'ev_draw': 1, 'ev_enc': 0, 'ev_frame': 0, 'ev_key': 0, 'ev_midi': 2,
+                      'ev_tick': 1}, counts
+    at = ln.tables['ev_midi'][0]
+    o = ln.layout['run_load'] + (at - DEV.ddr[0]) - DEV.main_load
+    assert struct.unpack('>III', ln.image[o:o + 12]) == \
+        (ln.map['ccwho_first'], ln.map['ccwho_last'], 0)
+
+
 def test_mkmod_diff_round_trip():
     st, img = stock()
     blob = bytes(range(200))

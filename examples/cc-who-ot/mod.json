@@ -1,0 +1,18 @@
+{
+ "id": "cc-who",
+ "version": "1.0",
+ "title": "CC who",
+ "category": "Examples",
+ "license": "GPL-2.0-or-later",
+ "description": "Shows each MIDI CC the Octatrack receives for a moment, and whether a mod took it (CC MAP keeps CC 62-73) or the Octatrack got it. A demo of the Octatrack core's hook bus: it runs before and after the other mods on the same MIDI input, and takes nothing.",
+ "device": "octatrack",
+ "os": "1.40C",
+ "sources": ["ccwho.c"],
+ "subscribe": [
+  {"event": "ev_midi", "fn": "ccwho_first", "order": 10},
+  {"event": "ev_midi", "fn": "ccwho_last", "order": 90},
+  {"event": "ev_tick", "fn": "ccwho_tick", "order": 50},
+  {"event": "ev_draw", "fn": "ccwho_draw", "order": 80}
+ ],
+ "requires": ["core"]
+}
