@@ -212,7 +212,7 @@ Cores come only from the catalog, at `init`. A page cannot add a core of its own
 
 ## For elekloader's releases
 
-Each release attaches the kit and the catalog. Both are reproducible from the commit:
+Each release attaches the kit and the catalog: run the **kit-build** workflow (Actions, by hand) with the release's tag. It takes `vX.Y.Z`, or `kit-vX.Y.Z` for a kit-only pre-release, which uses the latest release's cores. It attaches both files and their lines in `SHA256SUMS.txt`, and never replaces a file the release already carries with different bytes. With **test** ticked it keeps them as the run's artifact instead. Both are reproducible from the commit; the workflow runs:
 
 ```bash
 python packaging/build_kit.py --out build/kit                   # elekloader-kit-<version>.zip, and its sha256

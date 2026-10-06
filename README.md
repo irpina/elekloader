@@ -297,6 +297,19 @@ release. It needs these repository secrets:
 | `NOTARY_KEY_ID` | that key's ID |
 | `NOTARY_ISSUER` | the Issuer ID shown above the keys in App Store Connect |
 
+## The kit for websites
+
+The **kit-build** workflow (Actions, run by hand with a release's tag) builds
+the kit (`packaging/build_kit.py`) and elekloader's catalog (`js/tools/kit.ts
+feed` on `web/catalog.json`) and attaches `elekloader-kit-<version>.zip` and
+`elekloader-catalog.json` to the release, with their lines in
+`SHA256SUMS.txt`. A tag `kit-vX.Y.Z` is a kit-only pre-release: its catalog
+takes the latest release's cores. Node is pinned, so the zip is the one
+`build_kit.py` gives on your machine with the same Node. A file the release
+already carries is never replaced by different bytes. With **test** ticked
+it keeps the two files as the run's artifact. docs/INTEGRATING.md tells a
+site how to use them.
+
 ## Tests
 
 ```bash
