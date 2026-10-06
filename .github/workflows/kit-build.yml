@@ -1,0 +1,138 @@
+# The kit for websites (docs/INTEGRATING.md), built for a release: elekloader-kit-<version>.zip and
+# elekloader-catalog.json, attached to that release with their checksums in SHA256SUMS.txt.
+#
+# Run it by hand (Actions > kit-build > Run workflow) with the release's tag, once the release exists:
+#   - vX.Y.Z, an elekloader release: the catalog's cores are that release's core-*.elemod files;
+#   - kit-vX.Y.Z, a kit-only pre-release (never the latest, so the page and the apps keep the
+#     latest release's cores): the catalog's cores are the latest release's.
+# Either way the version is elekloader's at that tag. The catalog is web/catalog.json's list at
+# that tag, each file downloaded from its author's release or commit and read by the engine
+# (js/tools/kit.ts feed); then every pinned file is fetched again from its source, as a site's
+# sync does. Node is pinned: the same commit and Node give the same zip (packaging/build_kit.py).
+#
+# A file the release already carries is never replaced by different bytes: sites pin the kit by
+# its sha256. To rebuild one on purpose, delete it from the release first.
+#
+# With test ticked, it builds the branch it is run on instead (cores as above, from the tag's
+# release) and keeps both files as the run's artifact; nothing is attached.
+name: kit-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release's tag: vX.Y.Z, or kit-vX.Y.Z for a kit-only pre-release; it must exist and name elekloader's version"
+        required: true
+      test:
+        description: "Test: build the branch it is run on, attach nothing, keep the files as the run's artifact"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# windows-build and macos-build are in the same group: each rewrites the release's SHA256SUMS.txt
+concurrency:
+  group: ${{ inputs.test && 'test' || 'release' }}-${{ inputs.tag }}
+
+jobs:
+  kit-build:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.test && github.ref || inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24.19.0"
+          package-manager-cache: false
+      - name: The tag is the version
+        if: ${{ !inputs.test }}
+        run: |
+          v=$(python -c "import elekloader; print(elekloader.__version__)")
+          k=$(node -p "require('./js/package.json').version")
+          test "$v" = "$k" || { echo "elekloader is $v but js/package.json is $k"; exit 1; }
+          case "$TAG" in
+            "v$v"|"kit-v$v") ;;
+            *) echo "tag $TAG is neither v$v nor kit-v$v"; exit 1 ;;
+          esac
+      - name: The kit's tests
+        run: node --test "js/test/*.test.ts"
+      - name: The kit
+        run: python packaging/build_kit.py --out build/kit
+      - name: The cores, from the release (for a kit-only one, the latest release)
+        run: |
+          case "$TAG" in
+            kit-v*) src=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName) ;;
+            *) src=$TAG ;;
+          esac
+          echo "CORES=$src" >> "$GITHUB_ENV"
+          gh release download "$src" --repo "$GITHUB_REPOSITORY" --pattern "core-*.elemod" --dir build/core
+      - name: The mod shop's files, from their authors' releases and commits
+        run: |
+          # as pages.yml fetches them; feed leaves out a file that cannot be fetched (a draft release)
+          mkdir -p build/shop
+          python packaging/build_web.py --catalog-list web/catalog.json | while read -r how repo ref path; do
+            if [ "$how" = commit ]; then
+              out="build/shop/${path##*/}"
+              gh api "repos/$repo/contents/$path?ref=$ref" -H "Accept: application/vnd.github.raw" > "$out.part" \
+                && mv "$out.part" "$out" \
+                || { rm -f "$out.part"; echo "::warning::$repo $ref $path: not downloadable; the catalog leaves it out"; }
+            else
+              gh release download "$ref" --repo "$repo" --pattern "$path" --dir build/shop --clobber \
+                || echo "::warning::$repo $ref $path: not downloadable; the catalog leaves it out"
+            fi
+          done
+      - name: The catalog
+        run: |
+          node js/tools/kit.ts feed --list web/catalog.json --files build/shop --core build/core/core-*.elemod \
+            --core-source "$GITHUB_REPOSITORY@$CORES" --revision "$(git rev-parse HEAD)" --out build/kit/elekloader-catalog.json
+      - name: Every pinned file downloads from its source, as a site's sync does
+        run: node js/tools/kit.ts sync build/kit/elekloader-catalog.json build/sync-check
+      - name: Keep as the run's artifact
+        if: ${{ inputs.test }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: elekloader-kit
+          path: |
+            build/kit/elekloader-kit-*.zip
+            build/kit/elekloader-catalog.json
+      - name: Attach to the release
+        if: ${{ !inputs.test }}
+        run: |
+          cd build/kit
+          sha256sum elekloader-kit-*.zip elekloader-catalog.json > ours.txt
+          cat ours.txt
+          mkdir -p ../release
+          assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          # a file the release carries stays as it is: the same bytes are not uploaded again, other bytes stop the run
+          upload=()
+          while read -r sum name; do
+            if grep -qx "$name" <<< "$assets"; then
+              gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$name" --dir ../release --clobber
+              have=$(sha256sum "../release/$name" | cut -d' ' -f1)
+              if [ "$have" != "$sum" ]; then
+                echo "::error::the release's $name has sha256 $have, not this build's $sum; delete it from the release to replace it"
+                exit 1
+              fi
+              echo "$name: the release carries these bytes already"
+            else
+              upload+=("$name")
+            fi
+          done < ours.txt
+          # SHA256SUMS.txt lists every file on the release: keep the other builds' lines
+          old=/dev/null
+          if grep -qx SHA256SUMS.txt <<< "$assets"; then
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt --dir ../release --clobber
+            old=../release/SHA256SUMS.txt
+          fi
+          awk 'NR == FNR { ours[$2]; print; next } !($2 in ours)' ours.txt "$old" | sort -k 2 > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release upload "$TAG" "${upload[@]}" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
