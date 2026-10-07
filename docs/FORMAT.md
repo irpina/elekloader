@@ -21,7 +21,7 @@ made for different releases.
 | `title`, `description`, `category`, `author` | for people |
 | `license` | an SPDX identifier for the mod's own bytes, e.g. `GPL-2.0-or-later`; shown in the loader and by `lint` |
 | `sites` | changes to the stock image (below) |
-| `resources` | `regions`: run-time memory it claims, each inside one of the device's free areas; `names`: named resources such as `sysex:0x7d`, `settings:FAST AUDIO`, `drive:/cfw/slices.a` |
+| `resources` | `regions`: run-time memory it claims, each inside one of the device's free areas; `names`: named resources such as `sysex:0x7d`, `settings:FAST AUDIO`, `drive:/cfw/slices.a`; `core` (format 2): the oldest core version it links with, such as `"3.0"` (elekloader 0.4.0 and older ignore it) |
 | `requires`, `conflicts` | lists of mod ids |
 | `signature` | reserved; `null` |
 
@@ -107,7 +107,9 @@ Nothing is built unless all of these pass:
   twice.
 - **Links.** Every import resolves, and every contribution goes to a
   declared table in whole entries.
-- **Mods.** Exactly one core mod; `requires` and `conflicts` hold.
+- **Mods.** Exactly one core mod; `requires` and `conflicts` hold; the
+  core is at least every mod's `resources.core` (versions compare their
+  runs of digits as numbers: 2.10 after 2.9, 2.0a after 2.0).
 - **Copied blocks.** A mod's site inside another mod's `copied` block must:
   - be code;
   - avoid every byte a fix-up claims;

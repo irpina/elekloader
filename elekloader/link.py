@@ -29,8 +29,8 @@ import struct
 
 from . import dsp
 from .elemod import (ModError, sha, _int, _hex, common_checks, insn_check, overlaps, summarize,
-                    parse_parts, parse_resources, parse_sites, parts_bytes, resolve_target,
-                    format_of,
+                    parse_needs_core, parse_parts, parse_resources, parse_sites, parts_bytes,
+                    resolve_target, format_of, version_key,
                     COMMON)
 
 FORMAT2 = 2
@@ -154,6 +154,7 @@ class Mod2:
         self.copied = [(_int(c['lo'], name), _int(c['hi'], name), _int(c['to'], name))
                        for c in doc.get('copied', [])]
         self.regions, self.names = parse_resources(doc, name, self.dev)
+        self.needs_core = parse_needs_core(doc, name)
         self.requires = [str(x) for x in doc.get('requires', [])]
         self.conflicts = [str(x) for x in doc.get('conflicts', [])]
         self.blob = None                       # (format 1 only)
@@ -226,6 +227,11 @@ def check(mods, image):
     if len(cores) != 1:
         bad.insert(0, 'exactly one mod must carry .boot (core); got %s'
                    % ([m.label() for m in cores] or 'none'))
+    else:
+        for m in mods:
+            if m.needs_core and version_key(cores[0].version) < version_key(m.needs_core):
+                bad.append('%s needs core %s or newer, and this build has core %s'
+                           % (m.label(), m.needs_core, cores[0].version))
     owner = {}
     for m in mods:
         for x in m.exports:

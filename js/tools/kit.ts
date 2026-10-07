@@ -16,6 +16,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join, relative, sep } from 'node:path'
 import { sha } from '../src/bytes.ts'
+import { cmpVersions } from '../src/elemod.ts'
 import { loadAny } from '../src/patch.ts'
 import { VERSION } from '../src/version.ts'
 import { parseCatalog, sourceUrl, type Catalog, type CatalogMod, type Pin, type Source } from '../src/kit/catalog.ts'
@@ -39,11 +40,12 @@ function walk(dir: string): string[] {
 }
 
 /** What a file says about itself, as a pin. */
-function facts(path: string, source: Source, license?: string): Pin & { doc: Record<string, any>; requires: string[]; conflicts: string[] } {
+function facts(path: string, source: Source, license?: string): Pin & { doc: Record<string, any>; requires: string[]; conflicts: string[]; needs: string | null } {
   const data = new Uint8Array(readFileSync(path))
   const m = loadAny({ path, data })
   const lic = (m.doc.license as string) || license || ''
-  return { file: basename(path), sha256: sha(data), id: m.id, version: m.version, device: m.dev.key, os: m.rel.version, license: lic, source, doc: m.doc, requires: [...m.requires], conflicts: [...m.conflicts] }
+  return { file: basename(path), sha256: sha(data), id: m.id, version: m.version, device: m.dev.key, os: m.rel.version, license: lic, source, doc: m.doc,
+    requires: [...m.requires], conflicts: [...m.conflicts], needs: m.needsCore ?? null }
 }
 
 function feed() {
@@ -56,7 +58,7 @@ function feed() {
   for (const p of flags.get('core') ?? []) {
     if (!coreSource || !/^[\w.-]+\/[\w.-]+@.+$/.test(coreSource)) die('feed: --core-source owner/repo@tag, where the --core files are released')
     const [repo, tag] = coreSource!.split('@')
-    const { doc: _doc, requires: _r, conflicts: _c, ...pin } = facts(p, { repo, tag })
+    const { doc: _doc, requires: _r, conflicts: _c, needs: _n, ...pin } = facts(p, { repo, tag })
     cores.push(pin)
   }
   for (const it of list) {
@@ -67,10 +69,12 @@ function feed() {
     const f = facts(path, source, it.license)
     if (f.sha256 !== it.sha256) die(`${file}: sha256 ${f.sha256}, not the ${it.sha256} the list pins`)
     if (f.device !== it.device) die(`${file} is made for ${f.device}, not the list's ${it.device}`)
-    const { doc, requires, conflicts, ...pin } = f
+    const { doc, requires, conflicts, needs, ...pin } = f
     if (it.kind === 'core') { cores.push(pin); continue }
+    // a file's resources.core is the least it needs: the list may ask for more, never less
+    if (needs && it.needs_core && cmpVersions(it.needs_core, needs) < 0) die(`${file} needs core ${needs} (its resources.core), not the list's ${it.needs_core}`)
     const mod: CatalogMod = { ...pin, title: it.title ?? doc.title ?? f.id, requires, conflicts }
-    for (const [k, v] of [['summary', it.summary], ['description', doc.description], ['category', doc.category], ['author', doc.author], ['needs_core', it.needs_core], ['on_unit', it.on_unit]] as const)
+    for (const [k, v] of [['summary', it.summary], ['description', doc.description], ['category', doc.category], ['author', doc.author], ['needs_core', it.needs_core ?? needs], ['on_unit', it.on_unit]] as const)
       if (v) (mod as Record<string, unknown>)[k] = v
     mods.push(mod)
   }

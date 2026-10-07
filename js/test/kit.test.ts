@@ -5,6 +5,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { sha } from '../src/bytes.ts'
 import { VERSION } from '../src/version.ts'
+import { cmpVersions, pickCore } from '../src/elemod.ts'
 import { CatalogError, parseCatalog, planBuild, releases, sourceUrl, type Catalog } from '../src/kit/catalog.ts'
 import { createBuilder } from '../src/kit/client.ts'
 import { buildLogText, buildStep, describeBuilder, prepare } from '../src/kit/build.ts'
@@ -49,7 +50,7 @@ test('a file is downloaded from its release or its commit', () => {
   assert.equal(sourceUrl(c.mods[0]), `https://raw.githubusercontent.com/someone/mods/${'c'.repeat(40)}/elemods/digichain-1.53.elemod`)
 })
 
-test('a plan brings what each mod requires, and the newest core it needs', () => {
+test('a plan brings what each mod requires, and the core it needs', () => {
   const c = parseCatalog(structuredClone(CATALOG))
   const p = planBuild(c, 'digitakt-mk1', '1.53', ['digimono'])
   assert.deepEqual(p.mods.map(m => m.id), ['digichain', 'digimono'])
@@ -58,6 +59,33 @@ test('a plan brings what each mod requires, and the newest core it needs', () =>
   assert.deepEqual(planBuild(c, 'digitakt-mk1', '1.54', ['fancy', 'digichain']).missing, ['fancy'])
   assert.equal(planBuild(c, 'digitone-mk1', '1.43', []).core, undefined)
   assert.deepEqual(releases(c, 'digitakt-mk1', 'digimono'), ['1.53', '1.54'])
+})
+
+test('a new major core is taken only by the selections that need it', () => {
+  const cat = structuredClone(CATALOG)
+  cat.cores.push(core('core-3.0.elemod', '1.53', '3.0'))
+  cat.mods.push(mod('pages', '1.53', { needs_core: '3.0' }), mod('later', '1.53', { needs_core: '4.0' }))
+  const c = parseCatalog(cat)
+  const plan = (ids: string[]) => planBuild(c, 'digitakt-mk1', '1.53', ids).core?.file
+  assert.equal(plan(['digimono']), 'core-2.2.elemod')              // as before core 3.0 was listed
+  assert.equal(plan(['fancy']), 'core-2.2.elemod')
+  assert.equal(plan([]), 'core-2.2.elemod')
+  assert.equal(plan(['pages', 'digimono']), 'core-3.0.elemod')
+  assert.equal(plan(['later']), undefined)
+  assert.equal(planBuild(c, 'digitakt-mk1', '1.54', ['pages']).core?.file, 'core-2.1-os1.54.elemod')
+})
+
+test('versions sort as numbers, and pickCore takes the newest of the oldest line that will do', () => {
+  const order = ['', '0.13a', '0.13b', '2', '2.0', '2.0a', '2.1', '2.9', '2.10', '3.0', '10.0']
+  assert.deepEqual([...order].reverse().sort(cmpVersions), order)
+  assert.equal(cmpVersions('2.1', '2.1'), 0)
+  assert.equal(pickCore(['2.1', '3.0', '2.0a']), 0)
+  assert.equal(pickCore(['2.1', '3.0', '2.0a'], '2.1'), 0)
+  assert.equal(pickCore(['2.1', '3.0', '2.0a'], '2.2'), 1)
+  assert.equal(pickCore(['2.1', '3.0', '3.1'], '3.0'), 2)
+  assert.equal(pickCore(['2.1', '2.1'], null), 1)                  // the last of equals, as gui does
+  assert.equal(pickCore(['2.1', '3.0'], '3.1'), null)
+  assert.equal(pickCore([], null), null)
 })
 
 /** A site: its files by URL. */
