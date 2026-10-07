@@ -161,6 +161,18 @@ MAP's 50 (octabam2elemod v1.1). It shows, for each CC, whether CC MAP took it
 or the Octatrack got it. Before the bus that took a bridge written for the
 pair.
 
+### The DSP bus on the Octatrack (dspbus 0.1)
+
+`mods/dspbus-ot` is a second, optional bus, for code that runs on DSP core
+0 ("DSP code" in 3.4). It frees SPATIALIZER's 261 words of DSP memory for
+mods' DSP code, and takes SPATIALIZER off both FX menus to do it
+(mods/dspbus-ot/README.md). A mod with DSP code requires it:
+`"requires": ["core", "dspbus"]`. Start from `examples/dsp-tone-ot`.
+
+| event | when | handler | notes |
+|---|---|---|---|
+| `ev_dsp_rx` | DSP core 0, the head of every audio frame (2,756 a second), before anything reads the current RX block | DSP code, reached by `jsr`, ending in `rts` | the RX block is at `x:>$202`: 16 samples x 4 slots (2 input A, 3 input B, 0 and 1 C and D). Use `a`, `x1`, `r0`, `r1` and the condition codes; keep every other register. Subscribe with `subscribe_dsp` |
+
 ### SRC machines (core 2.1, Digitakt mk1)
 
 The Digitakt mk1 has four SRC machines: 0 ONESHOT, 1 WERP, 2 REPITCH and
@@ -606,8 +618,12 @@ refused.
 - `dsp_jsr` hooks one two-word instruction of a payload: its `stock` is
   those 6 bytes (24-bit little-endian words, as the payload holds them).
   What it calls must do the displaced instruction's work.
+- dsp_asm puts each label's address into the text wherever the label's
+  name appears, so no label may be part of a longer word (`tone` beside
+  `tone_end`). The SDK refuses that.
 - Test DSP code under a DSP emulator before any hardware: octabam's
-  `ot_emu --dsp` runs both cores.
+  `ot_emu --dsp` runs both cores. `examples/dsp-tone-ot` ran there: with
+  `--dsp-peek "0:X:8100,576"`, input A holds its ramp in every RX block.
 
 **3.5 Build it.**
 
@@ -802,7 +818,8 @@ python -m elekloader.sdk.octabam --octabam octabam --stock OCTATRACK_OS1.40C.syx
     `P:0x88`;
   - SPATIALIZER's dispatch on payload A pointed at the null stub;
   - the FX1 and FX2 choosers without SPATIALIZER, and their row tables.
-  So these mods take SPATIALIZER off both FX menus, as the remixes do.
+  So these mods take SPATIALIZER off both FX menus, as the remixes do. With
+  `--bus`, the DSP bus does that instead (below).
 - **The check** links the mod with the core and requires the OS image to
   equal octabam's build in every byte. The only exceptions are the address
   operands of our placed code and the descriptor served from a copy. On top
@@ -850,6 +867,23 @@ python -m elekloader.sdk.octabam --octabam octabam --stock OCTATRACK_OS1.40C.syx
 
   In a remix, the hook's 6 bytes octabam's build writes are the only other
   bytes allowed to differ, and only while they are stock.
+- **The DSP bus too.** USB AUDIO IN's RX inject hooks payload A's P:0x88,
+  which the DSP bus serves (`mods/dspbus-ot`, `ev_dsp_rx`), and every
+  `usb-io-*` remix gives up SPATIALIZER, as the bus does. So with `--bus`:
+  - the remix's mod leaves the hook, the FX menus and SPATIALIZER's words to
+    the bus. Its inject source is assembled into the mod (`"dsp"`, with
+    octabam's dsp_asm: set `ELEKLOADER_DSP_ASM`), and subscribes to
+    `ev_dsp_rx` past its replay of the displaced instruction
+    (`"addend": 2`, the instruction's two words);
+  - it requires the DSP bus (`"requires": ["core", "dspbus"]`);
+  - the check links it with the bus (built from `mods/dspbus-ot`, or
+    `--dspbus`). The image must equal octabam's build but for the hook's
+    jump and the bus's table, so the inject is where octabam placed it and
+    the menus are what its build writes. The inject must begin with the
+    instruction its hook displaces.
+
+  A remix that gives up another effect, or a DSP hook elsewhere, is refused
+  with `--bus`.
 
 What does not convert, and why:
 - **DSP code.** Modules with DSP code or an FX menu entry are out of scope,
@@ -929,6 +963,7 @@ Some differences from an octabam build, by design:
 | `holds an address the linker cannot place` (SDK) | a label used as a short or packed operand | use a form that takes the address as a whole word (`>`); branches are relative |
 | `is a DSP reference to a ColdFire address` (or the reverse) | a `dsp24` relocation names a ColdFire symbol, or a ColdFire one a DSP label | name the right symbol; DSP labels are word addresses on the DSP |
 | `dsp_asm is not installed` | the SDK needs octabam's DSP assembler | build octabam's `vendor/dsp56300` and set `ELEKLOADER_DSP_ASM` |
+| `the label N is part of a longer word here` (SDK) | dsp_asm would put N's address inside that word | rename the label |
 
 ## 6. Definition of done
 

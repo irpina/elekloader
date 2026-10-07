@@ -1,0 +1,15 @@
+{
+ "id": "dsp-tone",
+ "version": "1.0",
+ "title": "DSP tone",
+ "category": "Examples",
+ "license": "GPL-2.0-or-later",
+ "description": "Replaces input A with a quiet 2,756 Hz sawtooth, from DSP code on the DSP bus: the smallest mod that runs code on the Octatrack's DSP. A template to start from (docs/ADAPTING.md). Needs the DSP bus, which takes SPATIALIZER off the FX menus.",
+ "device": "octatrack",
+ "os": "1.40C",
+ "dsp": [{"source": "tone.asm", "payload": "A"}],
+ "subscribe_dsp": [
+  {"event": "ev_dsp_rx", "fn": "tone", "order": 50}
+ ],
+ "requires": ["core", "dspbus"]
+}

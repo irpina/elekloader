@@ -196,3 +196,10 @@ same conventions (docs/ADAPTING.md, "The hook bus on the Octatrack"):
 | `ev_enc` | 0x40061e00, `enc(encoder, delta)` | `int f(encoder, delta)`; nonzero: taken |
 | `ev_midi` | 0x40005572, the MIDI thread's handler call | `int f(msg)`; nonzero: taken |
 | `ev_frame` | 0x4000d94e, the frame interrupt, every 16 samples | `void f(void)` |
+
+An optional mod, the DSP bus (`mods/dspbus-ot`, dspbus 0.1), adds an event on
+DSP core 0. It is a DSP table, so its handlers are DSP code (`subscribe_dsp`):
+
+| event | site | handler |
+|---|---|---|
+| `ev_dsp_rx` | payload A's P:0x88 (0x400ef758), the head of every audio frame | DSP code from `jsr`, ending in `rts`; it may change `a`, `x1`, `r0`, `r1` |

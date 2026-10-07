@@ -4,6 +4,7 @@
     python -m elekloader.sdk.octabam --octabam PATH --stock OCTATRACK_OS1.40C.syx
                                      [--module NAME ...] [--remix NAME ...] [--reference IMAGE]
                                      --out DIR [--core CORE.elemod] [--bus]
+                                     [--dspbus DSPBUS.elemod]
 
 octabam (MIT) declares each module in modules/<name>/manifest.py, in the
 vocabulary of its tools/remix/schema.py. This reads the manifests of a
@@ -40,6 +41,7 @@ these:
 | category | the mod's category, as octabam titles it (CATEGORY_TITLE: "MIDI and USB", ...) |
 | Claims (part window, SRAM) | named resources, one per 16-byte block, so mods whose claims overlap are refused together |
 | a hook in BUS, with --bus | its site left stock; generated glue subscribes its code to the core's event (core-ot 0.2) |
+| a DspHook in DSP_BUS, in a remix, with --bus | its DSP source in the mod; it subscribes to the DSP bus's event (mods/dspbus-ot) |
 
 Anything else refuses the module, with the reason:
 - DSP code or an FX menu entry (only ColdFire-only modules convert);
@@ -63,6 +65,15 @@ inject in a stock effect's DSP code, its hook, the effect's dispatch pointed at 
 stub, and the FX1/FX2 choosers without the effect. The check then requires the linked OS
 image to equal that build in every byte, but for the address operands of our placed code and
 data served from a copy.
+
+With `--bus`, a remix whose hooked DSP code hooks a site the DSP bus serves (DSP_BUS: USB
+AUDIO IN's inject at payload A's P:0x88), and which gives up the effect the bus gives up
+(SPATIALIZER), runs on the DSP bus instead (mods/dspbus-ot): its DSP source is assembled into
+the mod (sdk.build's "dsp", with octabam's dsp_asm), and it subscribes to `ev_dsp_rx` past
+its replay of the displaced instruction. The bus's hook, menus and freed words are left to
+the bus, and the mod requires it. The check links it with the bus (built from
+mods/dspbus-ot, or `--dspbus`): the image must still equal octabam's build in every byte but
+for the hook's jump and the bus's table, so the DSP code is where octabam placed it.
 
 A unit's generated `include` is built for the modules this mod carries.
 Where it would change with another module that converts, the mod conflicts
@@ -95,7 +106,7 @@ import shutil
 import subprocess
 import sys
 
-from .. import elemod, formats, link
+from .. import dsp, elemod, formats, link
 from . import build as sdkbuild
 
 DEVICE = 'octatrack'
@@ -342,6 +353,17 @@ BUS = {
         event='ev_midi', kind='cc', next='CC_NEXT', stock=0x4000E79C),
 }
 BUS_ORDER = 50
+
+# ---- the DSP bus (mods/dspbus-ot, --bus) ----------------------------------------------
+# octabam DSP hooks (schema.DspHook: a two-word stock instruction becomes `jsr >label`, and
+# the label's code replays it first) that the DSP bus serves, by (payload, P address). With
+# --bus, a remix whose hooked DSP code hooks one of these, and which gives up exactly the
+# effects the bus does, leaves the site, the menus and the effect's words to the bus mod:
+# its DSP source is assembled into the mod, and subscribes to the event past its replay.
+DSP_BUS = {
+    ('A', 0x88): dict(event='ev_dsp_rx', stock=(0x627000, 0x000204), harvest=('SPATIALIZER',)),
+}
+DSPBUS_DIR = os.path.join(os.path.dirname(CORE_DIR), 'dspbus-ot')
 
 
 def _bus_glue(ob, mkey, hooks):
@@ -850,6 +872,37 @@ def convert(ob, name, image, dev, rx=None, bus=False):
                      'through %s, and leaves the protected bytes stock'
                      % (at, what, sym, ', '.join('0x%08x' % a for a in refs)))
 
+    # --bus: a remix's hooked DSP code the DSP bus serves subscribes to it instead
+    dsp_subs = []
+    for n, mm in zip(names_, mods):
+        if not (bus and rx is not None and hooked_dsp(mm)):
+            continue
+        for hk in mm.dsp.hooks:
+            for tag in sorted(mm.dsp.payloads):
+                spec = DSP_BUS.get((tag, hk.site))
+                if spec is None:
+                    raise Refused('%s: its DSP hook at payload %s P:0x%x is not one the DSP '
+                                  'bus serves (%s)' % (n, tag, hk.site, ', '.join(
+                                      'payload %s P:0x%x' % k for k in sorted(DSP_BUS))))
+                if tuple(hk.stock) != spec['stock']:
+                    raise Refused('%s: its DSP hook at P:0x%x expects %s, not the stock %s'
+                                  % (n, hk.site, ' '.join('%06x' % w for w in hk.stock),
+                                     ' '.join('%06x' % w for w in spec['stock'])))
+                if tuple(rx['harvested']) != spec['harvest']:
+                    raise Refused('it gives up %s, and the DSP bus gives up %s: --bus needs '
+                                  'the same' % (', '.join(rx['harvested']) or 'nothing',
+                                                ', '.join(spec['harvest'])))
+                dsp_subs.append(dict(spec, module=n, site=hk.site, label=hk.label,
+                                     asm=mm.dsp.asm, payload=tag))
+    if dsp_subs:
+        requires.append('dspbus')
+        notes.append('its DSP code (%s) subscribes to the DSP bus\'s %s, past its replay of the '
+                     'instruction the hook displaces; the bus (mods/dspbus-ot) owns the hook, '
+                     'the FX menus and %s\'s words, so it needs the DSP bus'
+                     % (', '.join(sorted({d['label'] for d in dsp_subs})),
+                        ', '.join(sorted({d['event'] for d in dsp_subs})),
+                        ', '.join(rx['harvested'])))
+
     # a remix: every other byte octabam's build of it writes in the OS image, as data
     remix_sites = []
     if rx is not None:
@@ -859,6 +912,8 @@ def convert(ob, name, image, dev, rx=None, bus=False):
         taken = [(int(s['addr'], 16), int(s['addr'], 16) + len(s['stock']) // 2)
                  for s in sites] + _core_spans() + [(h['site'], h['site'] + h['len'])
                                                     for h in hooks]   # left stock: the bus
+        if dsp_subs:
+            taken += _dspbus_spans(image, dev)      # the DSP bus's: compared by the check
         moved = {a + i for r in relocs.values() for a, w in r['pokes'] for i in range(len(w))}
 
         def ours(a):
@@ -890,11 +945,11 @@ def convert(ob, name, image, dev, rx=None, bus=False):
         notes.append('octabam\'s build of %s also writes these, carried as data: %s'
                      % (name, '; '.join('%s (0x%08x, %d bytes)' % (w, lo, hi - lo)
                                         for lo, hi, w in remix_sites) or 'nothing'))
-        if rx['harvested']:
+        if rx['harvested'] and not dsp_subs:
             notes.append('it leaves %s off both FX menus, as the remix does: octabam\'s build '
                          'gives their DSP code space to the remix\'s DSP code'
                          % ', '.join(rx['harvested']))
-        for n in names_:                    # for the reader: the build placed these words
+        for n in names_:                    # the build placed these words (--bus: we do)
             if hooked_dsp(ob.modules[n]):
                 asm = ob.modules[n].dsp.asm
                 with open(os.path.join(ob.root, *asm.split('/')), 'rb') as fh:
@@ -928,11 +983,14 @@ def convert(ob, name, image, dev, rx=None, bus=False):
         desc = '%s (octabam remix %s: %s; converted from %s)%s' % (
             rx['doc'], name, ', '.join(mm.key for mm in mods), ob.commit,
             ' It takes %s off both FX menus.' % ', '.join(rx['harvested'])
-            if rx['harvested'] else '')
+            if rx['harvested'] and not dsp_subs else '')
     if hooks:
         desc += ' It runs on the Octatrack core\'s hook bus: it needs core 0.2 or newer.'
+    if dsp_subs:
+        desc += (' Its DSP code runs on the DSP bus, which takes %s off both FX menus: it '
+                 'needs the DSP bus.' % ', '.join(rx['harvested']))
     doc = {
-        'id': mid, 'version': ob.commit + ('-bus' if hooks else ''),
+        'id': mid, 'version': ob.commit + ('-bus' if hooks or dsp_subs else ''),
         'title': title,
         'description': desc,
         'category': cat,
@@ -949,6 +1007,12 @@ def convert(ob, name, image, dev, rx=None, bus=False):
     if hooks:
         doc['subscribe'] = [{'event': h['event'], 'fn': h['sym'], 'order': BUS_ORDER}
                             for h in hooks]
+    if dsp_subs:                            # entered past the replay, which the bus's table makes
+        doc['dsp'] = [{'source': 'dsp/%s' % os.path.basename(a), 'payload': t}
+                      for a, t in sorted({(d['asm'], d['payload']) for d in dsp_subs})]
+        doc['subscribe_dsp'] = [{'event': d['event'], 'fn': d['label'],
+                                 'addend': len(d['stock']), 'order': BUS_ORDER}
+                                for d in dsp_subs]
     if names:
         doc['resources'] = {'names': names}
     if conflicts:
@@ -959,7 +1023,7 @@ def convert(ob, name, image, dev, rx=None, bus=False):
                         'bytes': bytes(r['bytes']), 'pokes': r['pokes']}
                        for lo, r in sorted(relocs.items())],
             'remix': rx, 'remix_sites': remix_sites,
-            'bus': hooks, 'bus_sources': rewritten}
+            'bus': hooks, 'bus_sources': rewritten, 'dsp_bus': dsp_subs}
 
 
 def write(ob, plan, out):
@@ -1028,12 +1092,39 @@ def _gnu_link(dev, root, src, at, cpu, defsyms, work, sections=('.text',), looku
         return fh.read()
 
 
-def check(ob, plan, mod_path, core_path, stock_path, work):
-    """The converted mod, linked with the core, against octabam's account -> [lines]."""
+_DSPBUS = []
+
+
+def _dspbus_spans(image, dev):
+    """The DSP bus's bytes (mods/dspbus-ot): its sites and the P words it frees -> [(lo, hi)]."""
+    if not _DSPBUS:
+        with open(os.path.join(DSPBUS_DIR, 'mod.json')) as fh:
+            j = json.load(fh)
+        for s in j['sites']:
+            a = int(s['addr'], 16)
+            _DSPBUS.append((a, a + len(s['stock']) // 2))
+        names = j.get('resources', {}).get('names', [])
+        for tag, lo, hi, nm, _w in dev.dsp_areas:
+            if nm in names:
+                at = dsp.p_span(image, dev, tag, lo, hi)
+                _DSPBUS.append((at, at + 3 * (hi - lo)))
+    return list(_DSPBUS)
+
+
+def check(ob, plan, mod_path, core_path, stock_path, work, dspbus_path=None):
+    """The converted mod, linked with the core (and the DSP bus, for DSP code on it), against
+    octabam's account -> [lines]."""
     st, dev, rel = formats.load(stock_path)
     image = formats.main_image(st, dev)
     mod, core = elemod.load_any(mod_path), elemod.load_any(core_path)
-    ln = link.link([core, mod], image)
+    given = [core, mod]
+    if plan.get('dsp_bus'):
+        if not dspbus_path:
+            raise CheckError('its DSP code runs on the DSP bus, so the check needs it '
+                             '(mods/dspbus-ot)')
+        dbus = elemod.load_any(dspbus_path)
+        given.insert(1, dbus)
+    ln = link.link(given, image)
     run_off = ln.layout['run_load'] - dev.main_load
     ddr0 = ln.layout['ddr'][0]
     mdir = os.path.join(os.path.dirname(mod_path), plan['id'])
@@ -1284,9 +1375,24 @@ def check(ob, plan, mod_path, core_path, stock_path, work):
                  if ref[a - base] == image[a - base]}      # only where octabam's build is stock
         bused = {a for h in plan.get('bus', ()) for a in range(h['site'], h['site'] + h['len'])
                  if ln.image[a - base] == image[a - base]}   # its hooks the bus serves: stock
+        dspd = set()                        # the DSP bus's hook (to its table) and its table
+        for d in plan.get('dsp_bus', ()):
+            tag, ev = d['payload'], d['event']
+            lo, hi = ln.layout['dsp'][tag]['area']
+            area = dsp.p_span(image, dev, tag, lo, hi)
+            at = dsp.p_span(image, dev, tag, d['site'], d['site'] + len(d['stock']))
+            dspd.update(range(at, at + 3 * len(d['stock'])))
+            _t, head, end = dbus.dsp_tables[ev]
+            t = area + 3 * (ln.tables[ev][0] - lo)
+            dspd.update(range(t, t + len(head) + ln.tables[ev][1] * ln.tables[ev][2] + len(end)))
+            o = area + 3 * (sym(d['label']) - lo) - base
+            if ln.image[o:o + 3 * len(d['stock'])] != b''.join(
+                    bytes((w & 0xFF, (w >> 8) & 0xFF, w >> 16)) for w in d['stock']):
+                raise CheckError('%s does not begin with the instruction its hook displaces, '
+                                 'which the DSP bus runs before it' % d['label'])
         diff = [base + i for i in _changed(ln.image[:len(image)], ref)]
         bad = [a for a in diff if a not in ours and a not in moved and a not in cores
-               and a not in bused]
+               and a not in bused and a not in dspd]
         if bad:
             raise CheckError('the linked image differs from octabam\'s build of %s at %d bytes '
                              'that are not our code\'s addresses, the first at 0x%08x'
@@ -1299,7 +1405,10 @@ def check(ob, plan, mod_path, core_path, stock_path, work):
                         sum(a in moved for a in diff),
                         sum(a in cores and a not in ours and a not in moved for a in diff),
                         '; %d bytes of its hooks are left stock for the bus'
-                        % sum(a in bused for a in diff) if bused else ''))
+                        % sum(a in bused for a in diff) if bused else '')
+                     + ('; %d bytes are the DSP bus\'s hook and table, its DSP code is where '
+                        'octabam\'s build placed it' % sum(a in dspd for a in diff)
+                        if dspd else ''))
 
     # the whole of the mod's RAM and fixed code against GNU ld's link of the same object
     obj = os.path.join(os.path.dirname(mod_path), plan['id'] + '.work', plan['id'] + '.o')
@@ -1386,6 +1495,8 @@ def main(argv=None):
                     help='put the hooks the Octatrack core\'s hook bus serves (BUS: TUNER, CC '
                          'FEEDBACK, CC MAP, USB AUDIO OUT\'s producer) on its events; such a mod '
                          'is versioned <commit>-bus and needs core 0.2 or newer')
+    ap.add_argument('--dspbus', help='the DSP bus .elemod, for mods whose DSP code runs on it '
+                                     '(default: build mods/dspbus-ot)')
     ap.add_argument('--no-check', action='store_true', help='build, but skip the check')
     a = ap.parse_args(argv)
     if inside_checkout(a.out):
@@ -1422,7 +1533,7 @@ def main(argv=None):
               'Such code assembles longer here: the same code, not the same bytes, and a unit '
               'whose author pinned its bytes (USB MIDI) fails its check. Install m68k-elf '
               'binutils (it is used when found), or set ELEKLOADER_CROSS=m68k-elf-.')
-    failed = 0
+    failed, dspbus = 0, a.dspbus
     for n, is_remix in [(n, False) for n in names] + [(r, True) for r in a.remix or ()]:
         if n in ob.broken:
             print('REFUSED   %-30s its manifest does not load (%s)' % (n, ob.broken[n]))
@@ -1445,8 +1556,11 @@ def main(argv=None):
         d = write(ob, plan, a.out)
         try:
             path, mod = sdkbuild.build(d, a.stock, a.out)
+            if plan.get('dsp_bus') and not dspbus and not a.no_check:
+                dspbus, _m = sdkbuild.build(DSPBUS_DIR, a.stock, os.path.join(a.out, 'dspbus'))
             lines = [] if a.no_check else check(ob, plan, path, core, a.stock,
-                                                os.path.join(a.out, plan['id'] + '.check'))
+                                                os.path.join(a.out, plan['id'] + '.check'),
+                                                dspbus)
         except (sdkbuild.BuildError, CheckError, elemod.ModError, OSError) as e:
             print('FAILED    %-30s %s' % (n, str(e).strip().replace('\n', '\n          ')))
             failed += 1
