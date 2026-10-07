@@ -154,6 +154,18 @@ arena writes listed in its `mod.json`, 0x40061e94, 0x40013cae, 0x40061dc8,
 0x400c46ea-0x400c4702. They keep clear of every byte that the converted
 octabam modules (4b) patch.
 
+### The DSP bus on the Octatrack (dspbus 0.1)
+
+`mods/dspbus-ot` is a second, optional bus, for code that runs on DSP core
+0 ("DSP code" in 3.4). It frees SPATIALIZER's 261 words of DSP memory for
+mods' DSP code, and takes SPATIALIZER off both FX menus to do it
+(mods/dspbus-ot/README.md). A mod with DSP code requires it:
+`"requires": ["core", "dspbus"]`. Start from `examples/dsp-tone-ot`.
+
+| event | when | handler | notes |
+|---|---|---|---|
+| `ev_dsp_rx` | DSP core 0, the head of every audio frame (2,756 a second), before anything reads the current RX block | DSP code, reached by `jsr`, ending in `rts` | the RX block is at `x:>$202`: 16 samples x 4 slots (2 input A, 3 input B, 0 and 1 C and D). Use `a`, `x1`, `r0`, `r1` and the condition codes; keep every other register. Subscribe with `subscribe_dsp` |
+
 ### SRC machines (core 2.1, Digitakt mk1)
 
 The Digitakt mk1 has four SRC machines: 0 ONESHOT, 1 WERP, 2 REPITCH and
@@ -599,8 +611,12 @@ refused.
 - `dsp_jsr` hooks one two-word instruction of a payload: its `stock` is
   those 6 bytes (24-bit little-endian words, as the payload holds them).
   What it calls must do the displaced instruction's work.
+- dsp_asm puts each label's address into the text wherever the label's
+  name appears, so no label may be part of a longer word (`tone` beside
+  `tone_end`). The SDK refuses that.
 - Test DSP code under a DSP emulator before any hardware: octabam's
-  `ot_emu --dsp` runs both cores.
+  `ot_emu --dsp` runs both cores. `examples/dsp-tone-ot` ran there: with
+  `--dsp-peek "0:X:8100,576"`, input A holds its ramp in every RX block.
 
 **3.5 Build it.**
 
@@ -922,6 +938,7 @@ Some differences from an octabam build, by design:
 | `holds an address the linker cannot place` (SDK) | a label used as a short or packed operand | use a form that takes the address as a whole word (`>`); branches are relative |
 | `is a DSP reference to a ColdFire address` (or the reverse) | a `dsp24` relocation names a ColdFire symbol, or a ColdFire one a DSP label | name the right symbol; DSP labels are word addresses on the DSP |
 | `dsp_asm is not installed` | the SDK needs octabam's DSP assembler | build octabam's `vendor/dsp56300` and set `ELEKLOADER_DSP_ASM` |
+| `the label N is part of a longer word here` (SDK) | dsp_asm would put N's address inside that word | rename the label |
 
 ## 6. Definition of done
 

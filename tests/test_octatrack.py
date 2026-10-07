@@ -653,6 +653,9 @@ def test_sdk_builds_dsp_code():
                 fh.write('tst:\n0\n(org + 3) >> 4\n')
             expect_build = lambda d, *w: _expect_build(build, d, tmp, *w)
             expect_build(sub, 'word 1 (+0x1) holds an address the linker cannot place')
+            with open(os.path.join(sub, 'test.asm'), 'w') as fh:
+                fh.write('tst:\n0\ntst_end:\n0x0c\n')
+            expect_build(sub, 'test.asm:3: the label tst is part of a longer word here')
             with open(os.path.join(sub, 'mod.json')) as fh:
                 doc = json.load(fh)
             doc['dsp'][0]['payload'] = 'Q'
@@ -721,6 +724,75 @@ def test_sdk_dsp_with_octabams_assembler():
             want = fh.read()
     o = AREA - DEV.main_load
     assert len(want) == 3 * n and ln.image[o:o + 3 * n] == want
+
+
+def test_the_dsp_bus_takes_spatializer_off_both_menus():
+    """mods/dspbus-ot (no code, so no toolchain): the FX1 and FX2 lists its six `lea`s load
+    are stock's without SPATIALIZER; in both id->row tables every row below SPATIALIZER's moves
+    up one (its own is 0 on FX1 and stays on FX2, as octabam's build writes them); its dispatch
+    words are stock's null stubs; and with a core alone, the frame runs the displaced
+    instruction and returns."""
+    from elekloader.sdk import build
+    st, img = stock()
+    with tempfile.TemporaryDirectory() as tmp:
+        _p, bus = build.build(os.path.join(ROOT, 'mods', 'dspbus-ot'), SYX, tmp)
+    assert bus.names == ['dsp:harvest:SPATIALIZER'] and 'ev_dsp_rx' in bus.dsp_tables
+    ln = link.link([link.Mod2(dsp_docs(img)[0], 'core'), bus], img)
+    new, B = ln.image, DEV.main_load
+
+    def long(b, a):
+        return struct.unpack('>I', b[a - B:a - B + 4])[0]
+
+    def chooser(b, a):
+        out = []
+        while long(b, a):
+            out.append(long(b, a))
+            a += 4
+        return out
+    spat = 0x400d4904 + 0x38                        # SPATIALIZER's descriptor, as the lists hold it
+    for stock_at, refs in ((0x400d6060, (0x40037990, 0x40052706, 0x40059bd2)),     # FX1
+                           (0x400d6090, (0x400375f4, 0x40052496, 0x40059a42))):    # FX2
+        assert {long(img, r) for r in refs} == {stock_at}
+        at = {long(new, r) for r in refs}
+        assert len(at) == 1, at
+        assert spat in chooser(img, stock_at)
+        assert chooser(new, at.pop()) == [d for d in chooser(img, stock_at) if d != spat]
+    for table, own in ((0x400d60d0, 0), (0x400d6150, 7)):   # FX1's and FX2's id -> row
+        rows = [long(img, table + 4 * i) for i in range(32)]
+        assert rows[5] == 7                         # SPATIALIZER, id 5: row 7 on both
+        assert [long(new, table + 4 * i) for i in range(32)] == [
+            own if i == 5 else r - 1 if r > 7 else r for i, r in enumerate(rows)]
+    x215, x235 = words(img, 0x400e2345, 1)[0], words(img, 0x400e23a5, 1)[0]
+    assert (x215, x235) == (0x7c8, 0x7c9)           # what stock gives an unused id
+    assert words(new, 0x400e2354, 1) == [x215] and words(new, 0x400e23b4, 1) == [x235]
+    assert words(new, HOOK, 2) == [0x0bf080, 0xaa8]
+    assert words(new, AREA, 3) == [0x627000, 0x000204, 0x0c]
+
+
+def test_the_dsp_tone_example():
+    """examples/dsp-tone-ot with the bus: its handler is the one entry of ev_dsp_rx, and its
+    words are what dsp_asm writes for P:0xaa8 itself."""
+    import subprocess
+    from elekloader.sdk import build
+    asm = os.environ.get('ELEKLOADER_DSP_ASM', '')
+    if not os.path.isfile(asm):
+        raise Skip('ELEKLOADER_DSP_ASM (octabam\'s dsp_asm) not given')
+    st, img = stock()
+    ex = os.path.join(ROOT, 'examples', 'dsp-tone-ot')
+    with tempfile.TemporaryDirectory() as tmp:
+        _p, bus = build.build(os.path.join(ROOT, 'mods', 'dspbus-ot'), SYX, tmp)
+        _p, tone = build.build(ex, SYX, tmp)
+        blob = os.path.join(tmp, 'at.bin')
+        subprocess.run([asm, '-in', os.path.join(ex, 'tone.asm'), '-org', 'aa8', '-out', blob],
+                       check=True, capture_output=True)
+        with open(blob, 'rb') as fh:
+            want = fh.read()
+    ln = link.link([link.Mod2(dsp_docs(img)[0], 'core'), bus, tone], img)
+    n = len(want) // 3
+    assert ln.tables['ev_dsp_rx'] == (0xaa8 + n, 1, 6)
+    o = AREA - DEV.main_load
+    assert ln.image[o:o + len(want)] == want
+    assert words(ln.image, AREA + 3 * n, 5) == [0x627000, 0x000204, 0x0bf080, 0xaa8, 0x0c]
 
 
 def test_mkmod_diff_round_trip():
