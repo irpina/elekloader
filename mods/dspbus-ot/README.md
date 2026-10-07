@@ -61,7 +61,9 @@ What changes for a user:
 
 The USB IO mods made from octabam's remixes (`octabam-usb-io-*`, v1.0)
 harvest SPATIALIZER themselves, with these same bytes. The linker therefore
-refuses to combine them with this mod.
+refuses to combine them with this mod. Converted with `--bus`
+(`elekloader.sdk.octabam`, docs/ADAPTING.md 4b), they run on it instead:
+their inject subscribes to `ev_dsp_rx`, and they require it.
 
 The examples, `examples/dsp-tone-ot` and USB AUDIO IN's inject, ran in
 octabam's emulator (`ot_emu --dsp`): the tone on input A, and

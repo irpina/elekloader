@@ -15,6 +15,7 @@ import shutil
 import sys
 import tempfile
 import textwrap
+import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -194,7 +195,8 @@ from types import SimpleNamespace as NS
 UNIT = NS(label="hunit", source="modules/hookmod/hunit.s", cave_addr=None, cpu="54455",
           reference=None, dram=True, include=None)
 MODULE = NS(name="hookmod", key="HOOKMOD", doc="a hook", menu=None, params=(),
-            dsp=NS(asm="modules/hookmod/inject.asm", hooks=(NS(site=0x88),)),
+            dsp=NS(asm="modules/hookmod/inject.asm", payloads=frozenset({"A"}),
+                   hooks=(NS(site=0x88, stock=(0x627000, 0x000204), label="inject"),)),
             runtime=None, arena=None, overrides=(), cf_patches=(), linked=(UNIT,),
             detours=(NS(site=0x4001de6e, expect=bytes.fromhex("23c0fc0b01c0"), unit="hunit",
                         symbol="hook_entry", note="", kind="jmp", target=None, pad_to=None,
@@ -400,6 +402,48 @@ def test_a_remix_carries_its_modules_and_the_rest_of_its_build():
             assert 'protects' in str(e), str(e)
         else:
             raise AssertionError('not refused')
+
+
+def test_a_remix_on_the_dsp_bus():
+    """--bus: a remix whose hook-only DSP code hooks P:0x88, and which gives up SPATIALIZER,
+    leaves the hook, the menus and the effect's words to the DSP bus (mods/dspbus-ot): its
+    DSP source goes into the mod, subscribed to ev_dsp_rx past its replay, and it requires the
+    bus. A remix that gives up another effect, or hooks another site, is refused."""
+    img = stock()
+    with tempfile.TemporaryDirectory() as tmp:
+        ob = fake_checkout(tmp)
+        plan = octabam.convert(ob, 'rx-test', img, DEV, fake_remix(img), bus=True)
+        j = plan['json']
+        assert j['requires'] == ['core', 'dspbus'] and j['version'].endswith('-bus')
+        assert j['dsp'] == [{'source': 'dsp/inject.asm', 'payload': 'A'}]
+        assert j['subscribe_dsp'] == [{'event': 'ev_dsp_rx', 'fn': 'inject', 'addend': 2,
+                                       'order': octabam.BUS_ORDER}]
+        assert 'dsp/inject.asm' in plan['files'] and 'DSP bus' in j['description']
+        at = {s['addr'] for s in j['sites']}
+        assert '0x4001de6e' in at                   # HOOKMOD's own detour stays
+        assert not at & {'0x400d7bbc', '0x400375f6'}    # what its build writes there is the bus's
+        rx = fake_remix(img)
+        rx['harvested'] = ['PLATE REV']
+        try:
+            octabam.convert(ob, 'rx-test', img, DEV, rx, bus=True)
+        except octabam.Refused as e:
+            assert 'gives up PLATE REV, and the DSP bus gives up SPATIALIZER' in str(e), str(e)
+        else:
+            raise AssertionError('not refused')
+        m = ob.modules['hookmod']
+        m.dsp.hooks = (types.SimpleNamespace(site=0x90, stock=(0x627000, 0x000204),
+                                             label='inject'),)
+        try:
+            octabam.convert(ob, 'rx-test', img, DEV, fake_remix(img), bus=True)
+        except octabam.Refused as e:
+            assert 'its DSP hook at payload A P:0x90 is not one the DSP bus serves' in str(e), e
+        else:
+            raise AssertionError('not refused')
+        # without --bus, as before: the build's bytes are the mod's
+        m.dsp.hooks = (types.SimpleNamespace(site=0x88, stock=(0x627000, 0x000204),
+                                             label='inject'),)
+        j = octabam.convert(ob, 'rx-test', img, DEV, fake_remix(img))['json']
+        assert 'dsp' not in j and j['requires'] == ['core']
 
 
 def test_a_remix_is_checked_against_its_build_byte_for_byte():
@@ -617,6 +661,56 @@ def test_real_usb_io_remix_equals_octabams_build():
     path, mod = build.build(octabam.write(ob, plan, out), SYX, out)
     lines = octabam.check(ob, plan, path, core(out), SYX, os.path.join(out, 'check'))
     assert any('equals octabam\'s build of %s' % name in x for x in lines), lines
+
+
+def test_real_usb_io_remix_on_the_dsp_bus():
+    """--bus: usb-io-tracks-main-cue-ab's inject is assembled into the mod and subscribes to the
+    DSP bus. Linked with core and the bus, the image equals octabam's build of the remix but
+    for our code's addresses, the descriptor served from a copy, the core's sites and the DSP
+    bus's hook and table: the inject is where octabam's build placed it, and the bus writes
+    the menus as that build does. Without the bus, the check refuses."""
+    ob, img = real(), stock()
+    tools()
+    if not octabam.bare_metal(DEV):
+        raise Skip('the configured assembler is not bare metal (ELEKLOADER_CROSS=m68k-elf-)')
+    asm = os.environ.get('ELEKLOADER_DSP_ASM') or os.path.join(
+        OCTABAM, 'vendor', 'dsp56300', 'build', 'source', 'dsp_host', 'dsp_asm')
+    if not os.path.isfile(asm):
+        raise Skip('no dsp_asm (ELEKLOADER_DSP_ASM, or `make setup` in the checkout)')
+    name = 'usb-io-tracks-main-cue-ab'
+    try:
+        octabam.stock_raw(ob, img)
+        rx = octabam.load_remix(ob, name)
+        rx['ref'] = octabam.build_reference(ob, name, img)
+    except octabam.Refused as e:
+        raise Skip(str(e).splitlines()[0])
+    plan = octabam.convert(ob, name, img, DEV, rx, bus=True)
+    j = plan['json']
+    assert j['subscribe_dsp'] == [{'event': 'ev_dsp_rx', 'fn': 'inject', 'addend': 2,
+                                   'order': octabam.BUS_ORDER}]
+    assert 'dspbus' in j['requires']
+    at = {int(s['addr'], 16) for s in j['sites']}
+    assert not at & {lo for lo, _hi in octabam._dspbus_spans(img, DEV)}
+    old = os.environ.get('ELEKLOADER_DSP_ASM')
+    os.environ['ELEKLOADER_DSP_ASM'] = asm
+    try:
+        out = tempfile.mkdtemp()
+        path, mod = build.build(octabam.write(ob, plan, out), SYX, out)
+        bus, _m = build.build(octabam.DSPBUS_DIR, SYX, out)
+    finally:
+        if old is None:
+            os.environ.pop('ELEKLOADER_DSP_ASM')
+        else:
+            os.environ['ELEKLOADER_DSP_ASM'] = old
+    lines = octabam.check(ob, plan, path, core(out), SYX, os.path.join(out, 'check'), bus)
+    assert any('equals octabam\'s build of %s' % name in x and 'the DSP bus\'s hook and table'
+               in x for x in lines), lines
+    try:
+        octabam.check(ob, plan, path, core(out), SYX, os.path.join(out, 'check2'))
+    except octabam.CheckError as e:
+        assert 'needs it (mods/dspbus-ot)' in str(e), str(e)
+    else:
+        raise AssertionError('checked without the DSP bus')
 
 
 def convert_bus(names, tamper=None):
