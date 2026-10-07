@@ -29,6 +29,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 | `elekloader/elek.py` | the Octatrack's family (ELEK, legacy SysEx, the ELUP card file): the same |
 | `elekloader/elemod.py` | the mod format: shared validation, format 1, the instruction check, `summarize` |
 | `elekloader/link.py` | format 2: the linker and its checks |
+| `elekloader/dsp.py` | the DSP code inside a main OS (the Octatrack's payloads): the linker places mods' DSP code in it |
 | `elekloader/patch.py` | the command line; `build()` is what the window calls too |
 | `elekloader/gui.py` | the window (Tkinter); `LoaderModel` is its logic without Tk |
 | `elekloader/lint.py`, `elekloader/mkmod.py`, `elekloader/sdk/` | tools for mod authors; `sdk/octabam.py` converts octabam's modules |

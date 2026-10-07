@@ -95,6 +95,9 @@ export function partsBytes(parts: Part[], image: Uint8Array, dev: Device): Uint8
 }
 
 export type Reloc = [number, string, string, number]          // offset, type, target, addend
+
+/** Each relocation type's size in bytes. */
+export const RSIZE = new Map([['abs32', 4], ['pc32', 4], ['pc16', 2], ['dsp24', 3]])
 export type Site = { addr: number; len: number; new: Uint8Array; kind: string; stock_sha256: string; relocs: Reloc[] }
 
 export function parseSites(doc: Record<string, any>, name: string, dev: Device, rel: Release, relocs = false): Site[] {
@@ -115,8 +118,8 @@ export function parseSites(doc: Record<string, any>, name: string, dev: Device, 
       for (const r of iter(get(s, 'relocs', []))) {
         const [off0, typ, tgt, add] = unpack(r, 4)
         const off = int(off0, what)
-        if (!['abs32', 'pc32', 'pc16'].includes(typ as string) || off < 0 || off + (typ === 'pc16' ? 2 : 4) > n)
-          throw new ModError(`${what}: bad relocation ${repr(r)}`)
+        const size = typeof typ === 'string' ? RSIZE.get(typ) : undefined
+        if (size === undefined || off < 0 || off + size > n) throw new ModError(`${what}: bad relocation ${repr(r)}`)
         site.relocs.push([off, typ as string, tgt as string, int(add, what)])
       }
     }

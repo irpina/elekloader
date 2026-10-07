@@ -26,6 +26,7 @@ and a hook bus of its own.
 | `blob_max` | a cap on the appended blob, if the DDR areas do not give one | none on the mk1 |
 | `image_free` | zero runs inside the main OS that `fixed` code may take (sdk.build) | none on the mk1 |
 | `reserve` | (unit, {name: (a, b)}): for a core that sizes its RAM reserve to the mods, the symbols the linker defines from n, the units the mods' RAM fills: a + b·n each | none on the mk1 (its `ddr` is free RAM) |
+| `dsp_payloads`, `dsp_areas` | DSP code the main OS uploads at boot (tag: address, length), and the P words of a payload a mod frees by claiming a name, where the linker places DSP code (docs/FORMAT.md, "DSP code") | none on the mk1: its OS has no DSP code |
 | `toolchain` | the compiler, assembler and flags the SDK uses | the CFW's build |
 
 ## The Digitakt II (1.17)
@@ -259,6 +260,11 @@ below was found again in 1.17.
     left out: they follow the table at `0x400d64a0`.
   - Left out entirely: `0x400d2ee6-0x400d3020` (a live descriptor), and
     everything above `0x400d8000` (the PROJECT subsystem's RAM).
+- **DSP code** (`dsp_payloads`, `dsp_areas`): the main OS uploads payload A
+  (`0x400e2324`, 0x136cb bytes) to DSP core 0 and B (`0x400f59ef`, 0x12d05
+  bytes) to core 1 at boot. Payload A's P memory is full, so the one area
+  for mods' DSP code is SPATIALIZER's code, P:0xaa8-0xbac (261 words), freed
+  by the mod that claims `dsp:harvest:SPATIALIZER`.
 - **Checked in an emulator** (octabam's `ot_emu`): with core and a mod that
   puts a marker in `.run`, the boot reaches the RTOS handoff as stock does,
   `.boot` runs once, and the marker is in the reserve after boot.

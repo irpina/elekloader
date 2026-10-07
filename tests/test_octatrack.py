@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-from elekloader import devices, elek, elemod, formats, link, mkmod, patch   # noqa: E402
+from elekloader import devices, dsp, elek, elemod, formats, link, mkmod, patch   # noqa: E402
 from elekloader.elemod import sha                                           # noqa: E402
 
 SYX = os.environ.get('ELEKLOADER_OT_SYX', '')
@@ -505,6 +505,291 @@ def test_the_example_subscribes_to_the_bus():
     at = ln.tables['ev_draw'][0]
     o = ln.layout['run_load'] + (at - DEV.ddr[0]) - DEV.main_load
     assert struct.unpack('>II', ln.image[o:o + 8]) == (ln.map['hello_draw'], 0)
+
+
+# ---- DSP code ---------------------------------------------------------------------------
+
+HOOK = 0x400ef758               # payload A's P:0x88, move r2,x:>$204 (627000 000204)
+AREA = 0x400f1771               # payload A's P:0xaa8, SPATIALIZER's first word
+
+
+def le24(*ws):
+    return b''.join(bytes((w & 0xFF, (w >> 8) & 0xFF, w >> 16)) for w in ws)
+
+
+def words(b, at, n):
+    o = at - DEV.main_load
+    return [dsp.w24(b, o + 3 * i) for i in range(n)]
+
+
+def dsp_docs(img):
+    """(a bare core, a DSP bus, a mod with DSP code) as documents. The bus frees SPATIALIZER's
+    words, declares ev_dsp_rx (the instruction it displaces, the entries, rts) and makes P:0x88
+    `jsr >ev_dsp_rx`. The other mod has four words, the third the address of the fourth, and
+    adds `jsr >its second word` to the table."""
+    tgt = devices.target_of(DEV, REL)
+    core = {'elemod': 2, 'id': 'core', 'version': '0', 'target': tgt,
+            'sections': {'.boot': {'len': 2, 'parts': [['hex', '4e75']]}},
+            'symbols': {'core_x': ['.boot', 0]}, 'exports': ['core_x']}
+    o = HOOK - DEV.main_load
+    hook = img[o:o + 6]
+    bus = {'elemod': 2, 'id': 'dspbus', 'version': '0', 'target': tgt, 'sections': {},
+           'requires': ['core'], 'resources': {'names': ['dsp:harvest:SPATIALIZER']},
+           'collections': {'ev_dsp_rx': {'entry': 6, 'space': 'dsp.A', 'head': hook.hex(),
+                                         'end': le24(0x00000c).hex()}},
+           'imports': ['ev_dsp_rx'],
+           'sites': [{'addr': '0x%08x' % HOOK, 'len': 6, 'kind': 'data', 'stock_sha256': sha(hook),
+                      'new': (le24(0x0bf080) + bytes(3)).hex(),
+                      'relocs': [[3, 'dsp24', 'sym:ev_dsp_rx', 0]]}]}
+    sub = {'elemod': 2, 'id': 'dsptest', 'version': '0', 'target': tgt, 'requires': ['core'],
+           'sections': {'.dsp.A': {'len': 12, 'parts': [['hex', le24(0, 0x60f400, 0, 0x0c).hex()]]}},
+           'symbols': {'tst': ['.dsp.A', 0]},
+           'relocs': [['.dsp.A', 6, 'dsp24', 'sec:.dsp.A', 3]],
+           'contribute': [{'to': 'ev_dsp_rx', 'order': 50, 'data': (le24(0x0bf080) + bytes(3)).hex(),
+                           'relocs': [[3, 'dsp24', 'sym:tst', 1]]}]}
+    return core, bus, sub
+
+
+def test_dsp_payloads_parse():
+    """Both payloads walk to their end; P:0x88 and SPATIALIZER's words are where the profile
+    and the bus expect them."""
+    st, img = stock()
+    for tag, (at, n) in DEV.dsp_payloads.items():
+        recs = dsp.records(img, DEV, tag)
+        assert recs and all(sp in (0, 1, 2) for sp, _a, _c, _w in recs), tag
+    assert dsp.p_span(img, DEV, 'A', 0x88, 0x8a) == HOOK
+    assert img[HOOK - DEV.main_load:HOOK - DEV.main_load + 6] == le24(0x627000, 0x000204)
+    for tag, lo, hi, _nm, _w in DEV.dsp_areas:
+        assert dsp.p_span(img, DEV, tag, lo, hi) == AREA
+    expect(lambda: dsp.p_span(img, DEV, 'A', 0x0, 0x100000), 'does not load P:0x00000-0xfffff')
+    expect(lambda: dsp.records(img, DEV, 'C'), 'has no DSP payload C')
+
+
+def test_dsp_code_links_into_the_area_a_mod_frees():
+    st, img = stock()
+    core, bus, sub = dsp_docs(img)
+    mods = [link.Mod2(d, d['id']) for d in (core, bus, sub)]
+    ln = link.link(mods, img)
+    assert ln.layout['dsp'] == {'A': {'area': [0xaa8, 0xbad], 'used': [0xaa8, 0xab1],
+                                      'name': 'dsp:harvest:SPATIALIZER',
+                                      'sections': {'dsptest .dsp.A': 0xaa8},
+                                      'tables': {'ev_dsp_rx': 0xaac}}}, ln.layout['dsp']
+    assert 'dsptest .dsp.A' not in ln.layout['sections']
+    assert ln.map['dsptest:tst'] == 0xaa8 and ln.map['ev_dsp_rx'] == 0xaac
+    assert ln.tables['ev_dsp_rx'] == (0xaac, 1, 6) and ln.map['ev_dsp_rx_n'] == 1
+    assert words(ln.image, HOOK, 2) == [0x0bf080, 0xaac]
+    assert words(ln.image, AREA, 10) == [0, 0x60f400, 0xaab, 0x0c,          # the code, relocated
+                                         0x627000, 0x000204, 0x0bf080, 0xaa9, 0x0c,  # the table
+                                         words(img, AREA + 27, 1)[0]]       # then stock
+    changed = [i for i in range(len(img)) if ln.image[i] != img[i]]
+    assert all(HOOK <= DEV.main_load + i < HOOK + 6 or AREA <= DEV.main_load + i < AREA + 27
+               for i in changed), hex(DEV.main_load + changed[0])
+    # the bus alone: P:0x88 runs the displaced instruction and returns, as stock does
+    ln = link.link(mods[:2], img)
+    assert words(ln.image, AREA, 3) == [0x627000, 0x000204, 0x0c]
+    assert ln.tables['ev_dsp_rx'] == (0xaa8, 0, 6)
+
+
+def test_dsp_code_is_refused_where_it_cannot_go():
+    st, img = stock()
+
+    def refused(docs, *msgs):
+        mods = [link.Mod2(d, d['id']) for d in docs]
+        return expect(lambda: link.link(mods, img), *msgs)
+    core, bus, sub = dsp_docs(img)
+    refused([core, sub], 'dsptest 0 adds to table ev_dsp_rx, which no given mod declares',
+            'dsptest 0 has DSP code for payload A, which needs a mod that frees DSP memory '
+            'there (one that claims dsp:harvest:SPATIALIZER)')
+    big = json.loads(json.dumps(sub))
+    big['sections']['.dsp.A'] = {'len': 3 * 300, 'parts': [['hex', '00' * 900]]}
+    refused([core, bus, big], 'the DSP code for payload A needs P words to 0x00bd9, past the '
+            '261 words dsp:harvest:SPATIALIZER frees (44 over)')
+    cf = json.loads(json.dumps(sub))
+    cf['contribute'][0]['relocs'][0][2] = 'sym:core_x'
+    refused([core, bus, cf], 'dsptest 0: an entry of ev_dsp_rx is a DSP reference to a '
+            'ColdFire address')
+    back = json.loads(json.dumps(sub))
+    back['sections']['.run'] = {'len': 4, 'parts': [['hex', '00000000']]}
+    back['relocs'].append(['.run', 0, 'abs32', 'sym:tst', 0])
+    refused([core, bus, back], 'dsptest 0: .run+0x0 is a ColdFire reference to a DSP address')
+    ent = json.loads(json.dumps(sub))
+    ent['contribute'][0]['relocs'] = [[0, 'abs32', 'sym:tst', 0], [1, 'dsp24', 'sym:tst', 0]]
+    refused([core, bus, ent], 'an entry for ev_dsp_rx has a abs32 relocation at +0; a DSP '
+            "table's entries take dsp24, at whole words",
+            'an entry for ev_dsp_rx has a dsp24 relocation at +1')
+    cft = json.loads(json.dumps(core))
+    cft['collections'] = {'ev_cf': {'entry': 4}}
+    ent = json.loads(json.dumps(sub))
+    ent['contribute'].append({'to': 'ev_cf', 'data': '00000000',
+                              'relocs': [[0, 'dsp24', 'sym:tst', 0]]})
+    refused([cft, bus, ent], 'an entry for ev_cf has a dsp24 relocation at +0; dsp24 is for '
+            'DSP tables')
+    site = json.loads(json.dumps(sub))
+    o = AREA + 3 - DEV.main_load
+    site['sites'] = [{'addr': '0x%08x' % (AREA + 3), 'len': 3, 'kind': 'data', 'new': '000000',
+                      'stock_sha256': sha(img[o:o + 3])}]
+    refused([core, bus, site], 'dspbus 0 DSP area dsp:harvest:SPATIALIZER (payload A '
+            'P:0x0aa8-0x0bac) and dsptest 0 site 0x400f1774 overlap')
+    # what each mod alone may hold
+    for change, msg in [
+            (lambda d: d['sections']['.dsp.A'].update(len=10, parts=[['hex', '00' * 10]]),
+             'not whole 24-bit DSP words'),
+            (lambda d: d['symbols'].update(tst=['.dsp.A', 1]), 'DSP symbol tst is not at a whole word'),
+            (lambda d: d['relocs'][0].__setitem__(2, 'abs32'), 'a abs32 relocation in .dsp.A'),
+            (lambda d: d['relocs'][0].__setitem__(1, 7), 'a dsp24 relocation in .dsp.A'),
+            (lambda d: d.update(collections={'t': {'entry': 6, 'space': 'dsp.Q'}}),
+             "table t in space 'dsp.Q', which the Octatrack lacks"),
+            (lambda d: d.update(collections={'t': {'entry': 6, 'space': 'dsp.A', 'head': '00'}}),
+             'DSP table t is not whole 24-bit words'),
+            (lambda d: d['sections'].update({'.dsp.B2': d['sections']['.dsp.A']}),
+             'unknown section .dsp.B2')]:
+        d = json.loads(json.dumps(sub))
+        change(d)
+        expect(lambda: link.Mod2(d, 'm'), msg)
+    dt = [x for x in devices.devices() if x.key == 'digitakt-mk1'][0]
+    d = json.loads(json.dumps(sub))
+    d['target'] = devices.target_of(dt, dt.releases['1.53'])
+    expect(lambda: link.Mod2(d, 'm'), 'unknown section .dsp.A')       # no DSP code in its OS
+
+
+def dsp_mod_dirs(tmp, img, source):
+    """mod.json folders for dsp_docs' bus and a mod with the DSP source `source`."""
+    o = HOOK - DEV.main_load
+    hook = img[o:o + 6].hex()
+    bus, sub = os.path.join(tmp, 'bus'), os.path.join(tmp, 'sub')
+    for d in (bus, sub):
+        os.makedirs(d)
+    with open(os.path.join(bus, 'mod.json'), 'w') as fh:
+        json.dump({'id': 'dspbus', 'version': '0', 'device': 'octatrack', 'os': '1.40C',
+                   'resources': {'names': ['dsp:harvest:SPATIALIZER']},
+                   'collections': {'ev_dsp_rx': {'entry': 6, 'space': 'dsp.A', 'head': hook,
+                                                 'end': le24(0x0c).hex()}},
+                   'sites': [{'addr': '0x%08x' % HOOK, 'stock': hook, 'op': 'dsp_jsr',
+                              'target': 'ev_dsp_rx'}],
+                   'requires': ['core']}, fh)
+    with open(os.path.join(sub, 'test.asm'), 'w') as fh:
+        fh.write(source)
+    with open(os.path.join(sub, 'mod.json'), 'w') as fh:
+        json.dump({'id': 'dsptest', 'version': '0', 'device': 'octatrack', 'os': '1.40C',
+                   'dsp': [{'source': 'test.asm', 'payload': 'A'}],
+                   'subscribe_dsp': [{'event': 'ev_dsp_rx', 'fn': 'tst', 'addend': 1}],
+                   'requires': ['core']}, fh)
+    return bus, sub
+
+
+def test_sdk_builds_dsp_code():
+    """sdk.build's "dsp", dsp_jsr sites, DSP tables and subscribe_dsp: built from mod.json, the
+    bus and the mod link as dsp_docs' do. The assembler is a stand-in that evaluates each line
+    at the origin, so the two-origin rule is tested without octabam's dsp_asm."""
+    from elekloader.sdk import build
+    st, img = stock()
+    real_run, old = build.run, os.environ.get('ELEKLOADER_DSP_ASM')
+
+    def fake_run(cmd):
+        if cmd[0] != os.environ['ELEKLOADER_DSP_ASM']:
+            return real_run(cmd)
+        a = dict(zip(cmd[1::2], cmd[2::2]))
+        org, ws, labels = int(a['-org'], 16), [], {}
+        with open(a['-in']) as fh:
+            for line in fh:
+                t = line.split(';')[0].strip()
+                if t.endswith(':'):
+                    labels[t[:-1]] = org + len(ws)
+                elif t:
+                    ws.append(eval(t, {'org': org}))
+        with open(a['-out'], 'wb') as fh:
+            fh.write(le24(*ws))
+        with open(a['-sym'], 'w') as fh:
+            fh.write(''.join('%s %x\n' % kv for kv in labels.items()))
+        return ''
+    with tempfile.TemporaryDirectory() as tmp:
+        fake = os.path.join(tmp, 'dsp_asm')
+        open(fake, 'w').close()
+        os.environ['ELEKLOADER_DSP_ASM'] = fake
+        build.run = fake_run
+        try:
+            bus, sub = dsp_mod_dirs(tmp, img, 'tst:\n0\n0x60f400\norg + 3   ; an address\n0x0c\n')
+            bp, bm = build.build(bus, SYX, tmp)
+            sp, sm = build.build(sub, SYX, tmp)
+            assert sm.symbols == {'tst': ('.dsp.A', 0)}, sm.symbols
+            assert sm.relocs == [('.dsp.A', 6, 'dsp24', 'sec:.dsp.A', 3)], sm.relocs
+            core = link.Mod2(dsp_docs(img)[0], 'core')
+            ln = link.link([core, bm, sm], img)
+            want = link.link([link.Mod2(d, d['id']) for d in dsp_docs(img)], img)
+            assert ln.image == want.image and ln.layout == want.layout
+            # an address the linker cannot place, a payload the device lacks, a short hook
+            with open(os.path.join(sub, 'test.asm'), 'w') as fh:
+                fh.write('tst:\n0\n(org + 3) >> 4\n')
+            expect_build = lambda d, *w: _expect_build(build, d, tmp, *w)
+            expect_build(sub, 'word 1 (+0x1) holds an address the linker cannot place')
+            with open(os.path.join(sub, 'mod.json')) as fh:
+                doc = json.load(fh)
+            doc['dsp'][0]['payload'] = 'Q'
+            with open(os.path.join(sub, 'mod.json'), 'w') as fh:
+                json.dump(doc, fh)
+            expect_build(sub, "payload 'Q'; the Octatrack has A, B")
+            with open(os.path.join(bus, 'mod.json')) as fh:
+                doc = json.load(fh)
+            doc['sites'][0]['stock'] = doc['sites'][0]['stock'][:8]
+            with open(os.path.join(bus, 'mod.json'), 'w') as fh:
+                json.dump(doc, fh)
+            expect_build(bus, 'a dsp_jsr replaces one two-word DSP instruction (6 bytes)')
+            doc['sites'][0].update(addr='0x4000050c', stock=img[0x10c:0x112].hex())
+            with open(os.path.join(bus, 'mod.json'), 'w') as fh:
+                json.dump(doc, fh)
+            expect_build(bus, "site 0x4000050c: a dsp_jsr goes in the DSP code the Octatrack's "
+                         'OS uploads (0x400e2324 +0x136cb, 0x400f59ef +0x12d05)')
+            os.environ['ELEKLOADER_DSP_ASM'] = os.path.join(tmp, 'absent')
+            doc['dsp'] = [{'source': 'x.asm', 'payload': 'A'}]
+            doc['sites'] = []
+            with open(os.path.join(bus, 'mod.json'), 'w') as fh:
+                json.dump(doc, fh)
+            expect_build(bus, 'is not installed: DSP code is assembled with octabam\'s dsp_asm')
+        finally:
+            build.run = real_run
+            if old is None:
+                os.environ.pop('ELEKLOADER_DSP_ASM', None)
+            else:
+                os.environ['ELEKLOADER_DSP_ASM'] = old
+
+
+def _expect_build(build, d, out, *words):
+    try:
+        build.build(d, SYX, out)
+    except build.BuildError as e:
+        for w in words:
+            assert w in str(e), 'expected %r in: %s' % (w, e)
+        return
+    raise AssertionError('built')
+
+
+def test_sdk_dsp_with_octabams_assembler():
+    """With octabam's dsp_asm (ELEKLOADER_DSP_ASM): a loop's end address becomes the one
+    relocation, and the linked words are what dsp_asm writes for that origin itself."""
+    import subprocess
+    from elekloader.sdk import build
+    asm = os.environ.get('ELEKLOADER_DSP_ASM', '')
+    if not os.path.isfile(asm):
+        raise Skip('ELEKLOADER_DSP_ASM (octabam\'s dsp_asm) not given')
+    st, img = stock()
+    src = ('tst:\n        move    r2,x:>$204\n        move    x:>$202,r1\n'
+           '        do      #4,loop_end\n        nop\n        nop\nloop_end:\n        rts\n')
+    with tempfile.TemporaryDirectory() as tmp:
+        bus, sub = dsp_mod_dirs(tmp, img, src)
+        bp, bm = build.build(bus, SYX, tmp)
+        sp, sm = build.build(sub, SYX, tmp)
+        n = sm.size('.dsp.A') // 3
+        end = sm.symbols['loop_end'][1] // 3
+        assert [(o, t, g) for _s, o, t, g, _a in sm.relocs] == [(15, 'dsp24', 'sec:.dsp.A')]
+        assert sm.relocs[0][4] == end - 1                       # do's operand: the last word
+        ln = link.link([link.Mod2(dsp_docs(img)[0], 'core'), bm, sm], img)
+        blob = os.path.join(tmp, 'at.bin')
+        subprocess.run([asm, '-in', os.path.join(sub, 'test.asm'), '-org', 'aa8', '-out', blob],
+                       check=True, capture_output=True)
+        with open(blob, 'rb') as fh:
+            want = fh.read()
+    o = AREA - DEV.main_load
+    assert len(want) == 3 * n and ln.image[o:o + 3 * n] == want
 
 
 def test_mkmod_diff_round_trip():

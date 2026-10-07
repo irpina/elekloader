@@ -69,6 +69,19 @@ Facts taken from sambanks/octabam (MIT) and not re-derived here are marked
   - Two ranges that read zero are left out: 0x400d2ee6-0x400d3020 is a live
     descriptor, and everything above 0x400d8000 is the PROJECT subsystem's
     RAM (octabam).
+- **DSP code** (`dsp_payloads`, `dsp_areas`; elekloader/dsp.py). The main
+  OS uploads two payloads to the DSP56721's two DSP56300 cores at boot:
+  A (0x400e2324, 0x136cb bytes) to core 0, which runs tracks 5-8, the
+  inputs, the mix and the master, and B (0x400f59ef, 0x12d05 bytes) to core
+  1, tracks 1-4 (octabam, docs/firmware/DSP.md). Each is records of 24-bit
+  little-endian words; both walk to their last byte (tests/
+  test_octatrack.py).
+  - Payload A's P memory is full, so DSP code can only take a stock
+    effect's words. The one area is SPATIALIZER's code, P:0xaa8-0xbac (261
+    words, from 0x400f1771), which octabam's remixes give to their DSP
+    modules once SPATIALIZER is taken out (octabam). A mod frees it by
+    claiming `dsp:harvest:SPATIALIZER`: it must then leave nothing in the
+    OS that runs those words.
 """
 from . import Device, Release
 
@@ -104,6 +117,9 @@ DEVICE = Device(
     image_free=((0x400C45B0, 0x400C4702), (0x400D24D0, 0x400D2CE0), (0x400D64E0, 0x400D7C3C)),
     reserve=(6144, {'arena_base': (0x40A955E0, 6144), '__arena_pages': (14602, -1),
                     '__arena_fill': (14603, -1), '__arena_clear': (0x05590800, -6144)}),
+    dsp_payloads={'A': (0x400E2324, 0x136CB), 'B': (0x400F59EF, 0x12D05)},
+    dsp_areas=(('A', 0x0AA8, 0x0BAD, 'dsp:harvest:SPATIALIZER',
+                "SPATIALIZER's code on payload A (core 0)"),),
     recovery=('hold FUNC while powering on for the startup menu, press TRIG 3 (MIDI '
               'UPGRADE) and send the stock .syx over 5-pin MIDI (not USB)'),
     toolchain={

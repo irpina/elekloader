@@ -60,12 +60,12 @@ A format-2 mod is a relocatable object:
 
 | field | |
 |---|---|
-| `sections` | `.run` (RAM), `.fast` (fast SRAM, copied in at run time), `.bss` (`{"size"}`), and `.boot` (the core mod only: it runs where the bootloader unpacks it); each with an `align`, a power of two up to 4,096 (default 4) |
+| `sections` | `.run` (RAM), `.fast` (fast SRAM, copied in at run time), `.bss` (`{"size"}`), and `.boot` (the core mod only: it runs where the bootloader unpacks it); each with an `align`, a power of two up to 4,096 (default 4). On a device whose OS carries DSP code, also `.dsp.<payload>` (below) |
 | `symbols` | `{"name": [".run", offset]}` or `["abs", value]` |
 | `exports` | the symbols other mods may use |
 | `imports`, `weak` | the names it uses from others; a weak one resolves to `core_zero` (zeros) if no mod provides it |
-| `relocs` | `[section, offset, "abs32"/"pc32"/"pc16", target, addend]`; target `"sym:NAME"`, `"sec:NAME"` or `"abs"` |
-| `collections` | tables this mod declares: `{"ev_tick": {"entry": 4}}` |
+| `relocs` | `[section, offset, "abs32"/"pc32"/"pc16"/"dsp24", target, addend]`; target `"sym:NAME"`, `"sec:NAME"` or `"abs"` |
+| `collections` | tables this mod declares: `{"ev_tick": {"entry": 4}}`, or a DSP table (below) |
 | `contribute` | entries for tables: `{"to", "order", "data", "relocs", "claims"}` |
 | `copied` | `[{"lo", "hi", "to"}]`: a block of the image this mod copies elsewhere at run time |
 
@@ -123,6 +123,40 @@ Nothing is built unless all of these pass:
   - avoid every byte a fix-up claims;
   - decode as whole instructions with no PC-relative operand and no relative
     branch, because it will run from the copy.
+- **DSP code** (below). A mod with DSP code or a DSP table needs the mod
+  that frees that payload's area; no other mod's site may touch the area;
+  the code and tables fit in it; `dsp24` relocations are only in DSP
+  sections and DSP table entries, at whole words, and only `dsp24` there;
+  and a DSP address and a ColdFire address are never written in place of
+  each other.
+
+### DSP code
+
+Some devices run code on DSPs that their main OS uploads at boot: the
+Octatrack's two DSP56300 cores. The profile names those payloads
+(`dsp_payloads`) and the P memory a mod may free in one (`dsp_areas`: the
+Octatrack's is payload A's 261 words at P:0xaa8, SPATIALIZER's code, freed
+by the mod that claims `dsp:harvest:SPATIALIZER`). A payload is records of
+24-bit little-endian words (`elekloader/dsp.py`), so DSP code is bytes of
+the main OS like any other.
+
+- A **DSP section** is `.dsp.<payload>`, for example `.dsp.A`: whole 24-bit
+  little-endian words, no alignment. A symbol in it is a word address, and
+  must be at a whole word (its offset a multiple of 3).
+- A **`dsp24`** relocation writes a DSP word address as three little-endian
+  bytes; its addend is in words.
+- A **DSP table** is a collection with a space:
+  `{"ev_dsp_rx": {"entry": 6, "space": "dsp.A", "head": "...", "end": "0c0000"}}`.
+  Its words are the head, the entries in (`order`, mod id) order, then the
+  end; there is no zero entry, and `NAME_n` counts the entries. A table the
+  bus calls with `jsr` can begin with the instruction its hook displaced and
+  end with `rts` (`0c0000`), so with no entries it does what the stock code
+  did.
+
+The linker places, in the area the claiming mod frees, every DSP section
+(core first, then by id), then the DSP tables by name, and writes them into
+the payload's words in the image. Nothing else about the build changes: a
+set of mods without DSP code links to the same bytes as before.
 
 ## The hook bus (Digitakt mk1, Digitone mk1, Digitakt II)
 
