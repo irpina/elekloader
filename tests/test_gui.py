@@ -149,6 +149,45 @@ def test_a_newer_os_gets_its_own_core():
             root.destroy()
 
 
+def test_two_core_lines_a_first_run_takes_2_1_and_a_mod_that_needs_3_0_takes_3_0():
+    """With core 2.1 and core 3.0 built in, a first run ticks 2.1 (the core
+    every build took before 3.0); ticking a mod whose resources.core asks for
+    3.0 (machine-pages) swaps the build's core for 3.0, and the set checks."""
+    need(STOCK, 'ELEKLOADER_STOCK')
+    mods = need(MODS, 'ELEKLOADER_MODS')
+    files = [os.path.join(mods, n) for n in ('core-2.1.elemod', 'core-3.0.elemod',
+                                              'machine-pages-1.0.elemod')]
+    if not all(os.path.exists(f) for f in files):
+        raise Skip('ELEKLOADER_MODS lacks core-2.1, core-3.0 or machine-pages-1.0')
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+    except Exception as e:
+        raise Skip('no Tk: %s' % e)
+    with tempfile.TemporaryDirectory() as tmp:
+        bundled = os.path.join(tmp, 'bundled')
+        os.makedirs(bundled)
+        for c in files[:2]:
+            shutil.copy(c, bundled)
+        root.withdraw()
+        w = gui.LoaderWindow(root, gui.LoaderModel(STOCK, os.path.join(tmp, 'lib'), [bundled],
+                                                   os.path.join(tmp, 'settings.json')))
+        try:
+            assert [os.path.basename(p) for p in w.enabled] == ['core-2.1.elemod']
+            w.model.install(files[2])
+            w.refresh()
+            mp = [p for p, d in w.descs.items() if d.get('id') == 'machine-pages'][0]
+            w.toggle(mp)
+            assert sorted(os.path.basename(p) for p in w.enabled) == [
+                'core-3.0.elemod', 'machine-pages-1.0.elemod']
+            r = w.model.check(sorted(w.enabled))
+            assert r['ok'], r
+            w.toggle(mp)                            # off again: the core stays as chosen
+            assert [os.path.basename(p) for p in w.enabled] == ['core-3.0.elemod']
+        finally:
+            root.destroy()
+
+
 DN_SYX = os.environ.get('ELEKLOADER_DN_SYX', '')
 DN_MODS = os.environ.get('ELEKLOADER_DN_MODS', '')
 

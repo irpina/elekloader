@@ -148,6 +148,55 @@ export function parseResources(doc: Record<string, any>, name: string, dev: Devi
   return [regions, iter(get(r, 'names', [])).map(x => str(x))]
 }
 
+/** The core version a mod's resources.core says it needs ("3.0"), or null. elekloader 0.4.0 and older read only regions and
+ * names there, so they ignore it; the imports such a mod makes still fail to link against an older core. */
+export function parseNeedsCore(doc: Record<string, any>, name: string): string | null {
+  const r0 = get(doc, 'resources'), v = get(truthy(r0) ? r0 : {}, 'core')
+  if (v === null) return null
+  if (typeof v !== 'string' || !(v.slice(0, 1) >= '0' && v.slice(0, 1) <= '9'))
+    throw new ModError(`${name}: resources.core is the version of core it needs, such as "3.0"`)
+  return v
+}
+
+type VersionPart = [number, bigint, string]
+
+/** A version as it sorts: its runs of digits as numbers (2.10 after 2.9), the rest as text, digits first (2.0
+ * before 2.0a before 2.1). elemod.version_key. */
+export function versionKey(v: string): VersionPart[] {
+  return (String(v).match(/[0-9]+|[^0-9]+/g) ?? []).map((x): VersionPart => (x[0] >= '0' && x[0] <= '9' ? [0, BigInt(x), ''] : [1, 0n, x]))
+}
+
+function cmpKey(a: VersionPart[], b: VersionPart[]): number {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    for (let j = 0; j < 3; j++) {
+      const x = a[i][j], y = b[i][j]
+      if (x < y) return -1
+      if (x > y) return 1
+    }
+  }
+  return a.length - b.length
+}
+
+/** a against b, in versionKey's order: < 0, 0 or > 0. */
+export const cmpVersions = (a: string, b: string) => cmpKey(versionKey(a), versionKey(b))
+
+/** The core a builder takes for a selection: of `versions` (the cores for one device and OS), the newest of the
+ * oldest major line with one at least `need`. A new line (3.x beside 2.x) is taken only when a mod needs it, so
+ * adding one leaves every other build as it was. -> its index (the last of equals), or null when none is new
+ * enough. elemod.pick_core. */
+export function pickCore(versions: string[], need: string | null = null): number | null {
+  const ok = versions.map((_, i) => i).filter(i => need === null || cmpVersions(versions[i], need) >= 0)
+  if (!ok.length) return null
+  const major = (i: number) => versionKey(versions[i]).slice(0, 1)
+  const low = ok.map(major).reduce((a, b) => (cmpKey(b, a) < 0 ? b : a))
+  let best: number | null = null
+  for (const i of ok) {
+    if (cmpKey(major(i), low) !== 0) continue
+    if (best === null || cmpVersions(versions[i], versions[best]) >= 0) best = i
+  }
+  return best
+}
+
 export const COMMON = new Set(['elemod', 'dtmod', 'id', 'version', 'title', 'description', 'category', 'author',
   'license', 'target', 'sites', 'resources', 'requires', 'conflicts', 'build', 'signature', 'notes'])
 
@@ -167,6 +216,8 @@ export type AnyMod = {
   names: string[]
   requires: string[]
   conflicts: string[]
+  sections?: Map<string, unknown>         // format 2 only
+  needsCore?: string | null               // format 2 only: resources.core
   label(): string
 }
 
@@ -336,11 +387,15 @@ export function commonChecks(mods: AnyMod[], image: Uint8Array, spans: Span<AnyM
 
 const FOLLOW_ON = ['imports ', 'adds to table ', 'has .fast code']
 
-/** The checker's lines, for a person: a mod that lacks a requirement shows that, not what follows from it; repeats
- * are merged with a count; "no .boot" says that core is not enabled. */
+/** The checker's lines, for a person: a mod that lacks a requirement, or needs a newer core than the one given, shows
+ * that, not what follows from it; repeats are merged with a count; "no .boot" says that core is not enabled. */
 export function summarize(problems: string[], mods: AnyMod[]): string[] {
   const ids = new Set(mods.map(m => m.id))
   const lacking = new Set(mods.filter(m => m.requires.some(r => !ids.has(r))).map(m => m.label()))
+  const cores = mods.filter(m => m.sections?.has('.boot'))
+  if (cores.length === 1) {
+    for (const m of mods) if (m.needsCore && cmpVersions(cores[0].version, m.needsCore) < 0) lacking.add(m.label())
+  }
   const out: string[] = [], count = new Map<string, number>()
   for (let x of problems) {
     if ([...lacking].some(lab => x.startsWith(lab + ' ') && FOLLOW_ON.some(f => x.includes(f)))) continue

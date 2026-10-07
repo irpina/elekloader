@@ -37,6 +37,47 @@ def test_requirements_are_ticked_with_a_mod():
     assert with_requirements(d, set(), 'app/core-2.0a.elemod') == {'app/core-2.0a.elemod'}
 
 
+def test_versions_sort_and_the_core_a_build_takes():
+    order = ['', '0.13a', '0.13b', '2', '2.0', '2.0a', '2.1', '2.9', '2.10', '3.0', '10.0']
+    assert sorted(reversed(order), key=elemod.version_key) == order
+    assert elemod.pick_core(['2.1', '3.0', '2.0a']) == 0
+    assert elemod.pick_core(['2.1', '3.0', '2.0a'], '2.1') == 0
+    assert elemod.pick_core(['2.1', '3.0', '2.0a'], '2.2') == 1
+    assert elemod.pick_core(['2.1', '3.0', '3.1'], '3.0') == 2
+    assert elemod.pick_core(['2.1', '2.1']) == 1                 # the last of equals
+    assert elemod.pick_core(['2.1', '3.0'], '3.1') is None
+    assert elemod.pick_core([]) is None
+
+
+def test_a_mod_that_needs_core_3_ticks_core_3():
+    from elekloader.gui import one_core, with_requirements
+    d = {
+        'app/core-2.1.elemod': {'id': 'core', 'version': '2.1', 'fits': True, 'requires': []},
+        'app/core-3.0.elemod': {'id': 'core', 'version': '3.0', 'fits': True, 'requires': []},
+        'lib/health.elemod': {'id': 'health', 'fits': True, 'requires': ['core']},
+        'lib/pages.elemod': {'id': 'pages', 'fits': True, 'requires': ['core'],
+                             'needs_core': '3.0'},
+        'lib/nb.elemod': {'id': 'nb', 'fits': True, 'requires': ['core', 'pages'],
+                          'needs_core': '3.0'},
+        'lib/later.elemod': {'id': 'later', 'fits': True, 'requires': ['core'],
+                             'needs_core': '4.0'},
+    }
+    c21, c30 = 'app/core-2.1.elemod', 'app/core-3.0.elemod'
+    # what needs nothing from 3.0 builds on 2.1, as before 3.0 was there
+    assert with_requirements(d, set(), 'lib/health.elemod') == {'lib/health.elemod', c21}
+    # what needs it brings 3.0, through its requirements too, in 2.1's place
+    assert with_requirements(d, {'lib/health.elemod', c21}, 'lib/nb.elemod') == {
+        'lib/health.elemod', 'lib/nb.elemod', 'lib/pages.elemod', c30}
+    # a core chosen by hand that will do is kept
+    assert with_requirements(d, {c30}, 'lib/health.elemod') == {c30, 'lib/health.elemod'}
+    # none new enough: the newest, for the check to say why
+    assert with_requirements(d, set(), 'lib/later.elemod') == {'lib/later.elemod', c30}
+    assert with_requirements(d, {c21}, 'lib/later.elemod') == {'lib/later.elemod', c21}
+    # the first run's ticks: one core
+    assert one_core(d, {c21, c30, 'lib/health.elemod'}) == {c21, 'lib/health.elemod'}
+    assert one_core(d, {c21, c30, 'lib/pages.elemod'}) == {c30, 'lib/pages.elemod'}
+
+
 def test_8in7_round_trip():
     rnd = random.Random(1)
     for n in (0, 1, 6, 7, 8, 13, 14, 101, 250):

@@ -121,6 +121,10 @@ function plan(configPath: string, casesPath: string) {
     ['collections-entry', d => { d.collections = { dsl_t: { entry: 6 } }; return d }],
     ['copied-site', d => { d.copied = [{ lo: '0x40000400', hi: '0x40400000', to: '0x80000000' }]; return d }],
     ['dup-name', d => { d.resources.names = ['machine:5', 'machine:5']; return d }],
+    ['needs-core-3', d => { d.resources.core = '3.0'; return d }],
+    ['needs-core-2.0a', d => { d.resources.core = '2.0a'; return d }],
+    ['needs-core-number', d => { d.resources.core = 3; return d }],
+    ['needs-core-word', d => { d.resources.core = 'three'; return d }],
   ]
   const raw: [string, Buffer][] = [
     ['not-json', Buffer.from('garbage{')],
@@ -144,6 +148,19 @@ function plan(configPath: string, casesPath: string) {
     const p = join(scratch, `mut-${name}.elemod`)
     writeFileSync(p, data)
     add(`mutation ${name}`, 'dt153', [f('dt', 'core-2.1.elemod'), p])
+  }
+  // core 3.0 (files.core3 and files.core3_154, optional): with core 2.1's mods, and with a mod that needs it
+  if (cfg.files.core3) {
+    const c3 = cfg.files.core3 as string
+    add('dt153 core-3.0 alone', 'dt153', [c3])
+    for (const m of dtMods) add(`dt153 core-3.0 + ${m}`, 'dt153', [c3, f('dt', m)])
+    add('dt153 core-3.0 + all three', 'dt153', [c3, ...three.map(m => f('dt', m))])
+    add('dt153 core-3.0 + a mod that needs it', 'dt153', [c3, join(scratch, 'mut-needs-core-3.elemod')])
+    add('dt153 core-3.0 and core-2.1', 'dt153', [c3, f('dt', 'core-2.1.elemod')])
+  }
+  if (cfg.files.core3_154) {
+    add('dt154 core-3.0 alone', 'dt154', [cfg.files.core3_154])
+    add('dt154 core-3.0 all', 'dt154', [cfg.files.core3_154, ...os154.map(m => f('dt', m))])
   }
   writeFileSync(casesPath, JSON.stringify({ root: cfg.root, cases }, null, 1))
   console.log(`${cases.length} cases -> ${casesPath}`)
