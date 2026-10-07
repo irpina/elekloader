@@ -201,7 +201,9 @@ Each `mod.json` gives the addresses of every OS it
 supports (its `os`, and its `ports`): the stock file you build with picks
 them. The Octatrack's, [mods/core-ot](mods/core-ot), has a source of its
 own: it reserves RAM for mods, copies their code there, and from 0.2 has a
-hook bus with the Octatrack's events. On the Digitakt mk1, core 3.0 and the
+hook bus with the Octatrack's events. Beside it,
+[mods/dspbus-ot](mods/dspbus-ot) is an optional bus for mods' DSP code on
+the Octatrack. On the Digitakt mk1, core 3.0 and the
 [machine-pages](mods/machine-pages) mod let the SRC machines mods add
 describe their own pages, so they combine (docs/ADAPTING.md, "Machine
 pages"). To build one yourself, use the SDK (below):
@@ -211,6 +213,7 @@ python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.54.syx            
 python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # the Digitone mk1's (or 1.43)
 python -m elekloader.sdk.build mods/core-dt2 --stock Digitakt_II_OS1.17.syx                      # the Digitakt II's
 python -m elekloader.sdk.build mods/core-ot --stock OCTATRACK_OS1.40C.syx                    # the Octatrack's
+python -m elekloader.sdk.build mods/dspbus-ot --stock OCTATRACK_OS1.40C.syx                  # its DSP bus (optional)
 ```
 
 Files from before version 0.2 used the `.dtmod` extension; they still load.
