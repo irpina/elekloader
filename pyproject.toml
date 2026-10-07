@@ -25,3 +25,7 @@ elekloader = "elekloader.gui:main"
 
 [tool.setuptools.packages.find]
 include = ["elekloader*"]
+
+# the SDK's headers for mods (sdk/include/digitakt-mk1/core3.h, core3.inc): not Python, so named here
+[tool.setuptools.package-data]
+"elekloader.sdk" = ["include/*/*"]

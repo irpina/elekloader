@@ -138,8 +138,10 @@ stock file.
   released yet.
 - **In the page,** a mod from the shop comes from this site like everything
   else, and the worker checks it against the catalog's sha256 again before
-  adding it. If it needs a newer core than the one ticked (`needs_core`),
-  the newest core that fits is ticked in its place, and the page says so.
+  adding it. If it needs a newer core than the one ticked (`needs_core`, or
+  the file's own `resources.core`), the core a build takes for it (the
+  newest of the oldest major line that is new enough: docs/ADAPTING.md,
+  "Core 3.0") is ticked in its place, and the page says so.
 
 To add a mod to the shop, publish its `.elemod` in a GitHub release, add an
 item to `web/catalog.json` with the asset's sha256 (the release page shows
@@ -221,7 +223,7 @@ cores, run the workflow by hand to put them on the site.
 
 ```bash
 curl -fLO "$(python packaging/build_web.py --pyodide-url)"
-python packaging/build_web.py --pyodide pyodide-core-314.0.7.tar.bz2 --core core-*.elemod --out build/site   # the release's: one per device and OS
+python packaging/build_web.py --pyodide pyodide-core-314.0.7.tar.bz2 --core core-*.elemod --out build/site   # the release's cores
 node tests/test_web.mjs build/site
 python -m http.server --directory build/site 8000      # then open http://localhost:8000
 ```

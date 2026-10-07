@@ -59,13 +59,16 @@ def with_requirements(descs, enabled, path):
     """-> `enabled` plus `path`, plus the mods it requires (and theirs) that are
     listed and made for the stock firmware, when none enabled already provides
     them. descs: {path: describe(path)}. Of several files with the id, the last
-    (by file name) is taken; a requirement nothing provides is left for the
-    check to report."""
+    (by file name) is taken, and for core the one with_core takes; a
+    requirement nothing provides is left for the check to report."""
     out = set(enabled) | {path}
-    todo = [path]
+    todo, core = [path], False
     while todo:
         d = descs.get(todo.pop(), {})
         for rid in d.get('requires', []):
+            if rid == 'core':
+                core = True
+                continue
             if any(descs.get(p, {}).get('id') == rid for p in out):
                 continue
             cands = sorted((p for p, x in descs.items()
@@ -74,7 +77,41 @@ def with_requirements(descs, enabled, path):
             if cands:
                 out.add(cands[-1])
                 todo.append(cands[-1])
-    return out
+    return with_core(descs, out) if core else out
+
+
+def with_core(descs, out):
+    """-> `out` with the core its mods need (their resources.core): the core
+    enabled when it is new enough, else the one elemod.pick_core takes of those
+    listed for the stock firmware, in its place (the newest, when none is new
+    enough, for the check to say so)."""
+    need = None
+    for p in out:
+        v = descs.get(p, {}).get('needs_core')
+        if v and (need is None or elemod.version_key(v) > elemod.version_key(need)):
+            need = v
+    on = [p for p in out if descs.get(p, {}).get('id') == 'core']
+    if on and (need is None or all(elemod.version_key(descs[p].get('version', ''))
+                                   >= elemod.version_key(need) for p in on)):
+        return out
+    cands = sorted((p for p, x in descs.items()
+                    if x.get('id') == 'core' and x.get('fits') and 'error' not in x),
+                   key=os.path.basename)
+    if not cands:
+        return out
+    i = elemod.pick_core([descs[p].get('version', '') for p in cands], need)
+    if i is None:
+        if on:
+            return out
+        i = len(cands) - 1
+    return (out - set(on)) | {cands[i]}
+
+
+def one_core(descs, paths):
+    """-> `paths` with one core, when it has several: the one with_core takes."""
+    if sum(descs.get(p, {}).get('id') == 'core' for p in paths) < 2:
+        return set(paths)
+    return with_core(descs, {p for p in paths if descs.get(p, {}).get('id') != 'core'})
 
 
 # ---- the logic ----------------------------------------------------------------------
@@ -164,7 +201,8 @@ class LoaderModel:
                                                     if not isinstance(m, link.Mod2) else ''),
                  author=m.doc.get('author', ''), license=m.doc.get('license', ''),
                  sha256=m.sha256,
-                 requires=list(m.requires), conflicts=list(m.conflicts), names=list(m.names))
+                 requires=list(m.requires), conflicts=list(m.conflicts), names=list(m.names),
+                 needs_core=getattr(m, 'needs_core', None))
         sites = []
         for s in m.sites:
             tgt = ''
@@ -704,7 +742,8 @@ class LoaderWindow:
         self.changed()
 
     def enable_all(self):
-        self.enabled = {p for p, d in self.descs.items() if d.get('format') == 2 and d.get('fits')}
+        self.enabled = one_core(self.descs, {p for p, d in self.descs.items()
+                                             if d.get('format') == 2 and d.get('fits')})
         self._remember()
         self.refresh()
 
@@ -1030,6 +1069,8 @@ class LoaderWindow:
                         on.append(n)
                 except (OSError, elemod.ModError):
                     pass
+            descs = {p: m.describe(p) for p in files.values()}
+            on = [os.path.basename(p) for p in one_core(descs, {files[n] for n in on})]
             m.profiles = {'Default': sorted(on)}
             m.profile = 'Default'
         if m.profile not in m.profiles:

@@ -163,7 +163,7 @@ longs:
 
 | offset | field | |
 |---|---|---|
-| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>` (NEIGHBOR is 4, DIGISLICER 5) |
+| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>`. Taken so far: 4 NEIGHBOR, 5 DIGISLICER, 6 Digi Poly's POLY, 7 SOPHIE, 20-29 Digi Mono's (20-26 in use); pick another, and say which in your mod's README |
 | +4 | name | its name in the machine menu and the SRC page's title (10 characters fit) |
 | +8 | short | its 4-character name (the SRC page's `NAME: sample` title) |
 | +12 | icon | an 11 x 7 Bitmap for the menu, in the stock icons' format, or 0 |
@@ -173,17 +173,150 @@ longs:
 ```json
 "contribute": [{"to": "core_machines", "order": 50, "data": "00000000",
                 "relocs": [[0, "abs32", "sym:my_machine", 0]]}],
-"resources": {"names": ["machine:6"]}
+"resources": {"names": ["machine:30"]}
 ```
+
+or, with the SDK, the same in one line: `"machines": [{"id": 30,
+"descriptor": "my_machine"}]`.
 
 With it, the menu lists the machine after the stock four (added ones by
 id), with its name and icon; the setter takes it, and a loaded kit keeps
 it (stock loads any machine past 3 as ONESHOT, and so does core for an id
 no installed mod adds). The firmware gives any machine past 3 SLICE's SRC
-page; to change it, hook the page layout `0x400657cc` as digineighbor
-does. `core_track_machine[t]` (8 bytes) is each track's own machine as the
+page; from core 3.0 a machine describes its own instead ("Machine pages",
+below). `core_track_machine[t]` (8 bytes) is each track's own machine as the
 render last took it, for a mod whose machine renders as a stock one:
 `core_machine(id)` returns an added machine's descriptor, or 0.
+
+### Core 3.0 (Digitakt mk1)
+
+Core 3.0 is core 2.1 and more: the same 39 sites with the same bytes, the
+same events and tables, and every 2.1 symbol where 2.1 has it (2.1's code
+is the start of 3.0's). A mod built for 2.1 links with 3.0 too, and builds
+the same bytes it did with 2.1 apart from where the mods are placed.
+`tests/test_sdk.py` checks this against the released core 2.1. What 3.0
+adds patches nothing:
+- **firmware locations as exports**, so a mod can name them instead of
+  their addresses (below);
+- **`core_machine_ui(id)`**, the page a machine describes (the
+  machine-pages mod draws it: "Machine pages").
+
+A mod that needs 3.0 says so in `resources`, which elekloader 0.4.0 and older
+ignore:
+
+```json
+"resources": {"core": "3.0"}
+```
+
+The loader then refuses it beside an older core with *"needs core 3.0 or
+newer"*, and an older loader with the imports it cannot resolve.
+
+**Which core a build takes.** A builder (the app, the web page, the kit)
+takes, of the cores it has for the stock OS, the newest of the oldest major
+line that every selected mod's `resources.core` (the catalog's
+`needs_core`) allows. A selection that needs nothing from 3.0 builds with
+2.x, as it did before 3.0 existed; one that needs 3.0 builds with the
+newest 3.x. A core chosen by hand that is new enough is kept.
+
+### Firmware locations (core 3.0, Digitakt mk1)
+
+Core 3.0 exports the firmware data and routines machine mods use as
+absolute symbols, with each OS's value in its port. A mod that names them,
+and patches no site of its own, builds for another OS version with no
+change but a port entry with nothing in it. In C, `#include
+"digitakt-mk1/core3.h"` (the SDK has it on the include path); in assembly
+use the names as they are.
+
+| name | 1.53 | |
+|---|---|---|
+| `fw_track_blocks` | 0x80001a18 | the render's block of each track: 32 Q31 samples, 128 bytes a track |
+| `fw_render_machine` | 0x800018bc | the machine each track renders as, a byte a track |
+| `fw_voice_params` | 0x80002794 | the machine's 8 parameters A-H, 8.8, 106 bytes a track |
+| `fw_voice_note`, `fw_voice_vel` | 0x80001f28, 0x80001f18 | the trig's note (16.16) and velocity (8.8) |
+| `fw_voice_start` | 0x80001228 | bit t: track t starts a voice this block |
+| `fw_amp_env` | 0x4199df54 | the AMP envelope: phase +0, level +4, 12 bytes a track |
+| `fw_pitch_tab` | 0x4019b1c0 | 2^((i - 10752) / 2048) in Q29 |
+| `fw_active_track` | 0x4197b6b4 | the active track, 0-7 |
+| `fw_kit` | 0x4199dc44 | -> the UI kit: track t's sound at +0x20 + 0xa2 t, its machine at +0x7e |
+| `fw_slice_layout` | 0x4197cf5c | SLICE's SRC page layout |
+| `fw_set_param` | 0x400771e8 | `set_param(value, track, slot)`: a knob's path into the engine |
+| `fw_bitmap_vt` | 0x401b73b4 | a Bitmap's vtable (an icon's first long) |
+| `fw_fillrect`, `fw_framerect`, `fw_textf`, `fw_font5`, `fw_blit` | | drawing, as `mods/core/fw.s` lists them |
+| `fw_op_new` | 0x400d4180 | the firmware's heap |
+
+Each 1.54 value was found by the code that uses it (the render's
+locations are the same in both; the rest moved), and is in
+`mods/core/mod.json`'s port.
+
+### Machine pages (core 3.0 and machine-pages, Digitakt mk1)
+
+Every machine mod used to hook the SRC page itself (its layout, labels,
+value texts, knob graphics and ranges), the LFO page's names and the
+render point after playback, so no two could be in one build. The
+`machine-pages` mod (`mods/machine-pages`) owns those places once and
+answers each from what a machine describes. A descriptor goes on past
+its six longs with a tagged tail, which core 2.1 does not read:
+
+| offset | field | |
+|---|---|---|
+| +24 | tag | 0x55493330, `"UI30"` |
+| +28 | ui | its page, a `struct cm_ui` |
+
+The page (`struct cm_ui`, 336 bytes; `digitakt-mk1/core3.h`):
+
+| offset | field | |
+|---|---|---|
+| +0 | abi | `cm_ui_v3`, which machine-pages exports: the machine links only beside it |
+| +4 | page_from | the stock machine whose SRC page it copies (byte): 3 SLICE, 0 ONESHOT |
+| +5, +6 | | 0 |
+| +8 | group | the LFO page's group for its parameters, or 0 for the stock one |
+| +12 | on_switch | `void f(int track, int from, unsigned char *sound)`, called on the UI task when a track of the kit turns to the machine (the machine menu switches as its cursor moves), or 0 |
+| +16 | knob[8] | A-H, 40 bytes each |
+
+A knob (`struct cm_knob`); a 0 field is the stock one:
+
+| offset | field | |
+|---|---|---|
+| +0, +4 | name, lname | its label on the SRC page, and its long name (the pop-up) |
+| +8, +12 | lfo, lfo_long | its names on the LFO page: the DEST box's, and the DEST list's (0: name and lname; a blank knob reads "Unused") |
+| +16 | look | the parameter id whose UI record and graphic it borrows (byte): how a turn moves it, its knob |
+| +17 | flags | 1 blank (it shows and turns nothing), 2 the range min-max, 4 the default def, 8 knob D is not a sample (turning it does not open the sample list) |
+| +20, +24, +28 | min, max, def | 8.8 |
+| +32 | fmt | `int f(char *buf, int value, int ctx, int machine)`: its value's text into buf, returning nonzero (0: the stock text). ctx 0 is the value under a turning knob, about 5 characters; 1 the pop-up, up to 15 |
+| +36 | gfx | `int f(int value)`: the value its graphic shows (whole steps) |
+
+In assembly `digitakt-mk1/core3.inc` has `CM_MACHINE`, `CM_UI` and
+`CM_KNOB`; digineighbor 0.7, digislicer 2.3 and SOPHIE's core 3.0 build use
+them. `examples/sine-machine` is a whole machine in C to start from: a sine
+the trig's note plays and a SHAPE knob folds, its page, its icon, and no
+firmware address, so its 1.54 port is empty. A machine with a page needs
+core 3.0 and machine-pages:
+
+```json
+"machines": [{"id": 30, "descriptor": "my_machine"}],
+"requires": ["core", "machine-pages"],
+"resources": {"core": "3.0"}
+```
+
+Which machine a site answers for: the SRC page's sites, the machine whose
+layout the page asked for last (it asks with its track's machine before it
+draws or turns a knob); a range, the machine of the sound the parameter
+belongs to; the LFO page, the active track's machine. A parameter id is a
+knob by the ids of the stock machine the page copies (`0x6c + 8 page_from`
+onwards, A-H), or else of its params machine (the ids MIDI, the LFOs and
+Randomize use).
+
+**The render event.** machine-pages declares `ev_render_voices`,
+`void f(int *blocks)` with `blocks` = `fw_track_blocks`, called after
+playback has written every track's block and before the overdrive
+(0x40077fba): order 10-49 for a machine that makes a track's sound
+(SOPHIE: 20), 50-89 for one that takes or changes sound already made
+(NEIGHBOR: 60).
+
+What it took, and what each port was checked against, is in
+`mods/machine-pages/README.md`. A machine that keeps hooking the page
+itself (core 2.1's way) still links with core 3.0, but not beside
+machine-pages, whose sites it overlaps.
 
 ### Parameter slots (core-dn1 2.1, Digitone mk1)
 
@@ -773,6 +906,7 @@ Some differences from an octabam build, by design:
 | `ends mid-instruction`, `sweeps land on the start`, `does not decode` | the site does not cover whole instructions | move or widen the site to instruction boundaries (disassemble the stock main OS) |
 | `... overlap (0x...-0x...)` | another mod patches or claims those bytes | subscribe to an event instead, or agree with that mod's author |
 | `X requires Y` / `core is not enabled` | a dependency is missing | add Y (with lint: `--with Y.elemod`) |
+| `X needs core 3.0 or newer, and this build has core 2.1` | the mod's `resources.core` asks for a newer core | build with that core (the app and the web page take it when you tick the mod); an older loader says `imports fw_..., which no given mod exports` instead |
 | `imports N, which no given mod exports` | a missing dependency, or a typo | add the mod that exports N, fix the name, or list N under `weak` |
 | `adds to table T, which no given mod declares` | the table's owner is missing, or the event name is wrong | add core (or the owner); check the event name |
 | `both export S` | two mods define the same global | prefix your globals with your mod id; make internals `static` |

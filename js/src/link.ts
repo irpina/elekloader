@@ -15,9 +15,9 @@ import { concat, sha } from './bytes.ts'
 import { type Device, type Release, imageEnd, linkable } from './devices.ts'
 import { pSpan } from './dsp.ts'
 import {
-  type AnyMod, type Part, type Region, type Site, type Span, COMMON, ModError, RSIZE, commonChecks, formatOf, get, hexBytes,
-  insnCheck, int, isDict, iter, overlaps, parseParts, parseResources, parseSites, partsBytes, partsLen, pyEq, resolveTarget,
-  summarize, unpack,
+  type AnyMod, type Part, type Region, type Site, type Span, COMMON, ModError, RSIZE, cmpVersions, commonChecks, formatOf, get,
+  hexBytes, insnCheck, int, isDict, iter, overlaps, parseNeedsCore, parseParts, parseResources, parseSites, partsBytes, partsLen,
+  pyEq, resolveTarget, summarize, unpack,
 } from './elemod.ts'
 import { PCREL, decodeColdFire, readerAt } from './isa/coldfire.ts'
 import { AttributeError, KeyError, PyException, ValueError, hex8, pyType, repr, str } from './py.ts'
@@ -74,6 +74,7 @@ export class Mod2 implements AnyMod {
   copied: [number, number, number][]
   regions: Region[]
   names: string[]
+  needsCore: string | null
   requires: string[]
   conflicts: string[]
   blob = null
@@ -173,6 +174,7 @@ export class Mod2 implements AnyMod {
       return [int((c as any).lo, name), int((c as any).hi, name), int((c as any).to, name)] as [number, number, number]
     })
     ;[this.regions, this.names] = parseResources(doc, name, this.dev)
+    this.needsCore = parseNeedsCore(doc, name)
     this.requires = iter(get(doc, 'requires', [])).map(x => str(x))
     this.conflicts = iter(get(doc, 'conflicts', [])).map(x => str(x))
   }
@@ -239,6 +241,11 @@ export function check(mods: Mod2[], image: Uint8Array): string[] {
   if (!linkable(dev)) return [`the ${dev.name} has no linkable (format-2) mods yet: only whole builds (format 1) can be used on it`]
   const cores = mods.filter(m => m.sections.has('.boot'))
   if (cores.length !== 1) bad.unshift(`exactly one mod must carry .boot (core); got ${cores.length ? repr(cores.map(m => m.label())) : 'none'}`)
+  else {
+    for (const m of mods)
+      if (m.needsCore && cmpVersions(cores[0].version, m.needsCore) < 0)
+        bad.push(`${m.label()} needs core ${m.needsCore} or newer, and this build has core ${cores[0].version}`)
+  }
   const owner = new Map<string, Mod2>()
   for (const m of mods) {
     for (const x of m.exports) {

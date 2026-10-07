@@ -63,7 +63,9 @@ python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.1.elemod --m
 With `pip install .` the same commands are `elekloader` and `elekpatch`.
 From source, core is not built in. Take your device's from
 [Releases](https://github.com/irpina/elekloader/releases/latest) (or build
-it, below), and install it like any mod. There is one per device and OS:
+it, below), and install it like any mod. There is one per device and OS
+(and from core 3.0 the Digitakt mk1 has two lines, 2.1 and 3.0: a build
+takes 3.0 only for a mod that needs it):
 
 | device | OS | core |
 |---|---|---|
@@ -199,8 +201,10 @@ Each `mod.json` gives the addresses of every OS it
 supports (its `os`, and its `ports`): the stock file you build with picks
 them. The Octatrack's, [mods/core-ot](mods/core-ot), has a source of its
 own: it reserves RAM for mods, copies their code there, and from 0.2 has a
-hook bus with the Octatrack's events. To build one yourself, use the SDK
-(below):
+hook bus with the Octatrack's events. On the Digitakt mk1, core 3.0 and the
+[machine-pages](mods/machine-pages) mod let the SRC machines mods add
+describe their own pages, so they combine (docs/ADAPTING.md, "Machine
+pages"). To build one yourself, use the SDK (below):
 
 ```bash
 python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.54.syx                          # the Digitakt mk1's (or 1.53)

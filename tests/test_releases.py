@@ -101,30 +101,34 @@ def test_releases_of_a_device_differ_only_in_the_main_os():
                 assert a.stored[sid] == b.stored[sid], (dev.key, sid)
 
 
-def core_dirs(dev, rel):
-    """The mods/ folders whose mod.json builds for this release (its os, or a port)."""
-    out = []
+def mod_dirs(dev, rel):
+    """The mods/ folders whose mod.json builds for this release (its os, or a
+    port): (the cores, the others: companions such as machine-pages)."""
+    cores, others = [], []
     for n in sorted(os.listdir(os.path.join(ROOT, 'mods'))):
         p = os.path.join(ROOT, 'mods', n, 'mod.json')
         if os.path.exists(p):
             with open(p) as fh:
                 j = json.load(fh)
             if j.get('device') == dev.key and rel.version in [j.get('os')] + list(j.get('ports', {})):
-                out.append(os.path.join(ROOT, 'mods', n))
-    return out
+                (cores if j.get('id') == 'core' else others).append(os.path.join(ROOT, 'mods', n))
+    return cores, others
 
 
 def test_each_core_builds_and_lints_for_each_release_it_names():
+    """Each core alone, and each companion in mods/ with the core built for
+    its release."""
     built = 0
     for dev, rel, path, raw in each_release():
-        dirs = core_dirs(dev, rel)
-        if not dirs:
+        cores, others = mod_dirs(dev, rel)
+        if not cores:
             continue
         tc = dev.toolchain
         if not shutil.which(os.environ.get('ELEKLOADER_CROSS', tc.get('prefix', '')) + 'as'):
             raise Skip('no cross assembler for the %s' % dev.name)
-        for d in dirs:
-            with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp:
+            core = None
+            for d in cores + others:
                 out, m = build.build(d, path, tmp)
                 with open(out) as fh:
                     doc = json.load(fh)
@@ -135,9 +139,12 @@ def test_each_core_builds_and_lints_for_each_release_it_names():
                     m.id, m.version, '' if primary else '-os' + rel.version)
                 buf = io.StringIO()
                 with contextlib.redirect_stdout(buf):
-                    rc = lint.main([out, '--stock', path, '--json'])
+                    rc = lint.main([out, '--stock', path, '--json']
+                                   + (['--with', core] if m.id != 'core' else []))
                 r = json.loads(buf.getvalue())
                 assert rc == 0, (d, rel.version, r['problems'])
+                if m.id == 'core':
+                    core = out
                 built += 1
     if not built:
         raise Skip('no core names a release in %s' % DIR)
