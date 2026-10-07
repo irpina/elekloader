@@ -61,6 +61,9 @@ class Device:
     fast_table: str = ''         # the table .fast sections are copied through
     image_free: tuple = ()       # ((lo, hi), ...): zero runs inside the main OS that
                                  # fixed code may take (sdk.build's "fixed")
+    reserve: tuple = ()          # (unit, {name: (a, b)}): what a core needs to size its RAM
+                                 # reserve to the mods (link.py): n = the units the mods' RAM
+                                 # fills, at least 1, and each name = a + b*n (32 bits)
     dsp_payloads: dict = field(default_factory=dict)   # tag -> (address, length): DSP code the
                                  # main OS uploads at boot, as records (dsp.py walks them)
     dsp_areas: tuple = ()        # ((tag, lo, hi, name, what), ...): P words of a payload that a

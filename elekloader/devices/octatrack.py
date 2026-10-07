@@ -47,11 +47,14 @@ Facts taken from sambanks/octabam (MIT) and not re-derived here are marked
   (0x40a955e0-0x46025de0, 14,602 pages of 6,144 B) to samples and the
   recorders.
   - Linkable mods run with the Octatrack's core (mods/core-ot), which takes
-    the arena's bottom 1,707 pages (10 MB), as octabam's platform does.
-    That is 0x40a955e0-0x41495de0, the `ddr` below. The core moves the
+    the arena's bottom pages, as octabam's platform does: at most 1,707
+    (10 MB), 0x40a955e0-0x41495de0, the `ddr` below. The core moves the
     arena's base past them: 23 instructions carry the base and one carries
     base + 6,144, then four literals give the geometry. Those are octabam's
     arena.py writes (octabam), for the same reservation.
+  - From core 0.3 it takes only the pages the mods' RAM fills (`reserve`
+    below: the linker computes each write from the page count n). 0.2 took
+    all 1,707. octamax 2.0 took 64 on units, so the writes hold for other n.
   - The arena clear then starts at the new base, so the OS never touches
     the reserve again (octabam, measured there).
   - A whole build (e.g. an octabam remix) brings its own loader instead, from
@@ -108,10 +111,12 @@ DEVICE = Device(
     relocatable=((0x400e2000, 18, (0x4001d82e,), 'the USB device descriptor'),),
     blob_max=None,
     areas={
-        'ddr': (0x40A955E0, 0x41495DE0),          # the arena's bottom 1,707 pages (core-ot)
+        'ddr': (0x40A955E0, 0x41495DE0),          # the arena's bottom 1,707 pages at most (core-ot)
     },
     ddr=(0x40A955E0, 0x41495DE0),
     image_free=((0x400C45B0, 0x400C4702), (0x400D24D0, 0x400D2CE0), (0x400D64E0, 0x400D7C3C)),
+    reserve=(6144, {'arena_base': (0x40A955E0, 6144), '__arena_pages': (14602, -1),
+                    '__arena_fill': (14603, -1), '__arena_clear': (0x05590800, -6144)}),
     dsp_payloads={'A': (0x400E2324, 0x136CB), 'B': (0x400F59EF, 0x12D05)},
     dsp_areas=(('A', 0x0AA8, 0x0BAD, 'dsp:harvest:SPATIALIZER',
                 "SPATIALIZER's code on payload A (core 0)"),),

@@ -229,27 +229,95 @@ def test_the_core_moves_the_arena_past_its_reserve():
     """Every arena write in mods/core-ot follows from one number, the pages it
     takes: the base and base + one page move up by the reserve; the page
     count, the fill limit and the clear length (one page more than the count)
-    shrink by it. Each stock value is checked against the stock image."""
+    shrink by it. From 0.3 the linker computes them (the profile's `reserve`):
+    each site names the value it carries, the profile's formula gives the
+    stock value at 0 pages, and at 1,707 pages the bytes core 0.2 wrote. Each
+    stock value is checked against the stock image."""
     with open(os.path.join(ROOT, 'mods', 'core-ot', 'mod.json')) as fh:
         j = json.load(fh)
     lo, hi = DEV.ddr
-    moved = {lo: hi, lo + PAGE: hi + PAGE,
+    moved = {lo: hi, lo + PAGE: hi + PAGE,                  # core 0.2's 1,707 pages
              STOCK_PAGES: STOCK_PAGES - PAGES, STOCK_PAGES + 1: STOCK_PAGES + 1 - PAGES,
              (STOCK_PAGES + 1) * PAGE: (STOCK_PAGES + 1 - PAGES) * PAGE}
+    named = {lo: ('arena_base', 0), lo + PAGE: ('arena_base', PAGE),
+             STOCK_PAGES: ('__arena_pages', 0), STOCK_PAGES + 1: ('__arena_fill', 0),
+             (STOCK_PAGES + 1) * PAGE: ('__arena_clear', 0)}
+    unit, names = DEV.reserve
+    assert unit == PAGE and set(names) == {t for t, _a in named.values()}
     st, img = stock()
     seen = {}
     for s in j['sites']:
         o = int(s['addr'], 16) - DEV.main_load
         old = bytes.fromhex(s['stock'])
         assert img[o:o + len(old)] == old, s['addr']
-        if s['op'] == 'bytes':
-            assert moved[int(s['stock'], 16)] == int(s['new'], 16), s['addr']
-            seen[int(s['stock'], 16)] = seen.get(int(s['stock'], 16), 0) + 1
+        if s['op'] == 'ptr':
+            v = int(s['stock'], 16)
+            t, add = named[v]
+            assert (s['target'], s.get('addend', 0)) == (t, add), s['addr']
+            a, b = names[t]
+            assert (a + add) & 0xFFFFFFFF == v                        # 0 pages: stock
+            assert (a + b * PAGES + add) & 0xFFFFFFFF == moved[v]     # 1,707: core 0.2's
+            seen[v] = seen.get(v, 0) + 1
     assert seen == {lo: 23, lo + PAGE: 1, STOCK_PAGES: 2, STOCK_PAGES + 1: 1,
                     (STOCK_PAGES + 1) * PAGE: 1}
     calls = {s['target']: int(s['addr'], 16) for s in j['sites'] if s['op'] == 'jsr'}
     assert calls.pop('boot') == 0x4000050c
     assert set(calls) == set(BUS_SITES), calls             # the rest are the hook bus's
+
+
+def reserve_docs(img, bss, fixed=False):
+    """A core that sizes its reserve (two of core-ot's arena writes, against the linker's
+    reserve symbols) or, `fixed`, one that exports arena_base as core 0.2 does; and a mod
+    with `bss` bytes of RAM."""
+    tgt = devices.target_of(DEV, REL)
+
+    def site(addr, sym):
+        o = addr - DEV.main_load
+        return {'addr': '0x%08x' % addr, 'len': 4, 'kind': 'data', 'new': '00000000',
+                'stock_sha256': sha(img[o:o + 4]), 'relocs': [[0, 'abs32', 'sym:' + sym, 0]]}
+    core = {'elemod': 2, 'id': 'core', 'version': '0', 'target': tgt,
+            'sections': {'.boot': {'len': 2, 'parts': [['hex', '4e75']]}},
+            'sites': [site(0x4000045e, 'arena_base'), site(0x40096f82, '__arena_pages')],
+            'imports': ['arena_base', '__arena_pages']}
+    if fixed:
+        core['symbols'] = {'arena_base': ['abs', DEV.ddr[1]]}
+        core['exports'] = ['arena_base']
+        core['imports'] = ['__arena_pages']
+    mod = {'elemod': 2, 'id': 'ram', 'version': '0', 'target': tgt, 'requires': ['core'],
+           'sections': {'.bss': {'size': bss}}}
+    return core, mod
+
+
+def test_the_reserve_fits_the_mods():
+    """The linker sizes the reserve to the mods' RAM, in pages, for a core that imports the
+    profile's reserve symbols: at least one page, and the arena's values follow. A core
+    that exports arena_base (a fixed reserve, core 0.2) gets none of them, and a link
+    without a sized core is as before."""
+    st, img = stock()
+    lo = DEV.ddr[0]
+    for bss, pages in ((0, 1), (PAGE - 200, 1), (PAGE * 3, 3), (PAGE * 3 + 4, 4),
+                      (PAGE * PAGES - 300, PAGES)):
+        core, mod = reserve_docs(img, bss)
+        ln = link.link([link.Mod2(core, 'core'), link.Mod2(mod, 'ram')], img)
+        assert ln.layout['reserve'] == {'units': pages, 'end': lo + pages * PAGE}, (bss, ln.layout)
+        assert ln.map['arena_base'] == lo + pages * PAGE
+        assert ln.map['__arena_pages'] == STOCK_PAGES - pages
+        o = 0x40096f82 - DEV.main_load
+        assert struct.unpack('>I', ln.image[o:o + 4])[0] == STOCK_PAGES - pages
+        o = 0x4000045e - DEV.main_load
+        assert struct.unpack('>I', ln.image[o:o + 4])[0] == lo + pages * PAGE
+    core, mod = reserve_docs(img, PAGE * PAGES + 4)        # past the most it may take
+    expect(lambda: link.link([link.Mod2(core, 'core'), link.Mod2(mod, 'ram')], img),
+           'the mods need RAM to 0x%08x, past 0x%08x' % (DEV.ddr[1] + 4, DEV.ddr[1]))
+    core, mod = reserve_docs(img, 64, fixed=True)
+    mods = [link.Mod2(core, 'core'), link.Mod2(mod, 'ram')]
+    expect(lambda: link.link(mods, img), 'core 0 imports __arena_pages, which no given mod '
+           'exports')
+    core['imports'], core['sites'] = [], core['sites'][:1]
+    core['sites'][0]['relocs'][0][2] = 'sym:arena_base'
+    ln = link.link([link.Mod2(core, 'core'), link.Mod2(mod, 'ram')], img)
+    assert 'reserve' not in ln.layout and '__arena_pages' not in ln.map
+    assert ln.map['arena_base'] == DEV.ddr[1]               # the fixed core's own
 
 
 # The hook bus (core-ot 0.2): each site, the instruction it replaces, and its event.
@@ -405,8 +473,9 @@ def test_core_builds_and_links():
     o = 0x4000050c - DEV.main_load
     assert new[o:o + 6] == b'\x4e\xb9' + struct.pack('>I', boot)
     assert new[len(img):].find(b'ELEKLOADER MARKER') > 0
-    o = 0x4000045e - DEV.main_load
-    assert new[o:o + 4] == struct.pack('>I', DEV.ddr[1])
+    o = 0x4000045e - DEV.main_load              # the arena's base, past the pages the mods fill
+    assert new[o:o + 4] == struct.pack('>I', DEV.ddr[0] + PAGE)
+    assert man['link']['layout']['reserve'] == {'units': 1, 'end': DEV.ddr[0] + PAGE}
     # the draw site calls the gate in the image (tst.b core_up), whose flag starts clear
     gate = 0x400c46ea
     o = 0x40013cae - DEV.main_load

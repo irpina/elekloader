@@ -200,6 +200,13 @@ export class Mod2 implements AnyMod {
 
 // ---- checks ----
 
+/** The symbols a core may size its RAM reserve with (the profile's `reserve`): none when a mod exports one of them, as
+ * a core with a fixed reserve does. */
+function reserveNames(dev: Device, exported: { has(k: string): boolean }): Set<string> {
+  const names = dev.reserve ? Object.keys(dev.reserve[1]) : []
+  return names.some(n => exported.has(n)) ? new Set() : new Set(names)
+}
+
 type Area = [number, number, number, Mod2, string]   // lo, hi, main OS address of P:lo, the mod, the area's name
 
 /** The DSP areas the mods free, by the name a mod claims: payload tag -> area. One area a payload, the first claimed. */
@@ -261,9 +268,11 @@ export function check(mods: Mod2[], image: Uint8Array): string[] {
       tables.set(c, [m, e])
     }
   }
+  const sized = reserveNames(dev, owner)
   for (const m of mods) {
     for (const x of m.imports) {
-      if (owner.has(x) || tables.has(x) || LINKER_SYMS.has(x) || m.weak.has(x) || (x.endsWith('_n') && tables.has(x.slice(0, -2)))) continue
+      if (owner.has(x) || tables.has(x) || LINKER_SYMS.has(x) || sized.has(x) || m.weak.has(x)
+        || (x.endsWith('_n') && tables.has(x.slice(0, -2)))) continue
       bad.push(`${m.label()} imports ${x}, which no given mod exports`)
     }
     for (const c of m.contribute) {
@@ -334,6 +343,7 @@ export type DspLayout = {
 export type Layout = {
   boot: [number, number]; run_load: number; ddr: [number, number]; bss: [number, number]; fast: [number, number]
   blob_len: number; sections: Record<string, number>; ddr_spare: number; fast_spare: number; ddr_size: number; fast_size: number
+  reserve?: { units: number; end: number }   // a core sized to the mods: the pages it takes, and where they end
   dsp?: Record<string, DspLayout>              // words: P addresses of each payload's area
 }
 
@@ -483,6 +493,17 @@ export function link(mods: Mod2[], image: Uint8Array): Linked {
   }
   for (const [k, v] of [['__run_load', runLoad], ['__run_start', ddrBase], ['__run_words', Math.floor((runEnd - ddrBase) / 4)],
     ['__bss_start', runEnd], ['__bss_end', bssEnd], ['__bss_words', Math.floor((bssEnd - runEnd) / 4)]] as [string, number][]) glob.set(k, v)
+  // a reserve sized to the mods, for a core that imports its symbols
+  const sized = reserveNames(dev, glob)
+  let units: number | null = null
+  if (order.some(m => m.imports.some(x => sized.has(x)))) {
+    const [unit, names] = dev.reserve!
+    units = Math.max(1, Math.ceil((bssEnd - ddrBase) / unit))
+    for (const nm of Object.keys(names).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
+      const [a, b] = names[nm]
+      glob.set(nm, (((a + b * units) % 2 ** 32) + 2 ** 32) % 2 ** 32)
+    }
+  }
   const zero = glob.get('core_zero')
 
   const resolve = (m: Mod2, tgt: string, where: string): number => {
@@ -633,6 +654,7 @@ export function link(mods: Mod2[], image: Uint8Array): Linked {
     blob_len: blob.length, sections, ddr_spare: ddrEnd - bssEnd, fast_spare: fastEnd - fastAt, ddr_size: ddrEnd - ddrBase,
     fast_size: fastEnd - fastBase,
   }
+  if (units !== null) layout.reserve = { units, end: ddrBase + units * dev.reserve![0] }   // the reserve the core takes
   if (areas.size) {
     const dspOut: Record<string, DspLayout> = {}
     for (const tag of [...areas.keys()].sort(cmp)) {

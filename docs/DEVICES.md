@@ -25,6 +25,7 @@ and a hook bus of its own.
 | `relocatable` | data inside a protected range that the OS reaches only through the listed 4-byte operands and never writes, so a mod may serve its own copy through them (sdk.octabam does, for a poke there) | none on the mk1 |
 | `blob_max` | a cap on the appended blob, if the DDR areas do not give one | none on the mk1 |
 | `image_free` | zero runs inside the main OS that `fixed` code may take (sdk.build) | none on the mk1 |
+| `reserve` | (unit, {name: (a, b)}): for a core that sizes its RAM reserve to the mods, the symbols the linker defines from n, the units the mods' RAM fills: a + b·n each | none on the mk1 (its `ddr` is free RAM) |
 | `dsp_payloads`, `dsp_areas` | DSP code the main OS uploads at boot (tag: address, length), and the P words of a payload a mod frees by claiming a name, where the linker places DSP code (docs/FORMAT.md, "DSP code") | none on the mk1: its OS has no DSP code |
 | `toolchain` | the compiler, assembler and flags the SDK uses | the CFW's build |
 
@@ -227,8 +228,9 @@ below was found again in 1.17.
 - **Linkable mods.** There is no free RAM in stock: the OS gives the whole
   audio page arena (`0x40a955e0-0x46025de0`, 14,602 pages of 6,144 B) to
   samples and the recorders. The core, `mods/core-ot`, takes the arena's
-  bottom 1,707 pages (10 MB), as sambanks/octabam's platform does, and
-  that is the device's `ddr`: `0x40a955e0-0x41495de0`.
+  bottom pages, as sambanks/octabam's platform does: from 0.3 only those
+  the mods' RAM fills (the profile's `reserve`), at most 1,707 (10 MB, all
+  of them in 0.2), which is the device's `ddr`: `0x40a955e0-0x41495de0`.
   - It moves the arena's base past them with octabam's 28 arena writes
     (the base, base + one page, the page count, the fill limit and the
     clear length). tests/test_octatrack.py derives each from the page count.

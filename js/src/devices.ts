@@ -38,6 +38,7 @@ export type Device = {
   sramCode: Range
   fastTable: string
   imageFree: Range[]
+  reserve: [number, Record<string, [number, number]>] | null   // [unit, {name: [a, b]}]: a RAM reserve sized to the mods
   dspPayloads: Record<string, Range>            // tag -> [address, length]: DSP code the main OS uploads at boot
   dspAreas: [string, number, number, string, string][]   // [tag, lo, hi, name, what]: P words a mod frees by claiming name
   recovery: string
@@ -49,7 +50,7 @@ const rel = (version: string, syxSha256: string, mainSha256: string, mainLen: nu
 const base = {
   mainSection: 3, mainLoad: 0x40000400, isa: 'coldfire' as const, hmacKeyFrom: null, container: 'ele3' as const,
   versionLen: 4, protected: [], relocatable: [], blobMax: null, sramCode: [0, 0] as Range, fastTable: '',
-  imageFree: [], dspPayloads: {}, dspAreas: [], trailer: null,
+  imageFree: [], reserve: null, dspPayloads: {}, dspAreas: [], trailer: null,
 }
 
 export const DIGITAKT_MK1: Device = {
@@ -110,6 +111,8 @@ export const OCTATRACK: Device = {
   areas: { ddr: [0x40a955e0, 0x41495de0] },
   ddr: [0x40a955e0, 0x41495de0],
   imageFree: [[0x400c45b0, 0x400c4702], [0x400d24d0, 0x400d2ce0], [0x400d64e0, 0x400d7c3c]],
+  reserve: [6144, { arena_base: [0x40a955e0, 6144], __arena_pages: [14602, -1], __arena_fill: [14603, -1],
+    __arena_clear: [0x05590800, -6144] }],
   dspPayloads: { A: [0x400e2324, 0x136cb], B: [0x400f59ef, 0x12d05] },
   dspAreas: [['A', 0xaa8, 0xbad, 'dsp:harvest:SPATIALIZER', "SPATIALIZER's code on payload A (core 0)"]],
   recovery: 'hold FUNC while powering on for the startup menu, press TRIG 3 (MIDI UPGRADE) and send the stock '

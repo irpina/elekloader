@@ -1,24 +1,36 @@
 # core for the Octatrack
 
 The boot copier and the hook bus for the Octatrack (MKI and MKII), OS 1.40C.
-Every set of linkable (format 2) mods for the Octatrack needs it. On its own
-it takes 10 MB of sample and recorder memory and changes nothing else the
-unit does.
+Every set of linkable (format 2) mods for the Octatrack needs it. It takes
+from the sample and recorder memory only the 6 KB pages the mods' RAM fills
+(from 0.3: one page for core and a small mod, where 0.2 took 10 MB), and
+changes nothing else the unit does.
 
 - **The reserve.** The OS gives the whole audio page arena
   (0x40a955e0-0x46025de0, 14,602 pages of 6,144 B) to samples and the
-  recorders. The core moves the arena's base past its bottom 1,707 pages,
-  so 0x40a955e0-0x41495de0 is left for mods: the device's `ddr`, where the
-  linker places `.run` and `.bss`. That takes 28 writes (`mod.json`):
+  recorders. The core moves the arena's base past its bottom pages, so they
+  are left for mods: the linker places `.run` and `.bss` from 0x40a955e0
+  (the device's `ddr`). That takes 28 writes (`mod.json`):
   - 23 instructions carry the base;
   - one carries base + 6,144;
   - four literals set the geometry: the page count, the fill limit and the
-    clear length each shrink by 1,707 pages.
+    clear length each shrink by the pages taken.
 
   These are the same writes sambanks/octabam's platform makes (`arena.py`,
-  MIT) for the same reservation. tests/test_octatrack.py derives each one
-  from the page count. The core exports the moved base as `arena_base`,
-  for mods that compare against it.
+  MIT) for the same reservation.
+  - **0.3 takes only what the mods use.** Each write is a `ptr` against a
+    symbol the linker defines from the pages the linked mods' RAM fills, at
+    least one (the profile's `reserve`): `arena_base`, `__arena_pages`,
+    `__arena_fill`, `__arena_clear`. Core with track meters and OT HEALTH
+    takes 1 page, so the arena keeps 14,601 of its 14,602 pages; the most
+    is 1,707 pages, 0.2's whole reserve (0x40a955e0-0x41495de0).
+  - 0.2 took 1,707 pages whatever the mods used, and exported the moved
+    base as `arena_base` itself. With 0.3 the linker defines `arena_base`,
+    for mods that compare against it.
+  - tests/test_octatrack.py derives each write from the page count: the
+    stock value at 0 pages, 0.2's at 1,707. Under octabam's port, the
+    OS's free-page count (0x80006920) after boot is 1,706 pages higher
+    with 0.3 than with 0.2, for the same mods.
 - **At boot.** The boot site 0x4000050c called 0x40001e50; it now calls
   `boot`, at the end of the OS image (0x4010fdf0), where the bootstrap
   unpacks it.

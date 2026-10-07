@@ -183,6 +183,13 @@ class Mod2:
 
 # ---- checks ---------------------------------------------------------------------------
 
+def reserve_names(dev, exported):
+    """The symbols a core may size its RAM reserve with (the profile's `reserve`): none when a
+    mod exports one of them, as a core with a fixed reserve does."""
+    names = set(dev.reserve[1]) if dev.reserve else set()
+    return set() if names & set(exported) else names
+
+
 def dsp_areas(mods, image):
     """The DSP areas the mods free, by the name a mod claims: payload tag -> (lo, hi, main
     OS address of P:lo, the mod, the area's name). One area a payload, the first claimed."""
@@ -247,9 +254,10 @@ def check(mods, image):
             if c in owner:
                 bad.append('table %s has the name of a symbol %s exports' % (c, owner[c].label()))
             tables[c] = (m, e)
+    sized = reserve_names(dev, owner)
     for m in mods:
         for x in m.imports:
-            if x in owner or x in tables or x in LINKER_SYMS or x in m.weak \
+            if x in owner or x in tables or x in LINKER_SYMS or x in sized or x in m.weak \
                     or (x.endswith('_n') and x[:-2] in tables):
                 continue
             bad.append('%s imports %s, which no given mod exports' % (m.label(), x))
@@ -446,6 +454,14 @@ def link(mods, image):
     glob.update({'__run_load': run_load, '__run_start': ddr_base,
                  '__run_words': (run_end - ddr_base) // 4, '__bss_start': run_end,
                  '__bss_end': bss_end, '__bss_words': (bss_end - run_end) // 4})
+    # a reserve sized to the mods, for a core that imports its symbols
+    sized, units = reserve_names(dev, glob), None
+    if any(x in sized for m in order for x in m.imports):
+        unit, names = dev.reserve
+        units = max(1, -(-(bss_end - ddr_base) // unit))
+        for nm in sorted(names):
+            a, b = names[nm]
+            glob[nm] = (a + b * units) & 0xFFFFFFFF
     zero = glob.get('core_zero')
 
     def resolve(m, tgt, where):
@@ -590,6 +606,8 @@ def link(mods, image):
         'ddr_spare': ddr_end - bss_end, 'fast_spare': fast_end - fast_at,
         'ddr_size': ddr_end - ddr_base, 'fast_size': fast_end - fast_base,
     }
+    if units is not None:                      # the reserve the core takes: units of dev.reserve
+        out.layout['reserve'] = {'units': units, 'end': ddr_base + units * dev.reserve[0]}
     if areas:                                  # words: P addresses of each payload's area
         out.layout['dsp'] = {
             tag: {'area': [lo, hi], 'used': [lo, dsp_at[tag]], 'name': nm,

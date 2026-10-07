@@ -6,9 +6,11 @@
 | What every Octatrack mod needs is RAM and a way to get its code into it,
 | and that is this file:
 |
-| - mod.json moves the audio page arena's base past its bottom 1,707 pages
-|   (0x40a955e0-0x41495de0, the device's `ddr`), so the OS never uses them.
-|   Those are octabam's arena writes for the same reservation.
+| - mod.json moves the audio page arena's base past the pages the linked
+|   mods' RAM fills (from 0.3; 0.2 took a fixed 1,707), so the OS never
+|   uses them. Those are octabam's arena writes for the same reservation;
+|   the linker computes their values from the page count (the profile's
+|   `reserve`): arena_base, __arena_pages, __arena_fill, __arena_clear.
 | - .boot runs where the bootstrap unpacks it (appended to MAIN OS at
 |   0x4010fdf0), from the boot site 0x4000050c. That site called
 |   BOOT_CONTINUE (0x40001e50), which is replayed first, as octabam's loader
@@ -18,13 +20,10 @@
 |   line can hold the reserve's old contents when the code there first runs.
 |
 | The linker defines __run_load, __run_start, __run_words, __bss_start and
-| __bss_words. BOOT_CONTINUE, UNCACHED and ARENA_BASE come from mod.json
-| (defsym).
-
-| The arena's base after the reserve, for a mod that compares against it
-| (octabam's RECORDER HOLD: a fetch past a recording returns the base).
-        .globl  arena_base
-        .set    arena_base, ARENA_BASE
+| __bss_words, and arena_base: the arena's base after the reserve, for a mod
+| that compares against it (octabam's RECORDER HOLD: a fetch past a
+| recording returns the base). BOOT_CONTINUE and UNCACHED come from
+| mod.json (defsym).
 
 | ============================ .boot =======================================
         .section .boot, "ax"
