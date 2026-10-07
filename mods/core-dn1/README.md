@@ -55,6 +55,14 @@ the Digitone needs it. On its own it changes nothing the unit does.
   each an entry's 16 x 16 icon over its label, with a scroll bar; the
   arrows move by tile and row. A descriptor may add the tag `0x49434F4E`
   ("ICON") and an icon after its `open`; one without (2.2's) gets a chip.
+  Below, from digikit's emulator, with digitables 1.3 and a test mod's
+  seven entries linked: holding T1 opens the first page, with TABLES
+  selected; RIGHT and then DOWN three times reach the last row, and the bar
+  on the right has moved down with it; YES on TABLES opens digitables' page.
+
+  ![The Mod Menu's first page: TABLES, SYNTH, DEMO TWO and NOTES, TABLES selected](../../docs/img/dn-modmenu-grid.png)
+  ![The Mod Menu scrolled to its last row: DICE, a long label cut at 14 characters, HEART and SMILE, SMILE selected](../../docs/img/dn-modmenu-scrolled.png)
+  ![TABLES picked: digitables' Table page, AMP's third page, with its TBL and SPD knobs](../../docs/img/dn-modmenu-tbl-page.png)
 - **OS 1.44:** every site has its port (`ports` in mod.json): the same
   code, moved, and RAM 0x1000 further on.
 
@@ -66,15 +74,16 @@ python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_
 python -m elekloader.lint mods/core-dn1/out/core-2.3-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
 ```
 
-A release names them `core-dn1-2.3.elemod` and `core-dn1-2.3-os1.44.elemod`.
+A release names them `core-dn1-2.3.elemod` and `core-dn1-2.3-os1.44.elemod`;
+2.3's are on the [core-dn1-v2.3](https://github.com/irpina/elekloader/releases/tag/core-dn1-v2.3) pre-release.
 
 Checked by cold-booting it in digikit's emulator against stock (docs/DEVICES.md):
 - every stage passes, and every screen is identical;
 - the audio is identical up to PLAY, then the same sound slightly shifted in
   time, as stock's own is when PLAY lands 0.3 ms later.
 
-The 1.44 port has not been run in an emulator: digikit's Digitone support
-does not yet boot stock 1.44 to a settled screen. It is the same code with
+The 1.44 port is checked the same way, against stock 1.44 (from 2.3):
+every stage passes, and every screen is identical. It is the same code with
 1.44's addresses. Its eight sites hold the same stock bytes as 1.43's, and
 each routine it calls was found again by its own code, with the addresses
 in it masked, and checked against the code that calls it. It lints and

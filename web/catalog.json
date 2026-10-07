@@ -42,9 +42,14 @@
       "summary": "SYSTEM INFO shows CPU, DSP and free RAM in the top bar."
     },
     {
-      "repo": "irpina/digitables", "tag": "v1.3", "file": "core-dn1-2.2.elemod", "kind": "core",
+      "repo": "irpina/elekloader", "tag": "core-dn1-v2.3", "file": "core-dn1-2.3.elemod", "kind": "core",
       "device": "digitone-mk1",
-      "sha256": "29e41968bc4789c0082b4387c1ccdde9bc36f1db5d87f5777a56f383328e5f21"
+      "sha256": "51a32a2c3457e52a2aeb6ba7646081c0dbf8c3b4927d48aaa80c752369b722ba"
+    },
+    {
+      "repo": "irpina/elekloader", "tag": "core-dn1-v2.3", "file": "core-dn1-2.3-os1.44.elemod", "kind": "core",
+      "device": "digitone-mk1",
+      "sha256": "fb2af06001576c1ac1cf2c10e86be863866b612259344e79646b48e3ad8a08d5"
     },
     {
       "repo": "irpina/digitables", "tag": "v1.3", "file": "digitables-1.3.elemod",
