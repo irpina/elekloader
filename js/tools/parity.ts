@@ -72,9 +72,41 @@ function plan(configPath: string, casesPath: string) {
   add('ot octabam all', 'ot', [f('octabam', 'core-0.1.elemod'), ...ob.map(m => f('octabam', m))])
   add('ot core-ot 0.1 + tuner', 'ot', [f('release', 'core-ot-0.1.elemod'), f('octabam', 'octabam-tuner-363861e.elemod')])
 
-  // broken copies of a real mod: every refusal must read the same
   const scratch = cfg.scratch
   mkdirSync(scratch, { recursive: true })
+
+  // DSP code (optional): files.dspcore, a core-ot that links them; files.dspbus, a mod that frees payload A's area and
+  // declares a DSP table; files.dspsub, a mod with a .dsp.A section, a dsp24 relocation and an entry in that table
+  if (cfg.files.dspsub) {
+    const [core, bus, sub] = [cfg.files.dspcore, cfg.files.dspbus, cfg.files.dspsub] as string[]
+    add('ot dsp: bus + subscriber', 'ot', [core, bus, sub])
+    add('ot dsp: the bus alone', 'ot', [core, bus])
+    add('ot dsp: the subscriber without the bus', 'ot', [core, sub])
+    const subDoc = () => JSON.parse(readFileSync(sub, 'utf8'))
+    const dspMuts: [string, (d: any) => any][] = [
+      ['dsp-words', d => { d.sections['.dsp.A'].parts.push(['hex', '00']); delete d.sections['.dsp.A'].len; return d }],
+      ['dsp-payload', d => { d.sections['.dsp.C'] = d.sections['.dsp.A']; return d }],
+      ['dsp-symbol', d => { d.symbols[Object.keys(d.symbols)[0]] = ['.dsp.A', 1]; return d }],
+      ['dsp-reloc-type', d => { d.relocs[0][2] = 'abs32'; return d }],
+      ['dsp-reloc-word', d => { d.relocs[0][1] += 1; return d }],
+      ['dsp-reloc-cf', d => { d.relocs[0][3] = 'sym:core_zero'; d.imports = ['core_zero']; return d }],
+      ['dsp-entry-abs32', d => { d.contribute[0].relocs = [[0, 'abs32', 'sym:inject', 0]]; return d }],
+      ['dsp-entry-word', d => { d.contribute[0].relocs[0][0] = 1; return d }],
+      ['dsp-entry-cf-table', d => { d.contribute.push({ to: 'ev_tick', order: 50, data: '00000000', relocs: [[0, 'dsp24', 'sym:inject', 0]], claims: [] }); return d }],
+      ['dsp-too-big', d => { d.sections['.dsp.A'] = { len: 900, parts: [['hex', '00'.repeat(900)]] }; d.relocs = []; return d }],
+      ['dsp-table-space', d => { d.collections = { t: { entry: 6, space: 'dsp.Q' } }; return d }],
+      ['dsp-table-words', d => { d.collections = { t: { entry: 6, space: 'dsp.A', head: '00' } }; return d }],
+      ['dsp-table-own', d => { d.collections = { t: { entry: 6, space: 'dsp.A', head: '000000', end: '0c0000' } }; d.contribute.push({ to: 't', order: 1, data: '80f00b000000', relocs: [[3, 'dsp24', 'sym:inject', 0]], claims: [] }); return d }],
+      ['dsp-site-in-area', d => { d.sites = [{ addr: '0x400f1774', len: 3, new: '000000', kind: 'data', stock_sha256: '0'.repeat(64), relocs: [] }]; return d }],
+    ]
+    for (const [name, fn] of dspMuts) {
+      const p = join(scratch, `mut-${name}.elemod`)
+      writeFileSync(p, Buffer.from(JSON.stringify(fn(subDoc()), null, 1)))
+      add(`mutation ${name}`, 'ot', [core, bus, p])
+    }
+  }
+
+  // broken copies of a real mod: every refusal must read the same
   const base = readFileSync(f('dt', 'digislicer-2.1.elemod'))
   const doc = () => JSON.parse(base.toString('utf8'))
   const muts: [string, (d: any) => any][] = [
