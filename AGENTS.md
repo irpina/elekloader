@@ -40,7 +40,7 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 | `packaging/`, `.github/workflows/windows-build.yml`, `macos-build.yml` | the apps: `elekloader-<version>-windows.exe`, and `elekloader-<version>-macos.dmg` (signed and notarized), with core built in (`elekloader/bundled`, never committed) |
 | `js/` | the engine in TypeScript (GPL-3.0-or-later; js/README.md): the formats, the checks, the linker, the build and the web bridge, ported from the Python and matching it byte for byte, messages included (`js/tools/parity.ts` checks with your stock files) |
 | `js/src/kit/`, `js/tools/kit.ts`, `js/examples/minimal/`, `packaging/build_kit.py`, `.github/workflows/kit-build.yml` | the kit for websites (docs/INTEGRATING.md): the builder worker, the page's client, the catalog format and elekloader's curated catalog, the lock and its checks. It names no website |
-| `web/`, `packaging/build_web.py`, `.github/workflows/pages.yml` | the web page (GitHub Pages): elekloader in Pyodide, in a worker; `bridge.py` is its only Python, a thin layer over `gui.LoaderModel` and `patch`; `catalog.json` is its mod shop's curated list (docs/WEB.md). Everything it loads comes from the site itself |
+| `web/`, `packaging/build_web.py`, `.github/workflows/pages.yml` | the web page (GitHub Pages): it builds from the user's own stock file and `.elemod` files (the mods are on Modwerk), with the TypeScript engine (js/) in a worker; `bridge.py` is the Python reference its bridge is compared with, not on the site, and `catalog.json` is the kit's curated list, not the page's (docs/WEB.md). Everything it loads comes from the site itself |
 
 Tests:
 
@@ -55,8 +55,9 @@ ELEKLOADER_DN_SYX=... python tests/test_digitone.py
 ELEKLOADER_DT2_SYX=... python tests/test_digitakt2.py
 ELEKLOADER_RELEASES=<folder of stock files> python tests/test_releases.py   # every known release, and the cores for it
 ELEKLOADER_STOCK=... ELEKLOADER_OT_SYX=... ELEKLOADER_MODS=... python tests/test_gui.py   # the window, hidden (Tk)
-python packaging/build_web.py --pyodide pyodide-core-<v>.tar.bz2 --core core-*.elemod --out build/site
-node tests/test_web.mjs build/site                           # the web page's engine, in Pyodide
+node --test "js/test/*.test.ts"                              # the TypeScript engine, no firmware
+python packaging/build_web.py --core core-*.elemod --out build/site   # needs Node 22.18 or newer
+node tests/test_web.mjs build/site                           # the web page's engine, from the site
 ```
 
 A test whose files are not given is skipped, not passed. Say which ran.
@@ -88,11 +89,10 @@ Rules:
   pass.
 - **The web page stays on its own site.** It loads nothing from anywhere
   else (no CDN, fonts, analytics or package downloads), sends the user's
-  files nowhere, and only offers downloads: no Web MIDI or USB. Its Python
-  goes through `elekloader` unchanged. The site never holds firmware or a
-  build; the only mods on it are the cores and the shop's
-  (`web/catalog.json`), each from its author's release, pinned by sha256,
-  under a licence that allows passing it on.
+  files nowhere, and only offers downloads: no Web MIDI or USB. It builds
+  with the engine in js/, unchanged. The site never holds firmware, a build
+  or a mod shop; the only mods on it are the release's cores. The mods are
+  on Modwerk, and users bring their own files.
 
 Done means all of these:
 - the tests that could run pass;

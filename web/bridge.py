@@ -1,15 +1,20 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""The web page's way into elekloader. It runs in Pyodide, in the page's
-worker (worker.js), on Pyodide's in-memory file system: the files the page
-hands over are written under /work, and nothing here reads anything else or
-talks to a network.
+"""The web page's calls, in Python: the reference for the bridge the page runs.
+The page's worker runs elekloader's TypeScript engine (js/src/bridge.ts), whose
+calls, arguments and replies are these; js/tools/bridge_parity.ts plays a
+page's sessions through both and compares every reply. It ran the page in
+Pyodide until the engine was ported.
+
+It works on an in-memory file system (Pyodide's, or a POSIX /work): the files
+the page hands over are written under /work, and nothing here reads anything
+else or talks to a network.
 
 The logic is elekloader's own, unchanged: gui.LoaderModel (the desktop
 window's logic without Tk) for the stock file, the mod list and the live
 check; gui.with_requirements for ticking; patch.build and patch.save for the
 build, as the command line and the window do.
 
-The worker calls call(name, args_json, data, progress) and gets JSON back.
+call(name, args_json, data, progress) answers with JSON.
 """
 import hashlib
 import json

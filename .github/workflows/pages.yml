@@ -1,15 +1,12 @@
-# The web patcher (web/) on GitHub Pages: elekloader in the browser, in Pyodide.
+# The web page (web/) on GitHub Pages: elekloader in the browser, building
+# custom firmware from the user's own stock OS file and .elemod files (the mods
+# are on Modwerk). It runs elekloader's TypeScript engine (js/).
 #
 # On every push to main, and by hand (Actions > pages > Run workflow). It takes
 # the core mods from the latest release (as windows-build takes them from its
-# release), the elekloader package as this commit has it, and the pinned
-# Pyodide (checked against its sha256 by build_web.py). It assembles the site,
-# runs the unit tests and the page's bridge under Pyodide on that very site
-# (tests/test_web.mjs), and deploys it.
-#
-# It also puts the mod shop on the site: each mod web/catalog.json lists,
-# from its author's GitHub release, checked against the sha256 the catalog
-# pins.
+# release) and the engine as this commit has it, assembles the site, runs the
+# unit tests (the Python's and the engine's) and the page's engine on that very
+# site (tests/test_web.mjs), and deploys it.
 #
 # No firmware reaches this workflow, and the site holds none: the page reads
 # the user's stock OS file only in their browser, and builds there.
@@ -57,29 +54,11 @@ jobs:
           tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
           echo "TAG=$tag" >> "$GITHUB_ENV"
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "core-*.elemod" --dir build/core
-          # the tag, so the page can say whether its package is that release's
+          # the tag, so the page can say whether its engine is that release's
           git fetch --depth=1 --no-tags origin "refs/tags/$tag:refs/tags/$tag"
-      - name: The mod shop's files, from their authors' releases and commits
-        run: |
-          # web/catalog.json pins each file's sha256 (build_web.py checks them); one that
-          # cannot be fetched (a draft release) is listed in the shop as not available
-          mkdir -p build/shop
-          python packaging/build_web.py --catalog-list web/catalog.json | while read -r how repo ref path; do
-            if [ "$how" = commit ]; then
-              out="build/shop/${path##*/}"
-              gh api "repos/$repo/contents/$path?ref=$ref" -H "Accept: application/vnd.github.raw" > "$out.part" \
-                && mv "$out.part" "$out" \
-                || { rm -f "$out.part"; echo "::warning::$repo $ref $path: not downloadable; the shop lists it as not available"; }
-            else
-              gh release download "$ref" --repo "$repo" --pattern "$path" --dir build/shop --clobber \
-                || echo "::warning::$repo $ref $path: not downloadable; the shop lists it as not available"
-            fi
-          done
-      - name: Pyodide, the pinned release
-        run: curl -fsSL --retry 3 --create-dirs -o build/pyodide-core.tar.bz2 "$(python packaging/build_web.py --pyodide-url)"
       - name: Assemble the site
-        run: python packaging/build_web.py --pyodide build/pyodide-core.tar.bz2 --core build/core/core-*.elemod --release "$TAG" --catalog web/catalog.json --catalog-dir build/shop --out build/site
-      - name: The engine under Pyodide, from the assembled site
+        run: python packaging/build_web.py --core build/core/core-*.elemod --release "$TAG" --out build/site
+      - name: The page's engine, from the assembled site
         run: node tests/test_web.mjs build/site
       - uses: actions/upload-pages-artifact@v5
         with:
