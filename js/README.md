@@ -36,6 +36,16 @@ Each `src/` file says which Python module it ports.
 
 Nothing here touches the network or a device, and files stay in memory (`Store`).
 
+## The kit, for websites
+
+`src/kit/` puts the engine on any website ([docs/INTEGRATING.md](../docs/INTEGRATING.md)):
+- **`worker.ts`:** a builder worker that keeps to the site it is served from;
+- **`client.ts`:** `createBuilder`, the page's promise API;
+- **`catalog.ts`:** the catalog format (the cores and mods a site offers, pinned by sha256), and planning a selection;
+- **`build.ts`:** the build page's helpers: prepare, the three build steps, the build log as text.
+
+`tools/kit.ts` copies a catalog's files (`sync`), checks them (`verify`), pins the kit and the catalog (`lock`), and builds elekloader's curated catalog (`feed`). `examples/minimal/` is the smallest site. Each release attaches the kit as `elekloader-kit-<version>.zip` (`packaging/build_kit.py`) and the catalog as `elekloader-catalog.json`.
+
 ## Test
 
 ```bash

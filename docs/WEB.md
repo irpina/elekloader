@@ -15,7 +15,7 @@ One view, in steps:
 - **02 Your mods:**
   - **The list:** every `.elemod` you added, and the site's cores, built in. The cores come from elekloader's latest release, one per device and OS.
   - **Adding:** a drop zone for your `.elemod` files. A `.elemod` dropped anywhere on the page is added too.
-  - **Ticking** a mod ticks what it requires (the core). Of several files with one id, the last by name is taken: a newer core you add is preferred to the site's.
+  - **Ticking** a mod ticks what it requires (the core). The core is the one a build takes: of the cores listed, the newest of the oldest major line that every ticked mod allows (docs/ADAPTING.md, "Core 3.0"), so a selection that needs nothing from core 3.0 keeps core 2.1. Ticking a mod that needs a newer core (its `resources.core`) swaps the core, and the page says so.
   - **The details:** each mod's description, what it needs, its memory and its patch sites.
   - **Profiles:** the profile menu.
 - **03 Check:** the live check, as you tick: conflicts, the load order, the RAM and fast SRAM the mods take.
@@ -93,6 +93,8 @@ The page shows the device's recovery text before it lets you download. Flash the
    - the refusals;
    - that the site carries no shop and no Pyodide;
 5. deploys it with `actions/upload-pages-artifact` and `actions/deploy-pages`.
+
+`web/catalog.json` is not the page's: it is the kit's curated list, which `.github/workflows/kit-build.yml` turns into `elekloader-catalog.json` (docs/INTEGRATING.md), reading it with `build_web.py --catalog-list`.
 
 No firmware reaches the workflow. Pages has to be on, with **GitHub Actions** as its source (Settings > Pages). When a new release carries its cores, run the workflow by hand to put them on the site.
 

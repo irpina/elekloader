@@ -1,0 +1,438 @@
+{
+  "about": "elekloader's curated list of cores and mods, for the kit (the page does not use it). The kit-build workflow takes each file from its author's GitHub release (repo, tag, file), or from their repository at a commit (repo, commit, path), checks it against the sha256 here, and lists it in elekloader-catalog.json (js/tools/kit.ts feed); nothing here is committed but this list. Only mods whose licence allows passing them on. kind 'core': a core the listed mods need, listed with the catalog's cores. needs_core: the oldest core version the mod links with. on_unit: what has been checked on real hardware, carried into the catalog. license: only for a file that names none (then the repository's licence).",
+  "items": [
+    {
+      "repo": "irpina/digislicer", "tag": "v2.2", "file": "core-2.1.elemod", "kind": "core",
+      "device": "digitakt-mk1",
+      "sha256": "f38b0c193677a060b3fdb28fe71b9332be8a5e7d36ecaf91a3c86a61bab558eb"
+    },
+    {
+      "repo": "irpina/digislicer", "tag": "v2.2", "file": "core-2.1-os1.54.elemod", "kind": "core",
+      "device": "digitakt-mk1",
+      "sha256": "8c1fe78ccd1427d6a93f181eaad9f064efb65cf6dd683192dbcc33e83dc548b9"
+    },
+    {
+      "repo": "irpina/digislicer", "tag": "v2.2", "file": "digislicer-2.2.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "20cfd79492c40289653c62667003e4a60eda7cc4ceed7abdb7fbde9e051a3527",
+      "summary": "A slicing machine with a slice editor: cut a sample where you want, and play the slices from the trig keys and the keyboard."
+    },
+    {
+      "repo": "irpina/digislicer", "tag": "v2.2", "file": "digislicer-2.2-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "c660a7232a5986a677696d61a18688256cfe208510d146c3ea876df50c738c27",
+      "summary": "A slicing machine with a slice editor: cut a sample where you want, and play the slices from the trig keys and the keyboard."
+    },
+    {
+      "repo": "irpina/digihealth", "tag": "v1.1", "file": "digihealth-1.0.elemod",
+      "device": "digitakt-mk1",
+      "sha256": "aba9413ee205e1368ec3997172a84e59eaa4e787d267bc7a3e94a161b4fcd0f1",
+      "summary": "FAST AUDIO lowers the DSP load; SYSTEM INFO shows CPU, DSP and memory in the top bar."
+    },
+    {
+      "repo": "irpina/digihealth", "tag": "v1.1", "file": "digihealth-1.0-os1.54.elemod",
+      "device": "digitakt-mk1",
+      "sha256": "b8a49c1137fb3f2a06338f71f0d5730812481a0ce1cef362144334fe55b11c5a",
+      "summary": "FAST AUDIO lowers the DSP load; SYSTEM INFO shows CPU, DSP and memory in the top bar."
+    },
+    {
+      "repo": "irpina/digihealth", "tag": "v1.1", "file": "digihealth-1.1.elemod",
+      "device": "digitone-mk1",
+      "sha256": "5d2e5e201f9cd6323f0641093817250b030b196dd00816e2b18ca6ab0ed0ca99",
+      "summary": "SYSTEM INFO shows CPU, DSP and free RAM in the top bar."
+    },
+    {
+      "repo": "irpina/digitables", "tag": "v1.3", "file": "core-dn1-2.2.elemod", "kind": "core",
+      "device": "digitone-mk1",
+      "sha256": "29e41968bc4789c0082b4387c1ccdde9bc36f1db5d87f5777a56f383328e5f21"
+    },
+    {
+      "repo": "irpina/digitables", "tag": "v1.3", "file": "digitables-1.3.elemod",
+      "device": "digitone-mk1", "needs_core": "2.2",
+      "sha256": "a9a2335d0f0c80c17103062bb731a3560af5aca3b05b1b4650713dd273ca5511",
+      "summary": "Pitch tables for every note: arpeggios, trills and riffs from one trig, and ADD steps that strum chords.",
+      "on_unit": "Tested on a Digitone mk1 (3-4 Oct 2026): the TBL page, the table editor, the fast speeds, the Mod Menu and ADD steps. Not yet checked: the tables restored at power-up, and the arpeggiator with tables."
+    },
+    {
+      "repo": "irpina/digineighbor", "tag": "v0.6", "file": "digineighbor-0.6.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "title": "digineighbor", "version": "0.6",
+      "sha256": "380837f86c05cf6d0aba2dfc930a4309cc6b2e99b2e8c6a450f0abe6e844dccd",
+      "summary": "A NEIGHBOR machine like the Octatrack's: a track plays another track's audio through its own chain. A prototype."
+    },
+    {
+      "repo": "irpina/digineighbor", "tag": "v0.6", "file": "digineighbor-0.6-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "title": "digineighbor", "version": "0.6",
+      "sha256": "664cb3286b1f7b18ee757ce67c3d38d878741f8ebf6920da21d1eb576a6aeec0",
+      "summary": "A NEIGHBOR machine like the Octatrack's: a track plays another track's audio through its own chain. A prototype."
+    },
+    {
+      "repo": "soejrd/digisophie", "tag": "v1.1.13", "file": "digisophie-1.1.13.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "6eadc29d581b24ff84fe3fe32399b998a91375ee06182631ab499109b4a003a5",
+      "summary": "A metallic percussion machine with four models: FUSE, BOOM, PIPE and SHARD.",
+      "on_unit": "Tested on a Digitakt mk1 by its author (release v1.1.13): one Sophie track runs without FAST AUDIO, two ran with it on; eight tracks are not claimed."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digichain-1.6.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "819f6045b5ad4deaa720c74f0126d078cc15c019dfcb07710112ac453b65d47d",
+      "summary": "What Digi Mono and Digi Poly build on: their SRC pages, knob graphics and menu icons. Not with the shop's DIGISLICER, NEIGHBOR or SOPHIE.",
+      "on_unit": "Not yet tested on a unit, its author reports; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digichain-1.6-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "5d4910f597874ac2f5348e2cd76bea7e34b9ea0060c9bcf1406dd317a7af9e42",
+      "summary": "What Digi Mono and Digi Poly build on: their SRC pages, knob graphics and menu icons. Not with the shop's DIGISLICER, NEIGHBOR or SOPHIE.",
+      "on_unit": "Not yet tested on a unit, its author reports; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digimono-0.13b.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "79b51a364b1b7fd8ca13ac6aacba15bd1439bb46569b11d1ad5b3a35b1cec3ec",
+      "summary": "Seven synth machines after the Monomachine: sine, noise, saw, pulse, an ensemble, a formant voice and a three-sine chord, each with its own SRC page.",
+      "on_unit": "Not yet tested on a unit, its author reports; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digimono-0.13b-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "bbd79b944ab7a2176d933d671cc3019e2f55748412c37e1b9c64779348137dbc",
+      "summary": "Seven synth machines after the Monomachine: sine, noise, saw, pulse, an ensemble, a formant voice and a three-sine chord, each with its own SRC page.",
+      "on_unit": "Not yet tested on a unit, its author reports; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digipoly-2.0.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "license": "MIT",
+      "sha256": "1d2615c58e0a944c1ca49741739be4e1b3cc26cf8d94ce3ab1cd6af78c47ebac",
+      "summary": "A POLY machine: chords from a track's own trigs, borrowing other tracks' voices, and polyphonic MIDI on its channel.",
+      "on_unit": "Not yet tested on a unit, its author reports; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digipoly-2.0-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "license": "MIT",
+      "sha256": "4cc14624253150776b2eedd8e02b8b86b378888b1459cd2f0a0b49148b48263e",
+      "summary": "A POLY machine: chords from a track's own trigs, borrowing other tracks' voices, and polyphonic MIDI on its channel.",
+      "on_unit": "Not yet tested on a unit, its author reports; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digimatrix-1.0b.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "license": "MIT",
+      "sha256": "792810c2432cadab14e6db5c02957c85714f87eca2a066d68b28e8e134148a9b",
+      "summary": "A modulation matrix: any track's LFO to any parameter of any track, in 8 slots, per pattern.",
+      "on_unit": "Not yet tested on a unit, its author reports; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digimatrix-1.0b-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "license": "MIT",
+      "sha256": "f12fd6c0f154f1358c5b16916630865263cb81c1b72a13e2795f6eba171c95aa",
+      "summary": "A modulation matrix: any track's LFO to any parameter of any track, in 8 slots, per pattern.",
+      "on_unit": "Not yet tested on a unit, its author reports; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digieq-1.0b.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "license": "MIT",
+      "sha256": "af5088bf444de4f1c269e56151805e196277568a96645cf216fc947091162969",
+      "summary": "A 4-band master EQ on every output (main outs, headphones and USB), per pattern.",
+      "on_unit": "Not yet tested on a unit, its author reports; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digieq-1.0b-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "license": "MIT",
+      "sha256": "82dcd78faf44e67bc7fd0920266bb122583bd60288c1dd03fa878b6f3f9301a0",
+      "summary": "A 4-band master EQ on every output (main outs, headphones and USB), per pattern.",
+      "on_unit": "Not yet tested on a unit, its author reports; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digiutils-1.9a.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "license": "MIT",
+      "sha256": "8697ac1fe883cb8fc6ee29f441f6172bde5b24506a1a4337358d66106844b5c1",
+      "summary": "Hold \"...\" for a live scope, spectrum analyser and stereo X-Y view, with a tuner and track activity.",
+      "on_unit": "Its author reports the stand-alone 1.5d tested on a Digitakt mk1, and 1.9a not yet; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "gdeo607/digi1_mods", "commit": "35bacb3730d108e4dc48a7bd6de4c99ae9b161e6",
+      "path": "elemods/digiutils-1.9a-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1", "license": "MIT",
+      "sha256": "ed13ca17753e4885b195c2ee7183ce370ad2fdd5b9f730de8a03962fc9397765",
+      "summary": "Hold \"...\" for a live scope, spectrum analyser and stereo X-Y view, with a tuner and track activity.",
+      "on_unit": "Its author reports the stand-alone 1.5d tested on a Digitakt mk1, and 1.9a not yet; it passes their emulator tests on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "Alez22/digistring", "tag": "v0.8.0", "file": "digistring-0.8.0.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "7f4360f7d003ecbb1a0e628abf24be7ce4f277c617fa2ddb8a752144613c01ff",
+      "summary": "A Karplus-Strong plucked string machine: BOW, HIT, NOISE and PLUCK exciters, stiffness, pluck position, tone and decay as a time.",
+      "on_unit": "Tested on a Digitakt mk1 by its author (v0.8.0): on OS 1.53, five tracks at about 95% DSP, with digihealth's FAST AUDIO on. The 1.54 file was not flashed on its own; STRING-fast for 1.54, which has the same hooks and addresses, was."
+    },
+    {
+      "repo": "Alez22/digistring", "tag": "v0.8.0", "file": "digistring-0.8.0-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "6166b1f32700ae2e107f9fcc1af8723da2680e7f4d6b186ec84ab5a9536b89dc",
+      "summary": "A Karplus-Strong plucked string machine: BOW, HIT, NOISE and PLUCK exciters, stiffness, pluck position, tone and decay as a time.",
+      "on_unit": "Tested on a Digitakt mk1 by its author (v0.8.0): on OS 1.53, five tracks at about 95% DSP, with digihealth's FAST AUDIO on. The 1.54 file was not flashed on its own; STRING-fast for 1.54, which has the same hooks and addresses, was."
+    },
+    {
+      "repo": "Alez22/digistring", "tag": "v0.8.0", "file": "digistring-fast-0.8.0.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "dc5257270155d1c0434fde164ee3d0bafb8cc4e5102896f302fa40f46fb960ce",
+      "summary": "STRING with its per-sample loop in on-chip SRAM while digihealth's FAST AUDIO is on, for more tracks. Install STRING or STRING-fast, not both.",
+      "on_unit": "Tested on a Digitakt mk1 by its author (v0.8.0): five tracks at about 95% DSP with FAST AUDIO on, on OS 1.53 and 1.54; on 1.54 also together with digichain + digimono + digipoly, with digineighbor, and with digislicer."
+    },
+    {
+      "repo": "Alez22/digistring", "tag": "v0.8.0", "file": "digistring-fast-0.8.0-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "2.1",
+      "sha256": "7d2c681592ae3fea5d91a09523a74cc604f2be60f8ac0261ae733f8233586316",
+      "summary": "STRING with its per-sample loop in on-chip SRAM while digihealth's FAST AUDIO is on, for more tracks. Install STRING or STRING-fast, not both.",
+      "on_unit": "Tested on a Digitakt mk1 by its author (v0.8.0): five tracks at about 95% DSP with FAST AUDIO on, on OS 1.53 and 1.54; on 1.54 also together with digichain + digimono + digipoly, with digineighbor, and with digislicer."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-tuner-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "1e2447d88c953b09584bcd0b84a9b7733bb87264b6542169d0f2686f9762dff6",
+      "summary": "UP + TEMPO opens a tuner for the current audio track.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-synth-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "6d5b9ff2a9f2d957fea17b556415e76d7b8ebbc39a2f8f720f4273e4eba72a43",
+      "summary": "A FLEX track with an FMSYNTH* sample plays a two-operator FM voice.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-quantizer-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "cabc7e126796ab3bd4574e78ab9c0ea69031128278f95a2f8b03e0d6e655f1b6",
+      "summary": "PTCH and CHROMATIC keys follow one of 24 scales, with root and glide.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-repitch-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "1d53f38f6b2bd0541c4dc2e6196859e68464f4f9339537c26a447e56b7f1ae33",
+      "summary": "TSTR REPITCH: follow the project tempo by playback speed, no grains.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-direct-jump-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "53169664f2aa8073720c9e2422dfc58bcd6f472c56dff7e0b7193723b2dd9310",
+      "summary": "CHAIN AFTER DIRECT: a pattern change lands at the next step, as on Rytm.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-rlen-plen-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "a4af12dc94910a7e52bc94d63cb0a672f92c51aae3fdef582abab524d830f98d",
+      "summary": "RLEN PLEN: TRIG ONE + QREC PLEN records one pass of the pattern.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-midi-scenes-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "3d06bb5e9dfcc6789c2d39a5b78ddf9ec770e4c4d6a38fd30f7e4d14ae39e1e3",
+      "summary": "MIDI scene locks: hold, morph, save, reload, copy. Not with SCENES P2.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-scenes-p2-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "5609e2eabb3ac09374e6c8bbb5a9577568f6e39dfbde589a83b89c7fd8157a27",
+      "summary": "Scene locks and the crossfader on FX1/FX2 page 2. Not with MIDI SCENES.",
+      "on_unit": "Boots on an Octatrack MKII (3 Oct 2026); its features are not yet tested on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-cc-map-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "a57eff6a7ca72bd2c20a002ee7073ee95a5365f9cf971b2aedb8e3ee9da0e2c3",
+      "summary": "MIDI CC 62-67 play FX2's page-2 knobs, 68-73 FX1's.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-cc-feedback-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "6d994b332c9d9844be6879e550b3024ce692a4f6812bf0892dabd3ee1e6dd476",
+      "summary": "Every knob change goes out as its MIDI CC, so controllers follow.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-recorder-hold-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "55dbd9ba0997cc7628b2ca0922b91b177cfadd52d56f310851d89b3e7d783c74",
+      "summary": "A FLEX voice past a recording's end holds its last sample, not zero.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-recorder-spacing-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "d9fe947770d36a36c37f37221eb32d6ef6728ba46300670624e865624a4b7849",
+      "summary": "A fixed-RLEN recording lasts exactly until the next arm.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-flex-seekbind-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "fb995dcdac85c3492830ed23816d6afe16dc74127f23838b3ffdbed03ff79466",
+      "summary": "A FLEX re-bind of the same sample seeks in place, not a new note.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-flex-seekbind-ctr-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "800f8fa478c11acc953fdbd211e72dcdd545a438f13904c7b648066fea796c40",
+      "summary": "With FLEX SEEK BIND: such a re-bind keeps the voice's bind counter.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-lofi-amf-fix-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "c61de0bf9130ef31595a99bab6a907a2f67a8122d076535e119df015f3ff0b5a",
+      "summary": "Fixes the stock LO-FI effect's AMF knob.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-midi-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "d21d871cccdc7be7da9f9823e68bc31fcc891f59418b941dbabe4d9f659faaa4",
+      "summary": "Class-compliant USB MIDI in and out, mirroring the DIN ports.",
+      "on_unit": "Boots on an Octatrack MKII (3 Oct 2026); its features are not yet tested on a unit. The same octabam module (USB MIDI) is part of USB IO TRACKS MAIN CUE AB, which was tested."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-crossbar-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "36b522b41636046852fef89bfdf88eb8a20a86161553ba6125a51d6090b557c7",
+      "summary": "USB first on memory: no lost audio packets. Use with USB AUDIO OUT.",
+      "on_unit": "Boots on an Octatrack MKII (3 Oct 2026); its features are not yet tested on a unit. The same octabam module (USB CROSSBAR) is part of USB IO TRACKS MAIN CUE AB, which was tested."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-audio-out-tracks-main-cue-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "a0d4ef2e0e998ea5d392e17a1139e9961987c80e1db4c6521f7d070d56d06d5a",
+      "summary": "USB audio to the computer: 20 ch (tracks, MAIN, CUE), with USB MIDI.",
+      "on_unit": "Boots on an Octatrack MKII (3 Oct 2026); its features are not yet tested on a unit. The same octabam module (USB AUDIO OUT TRACKS MAIN CUE) is part of USB IO TRACKS MAIN CUE AB, which was tested."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-audio-out-tracks-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "7d16d043886df801a8b9715f8c08dc240bcc83e40545188ff1a4e85dfcf84e42",
+      "summary": "USB audio to the computer: 16 ch (the tracks), with USB MIDI.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-audio-out-main-cue-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "4f9dd7330f3cffdfc49f55b0a9bcdb47026a2dd0a8852bee9b31dce13d3b2589",
+      "summary": "USB audio to the computer: 4 ch (MAIN, CUE), with USB MIDI.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-audio-out-main-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "cb71d3e8c99233f7a5a6cb712059ce17fa4a70ce96aa936559f4aac2e6942e6b",
+      "summary": "USB audio to the computer: 2 ch (MAIN), with USB MIDI.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-audio-out-master-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "98a8d12cbd002a25dc05da1ab6f54b244aeeaf94999489d319f5e22eadb14039",
+      "summary": "USB audio to the computer: 2 ch (track 8), with USB MIDI.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-main-cue-ab-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "5dfa5a78318b33169cbd372d77cb0784179edd1bbfe5d08924b0a88be0452742",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 20 ch (tracks, MAIN, CUE) out, A/B in.",
+      "on_unit": "Tested on an Octatrack MKII (3 Oct 2026): it boots and works, in one build with the other mods tested that day."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-main-cue-cd-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "f0181a3420af9ca568da1fda71eadddb951ff1cc9039a4f0cb2072f4e35a8538",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 20 ch (tracks, MAIN, CUE) out, C/D in.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-main-cue-abcd-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "2032081ba13a9b85c5459fb679e8bb4716c818ea657468c326908ca1439ace3e",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 20 ch (tracks, MAIN, CUE) out, A-D in.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-ab-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "3672ec49d8cd550dd519e7e0c959733ebde13f73dada8354fdda223aae60492b",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 16 ch (the tracks) out, A/B in.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-cd-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "5d2b7291381ca0fc69b8ed0930343686e5d641dda57ddc8d4cf11ca11753a421",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 16 ch (the tracks) out, C/D in.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-tracks-abcd-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "2d20459aa62c226f73e1db54994434dbdc57b2656c58041976e38cd8de5e90a2",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 16 ch (the tracks) out, A-D in.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-cue-ab-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "f998c28a6b0441f58ee5a563b15be0fa6a92f3c34411b245809035b1cd49fe2c",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 4 ch (MAIN, CUE) out, A/B in.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-cue-cd-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "9b679ba37441e47f20f60c3ddf26df8d42cb98d9dd80ea35f4e992972fbdabec",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 4 ch (MAIN, CUE) out, C/D in.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-cue-abcd-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "598edd522c858f00bfc51fb965857df1fea043a45c5353f5cd1451f9fe96600c",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 4 ch (MAIN, CUE) out, A-D in.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-ab-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "c1e3729a13db0a4241faf78996e7a4f29b8851b27f2d0787e4d5b5c52ae94086",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 2 ch (MAIN) out, A/B in.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-cd-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "193c898bdac962f8a8896fcdcc068e57e670929f3f4b174c626e9b0cb7d8b2bd",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 2 ch (MAIN) out, C/D in.",
+      "on_unit": "Not yet run on a unit."
+    },
+    {
+      "repo": "irpina/octabam2elemod", "tag": "v1.0", "file": "octabam-usb-io-main-abcd-363861e.elemod",
+      "device": "octatrack", "needs_core": "0.1",
+      "sha256": "2b9ccbb39fa757ac68ac56ee248d7f4d2cd0f087a894944adaba450bd0932ba3",
+      "summary": "Removes SPATIALIZER. USB audio both ways: 2 ch (MAIN) out, A-D in.",
+      "on_unit": "Not yet run on a unit."
+    }
+  ]
+}

@@ -4,6 +4,7 @@
 
     python packaging/build_web.py --core core-2.1.elemod [core-dn1-2.0a.elemod ...] \\
         [--release v0.4.0] --out build/site
+    python packaging/build_web.py --catalog-list web/catalog.json   # the kit's downloads
 
 The page builds custom firmware from the user's own stock OS file and their
 own .elemod files. The mods themselves are on Modwerk, not here.
@@ -20,6 +21,9 @@ The site holds:
 Everything the page loads is in the site: it fetches nothing from anywhere
 else. No firmware goes in. The stock OS file is only ever read in the
 user's browser, and each core is checked to be a core mod.
+
+--catalog-list prints what web/catalog.json, the kit's curated list, names,
+for .github/workflows/kit-build.yml to download. The page does not use it.
 """
 import argparse
 import hashlib
@@ -100,6 +104,31 @@ def cores(paths):
                      'version': m.version, 'device': m.dev.key, 'os': m.rel.version}, raw))
     return out
 
+def read_catalog(path):
+    """The catalog's items. Each names its file one of two ways: an asset of a
+    GitHub release (`tag`, `file`), or a file in the repository at a commit
+    (`commit`, `path`), whose `file` is then the path's last part."""
+    with open(path, encoding='utf-8') as fh:
+        doc = json.load(fh)
+    names = set()
+    for it in doc['items']:
+        at = 'commit' in it
+        for k in ('repo', 'sha256', 'device') + (('commit', 'path') if at else ('tag', 'file')):
+            if not it.get(k):
+                sys.exit('%s: an item has no "%s"' % (path, k))
+        if at:
+            if 'file' in it or 'tag' in it:
+                sys.exit("%s: %s: a commit's file is named by its path alone" % (path, it['path']))
+            if (not re.fullmatch('[0-9a-f]{40}', it['commit'])
+                    or not re.fullmatch(r'[\w.-]+(/[\w.-]+)*', it['path']) or '..' in it['path'].split('/')):
+                sys.exit('%s: %s at %s: the whole commit id, and a plain path in the repository'
+                         % (path, it['path'], it['commit']))
+            it['file'] = it['path'].rsplit('/', 1)[-1]
+        if it['file'] in names:              # they are all downloaded into one folder
+            sys.exit('%s: two items named %s' % (path, it['file']))
+        names.add(it['file'])
+    return doc['items']
+
 
 def tree(rev, path):
     """The git tree of `path` at `rev`, or None when it has none there."""
@@ -113,8 +142,18 @@ def main(argv=None):
     ap.add_argument('--core', nargs='*', default=[], help='the core mods to list (the release\'s)')
     ap.add_argument('--release', help='the release the cores come from (its tag, fetched): the '
                                       'page says whether its engine is that release\'s')
-    ap.add_argument('--out', required=True, help='the site folder to write (emptied first)')
+    ap.add_argument('--catalog-list', metavar='CATALOG',
+                    help='print each item of the kit\'s catalog as "release repo tag file" or '
+                         '"commit repo commit path", for the download')
+    ap.add_argument('--out', help='the site folder to write (emptied first)')
     a = ap.parse_args(argv)
+    if a.catalog_list:
+        for it in read_catalog(a.catalog_list):
+            print(*(('commit', it['repo'], it['commit'], it['path']) if 'commit' in it
+                    else ('release', it['repo'], it['tag'], it['file'])))
+        return 0
+    if not a.out:
+        ap.error('--out is required')
     eng, node_version = engine()
     cs = cores(a.core)
     if os.path.exists(a.out):

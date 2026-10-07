@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The smallest site with elekloader's kit: the owner's stock file, mods from the site's catalog, a build, its log and
+     the downloads. Everything loads from this site; nothing is uploaded. docs/INTEGRATING.md explains each part. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>Build firmware</title>
+<style>
+  :root { color-scheme: light dark; --line: #8884; }
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 16px; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 16px; padding: 12px 16px; }
+  label { display: block; margin: 4px 0; }
+  small { opacity: .7; }
+  ol.log { font: 12px/1.6 ui-monospace, monospace; padding-left: 0; list-style: none; overflow-wrap: anywhere; }
+  ol.log span { opacity: .6; margin-right: 8px; }
+  #steps li.on { font-weight: 600; } #steps li.done { opacity: .6; }
+  a.file { display: block; }
+</style>
+</head>
+<body>
+<h1>Build firmware</h1>
+<p id="status">Loading the builder…</p>
+<fieldset><legend>1. Your stock OS file</legend>
+  <input type="file" id="stock" accept=".syx,.bin,.zip">
+  <p id="stock-info"><small>Elektron's file for your device, as you downloaded it. It stays in this browser.</small></p>
+</fieldset>
+<fieldset><legend>2. Mods</legend><div id="mods"><small>Choose your stock file first.</small></div></fieldset>
+<fieldset><legend>3. Build</legend>
+  <button id="build" disabled>Build firmware</button>
+  <ol id="steps"><li>Build modules</li><li>Prepare file</li><li>Verify file</li></ol>
+  <div id="result"></div>
+  <details id="log-box" hidden><summary>Build log</summary><ol class="log" id="log"></ol><button id="save-log">Download build log</button></details>
+</fieldset>
+<script type="module" src="main.js"></script>
+</body>
+</html>

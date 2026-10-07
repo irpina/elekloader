@@ -60,7 +60,7 @@ function dec87(p: Uint8Array): Uint8Array {
 export function encodeSyx(container: Uint8Array, devId: number): Uint8Array {
   const head = [0xf0, ...MFR, devId, 0x00]
   const out: number[] = []
-  let prev = new Uint8Array(0)
+  let prev: Uint8Array = new Uint8Array(0)
   for (let off = 0; off < container.length; off += CHUNK) {
     const data = container.subarray(off, off + CHUNK)
     const nib = nibbles(FIRST + off)

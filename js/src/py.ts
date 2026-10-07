@@ -111,14 +111,14 @@ export function pyInt(v: unknown): number | null {
   if (typeof v === 'number') return Number.isInteger(v) ? v : null
   if (typeof v !== 'string') return null
   // Python reads any Unicode decimal digit as its value ('٣' is 3): each run of them counts 0 to 9
-  v = v.replace(/\p{Nd}/gu, ch => {
+  const text = v.replace(/\p{Nd}/gu, ch => {
     const cp = ch.codePointAt(0)!
     if (cp < 0x80) return ch
     let start = cp
     while (/\p{Nd}/u.test(String.fromCodePoint(start - 1))) start--
     return String((cp - start) % 10)
   })
-  const m = /^\s*([+-]?)(0[xX](?:_?[0-9a-fA-F])+|0[oO](?:_?[0-7])+|0[bB](?:_?[01])+|0(?:_?0)*|[1-9](?:_?[0-9])*)\s*$/.exec(v)
+  const m = /^\s*([+-]?)(0[xX](?:_?[0-9a-fA-F])+|0[oO](?:_?[0-7])+|0[bB](?:_?[01])+|0(?:_?0)*|[1-9](?:_?[0-9])*)\s*$/.exec(text)
   if (!m) return null
   const body = m[2].replace(/_/g, '')
   const lower = body.toLowerCase()

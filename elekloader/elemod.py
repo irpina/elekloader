@@ -16,6 +16,7 @@ instruction decoder.
 import hashlib
 import json
 import os
+import re
 
 from . import devices
 
@@ -125,8 +126,9 @@ def parse_sites(doc, name, dev, rel, relocs=False):
             for r in s.get('relocs', []):
                 off, typ, tgt, add = r
                 off = _int(off, what)
-                if typ not in ('abs32', 'pc32', 'pc16') or off < 0 \
-                        or off + (2 if typ == 'pc16' else 4) > n:
+                size = {'abs32': 4, 'pc32': 4, 'pc16': 2, 'dsp24': 3}.get(typ) \
+                    if isinstance(typ, str) else None
+                if size is None or off < 0 or off + size > n:
                     raise ModError('%s: bad relocation %r' % (what, r))
                 site['relocs'].append((off, typ, tgt, _int(add, what)))
         out.append(site)
@@ -146,6 +148,39 @@ def parse_resources(doc, name, dev):
                            % (name, g.get('name'), lo, hi))
         regions.append({'name': str(g.get('name', '?')), 'lo': lo, 'hi': hi, 'area': area[0]})
     return regions, [str(x) for x in r.get('names', [])]
+
+
+def parse_needs_core(doc, name):
+    """-> the core version a mod's resources.core says it needs ("3.0"), or None.
+    elekloader 0.4.0 and older read only regions and names there, so they ignore it; the
+    imports such a mod makes still fail to link against an older core."""
+    v = (doc.get('resources') or {}).get('core')
+    if v is None:
+        return None
+    if not isinstance(v, str) or not '0' <= v[:1] <= '9':
+        raise ModError('%s: resources.core is the version of core it needs, such as "3.0"' % name)
+    return v
+
+
+def version_key(v):
+    """A version as it sorts: its runs of digits as numbers (2.10 after 2.9), the
+    rest as text, digits first (2.0 before 2.0a before 2.1)."""
+    return tuple((0, int(x), '') if '0' <= x[0] <= '9' else (1, 0, x)
+                 for x in re.findall(r'[0-9]+|[^0-9]+', str(v)))
+
+
+def pick_core(versions, need=None):
+    """The core a builder takes for a selection: of `versions` (the cores for one
+    device and OS), the newest of the oldest major line with one at least `need`.
+    A new line (3.x beside 2.x) is taken only when a mod needs it, so adding one
+    leaves every other build as it was. -> its index (the last of equals), or
+    None when none is new enough."""
+    ok = [i for i, v in enumerate(versions) if need is None or version_key(v) >= version_key(need)]
+    if not ok:
+        return None
+    major = {i: version_key(versions[i])[:1] for i in ok}
+    low = min(major.values())
+    return max((i for i in ok if major[i] == low), key=lambda i: (version_key(versions[i]), i))
 
 
 def read_json(path):
@@ -338,12 +373,17 @@ FOLLOW_ON = ('imports ', 'adds to table ', 'has .fast code')
 
 def summarize(problems, mods):
     """The checker's lines, for a person:
-    - a mod that lacks a requirement shows that, not the unresolved names and
-      tables that follow from it;
+    - a mod that lacks a requirement, or needs a newer core than the one
+      given, shows that, not the unresolved names and tables that follow from
+      it;
     - repeats are merged, with a count;
     - "no .boot" says that core is not enabled."""
     ids = {m.id for m in mods}
     lacking = {m.label() for m in mods if any(r not in ids for r in m.requires)}
+    cores = [m for m in mods if '.boot' in getattr(m, 'sections', {})]
+    if len(cores) == 1:
+        lacking |= {m.label() for m in mods if getattr(m, 'needs_core', None)
+                    and version_key(cores[0].version) < version_key(m.needs_core)}
     out, count = [], {}
     for x in problems:
         if any(x.startswith(lab + ' ') and any(f in x for f in FOLLOW_ON) for lab in lacking):

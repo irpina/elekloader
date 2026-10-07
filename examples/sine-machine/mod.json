@@ -1,0 +1,16 @@
+{
+ "id": "sine-machine",
+ "version": "1.0",
+ "title": "Sine machine",
+ "category": "Examples",
+ "license": "GPL-2.0-or-later",
+ "description": "SINE, an SRC machine that plays a sine at the trig's note and TUNE, which SHAPE folds into brighter waves. A template for a machine mod on core 3.0: it names no firmware address, so its 1.54 port is empty (docs/ADAPTING.md, \"Machine pages\").",
+ "device": "digitakt-mk1",
+ "os": "1.53",
+ "sources": ["sine.c"],
+ "ports": {"1.54": {}},
+ "machines": [{"id": 120, "descriptor": "sine_machine"}],
+ "subscribe": [{"event": "ev_render_voices", "fn": "sine_render", "order": 20}],
+ "requires": ["core", "machine-pages"],
+ "resources": {"core": "3.0"}
+}

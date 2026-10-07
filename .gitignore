@@ -18,3 +18,6 @@ elekloader/bundled/
 
 # the TypeScript engine's build output
 js/dist/
+# the minimal example's built kit and catalog copy (js/examples/minimal/main.js)
+js/examples/minimal/elekloader/
+js/examples/minimal/catalog/

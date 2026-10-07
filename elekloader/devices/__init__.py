@@ -61,6 +61,10 @@ class Device:
     fast_table: str = ''         # the table .fast sections are copied through
     image_free: tuple = ()       # ((lo, hi), ...): zero runs inside the main OS that
                                  # fixed code may take (sdk.build's "fixed")
+    dsp_payloads: dict = field(default_factory=dict)   # tag -> (address, length): DSP code the
+                                 # main OS uploads at boot, as records (dsp.py walks them)
+    dsp_areas: tuple = ()        # ((tag, lo, hi, name, what), ...): P words of a payload that a
+                                 # mod frees by claiming `name`; the linker places DSP code there
     recovery: str = ''           # how to get back to stock, said to the user
     toolchain: dict = field(default_factory=dict)   # for the SDK: prefix, asflags, cflags
     notes: str = ''

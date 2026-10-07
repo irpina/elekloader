@@ -18,17 +18,33 @@ A relocation target is one of:
   the import is weak, core_zero;
 - "sec:NAME": this mod's section;
 - "abs": zero, so the addend is the value.
+
+On a device with DSP code in its main OS (the profile's `dsp_payloads`), a mod may also
+carry DSP56300 code, `.dsp.<payload>` sections of 24-bit little-endian words, and declare
+DSP tables (a collection with "space": "dsp.<payload>"). They are placed in the P words of
+that payload a mod frees by claiming the area's name (the profile's `dsp_areas`); a symbol
+there is a DSP word address, and a `dsp24` relocation writes one as three little-endian bytes.
 """
 import struct
 
+from . import dsp
 from .elemod import (ModError, sha, _int, _hex, common_checks, insn_check, overlaps, summarize,
-                    parse_parts, parse_resources, parse_sites, parts_bytes, resolve_target,
-                    format_of,
+                    parse_needs_core, parse_parts, parse_resources, parse_sites, parts_bytes,
+                    resolve_target, format_of, version_key,
                     COMMON)
 
 FORMAT2 = 2
 SECTIONS = ('.boot', '.run', '.fast', '.bss')
-RTYPES = ('abs32', 'pc32', 'pc16')
+RTYPES = ('abs32', 'pc32', 'pc16', 'dsp24')
+RSIZE = {'abs32': 4, 'pc32': 4, 'pc16': 2, 'dsp24': 3}
+DSP = '.dsp.'                     # a DSP section: '.dsp.' + its payload's tag
+
+
+def _dsp_tag(dev, sec):
+    """The payload tag of a DSP section name, or None."""
+    if sec.startswith(DSP) and sec[len(DSP):] in dev.dsp_payloads:
+        return sec[len(DSP):]
+    return None
 FAST_ENTRY = 16                   # a .fast copy entry: src, dst, len, 0
 MAX_ALIGN = 4096                  # a section's alignment: a power of two up to this
 LINKER_SYMS = {'__run_load', '__run_start', '__run_words', '__bss_start', '__bss_end',
@@ -58,8 +74,16 @@ class Mod2:
         self.dev, self.rel = resolve_target(doc, name)
         self.sections = {}
         for sec, d in doc['sections'].items():
-            if sec not in SECTIONS:
+            tag = _dsp_tag(self.dev, sec)
+            if sec not in SECTIONS and tag is None:
                 raise ModError('%s: unknown section %s' % (name, sec))
+            if tag is not None:                 # DSP words: no alignment, whole words
+                parts = parse_parts(d.get('parts', []), name + ' ' + sec, self.dev, self.rel)
+                n = sum(len(p[1]) if p[0] == 'hex' else p[2] for p in parts)
+                if n != _int(d.get('len', n), name) or n % 3:
+                    raise ModError('%s %s: %d bytes, not whole 24-bit DSP words' % (name, sec, n))
+                self.sections[sec] = {'align': 1, 'parts': parts, 'len': n}
+                continue
             align = _int(d.get('align', 4), name)
             if align < 1 or align & (align - 1) or align > MAX_ALIGN:
                 raise ModError('%s %s: alignment %d (a power of two up to %d)'
@@ -79,6 +103,8 @@ class Mod2:
             if v[0] != 'abs' and v[0] not in self.sections:
                 raise ModError('%s: symbol %s in a section it lacks (%s)' % (name, nm, v[0]))
             self.symbols[nm] = (v[0], _int(v[1], name))
+            if _dsp_tag(self.dev, v[0]) and self.symbols[nm][1] % 3:
+                raise ModError('%s: DSP symbol %s is not at a whole word' % (name, nm))
         self.exports = [str(x) for x in doc.get('exports', [])]
         for x in self.exports:
             if x not in self.symbols:
@@ -94,11 +120,22 @@ class Mod2:
             self._reloc_ok(sec, off, typ, tgt)
             self.relocs.append((sec, off, typ, tgt, _int(add, name)))
         self.sites = parse_sites(doc, name, self.dev, self.rel, relocs=True)
-        self.collections = {}
+        self.collections, self.dsp_tables = {}, {}
         for c, d in doc.get('collections', {}).items():
             e = _int(d.get('entry'), name)
-            if e <= 0 or e % 4:
-                raise ModError('%s: table %s entry size %d' % (name, c, e))
+            space = d.get('space')
+            if space is None:
+                if e <= 0 or e % 4:
+                    raise ModError('%s: table %s entry size %d' % (name, c, e))
+            else:
+                tag = _dsp_tag(self.dev, '.' + str(space))
+                if tag is None:
+                    raise ModError('%s: table %s in space %r, which the %s lacks'
+                                   % (name, c, space, self.dev.name))
+                head, end = _hex(d.get('head', ''), name), _hex(d.get('end', ''), name)
+                if e <= 0 or e % 3 or len(head) % 3 or len(end) % 3:
+                    raise ModError('%s: DSP table %s is not whole 24-bit words' % (name, c))
+                self.dsp_tables[c] = (tag, head, end)
             self.collections[c] = e
         self.contribute = []
         for i, c in enumerate(doc.get('contribute', [])):
@@ -108,7 +145,7 @@ class Mod2:
             for r in c.get('relocs', []):
                 off, typ, tgt, add = r
                 off = _int(off, what)
-                if typ not in RTYPES or off < 0 or off + 4 > len(data):
+                if typ not in RTYPES or off < 0 or off + (3 if typ == 'dsp24' else 4) > len(data):
                     raise ModError('%s: bad relocation %r' % (what, r))
                 rel.append((off, typ, tgt, _int(add, what)))
             claims = [(_int(a, what), _int(b, what)) for a, b in c.get('claims', [])]
@@ -117,6 +154,7 @@ class Mod2:
         self.copied = [(_int(c['lo'], name), _int(c['hi'], name), _int(c['to'], name))
                        for c in doc.get('copied', [])]
         self.regions, self.names = parse_resources(doc, name, self.dev)
+        self.needs_core = parse_needs_core(doc, name)
         self.requires = [str(x) for x in doc.get('requires', [])]
         self.conflicts = [str(x) for x in doc.get('conflicts', [])]
         self.blob = None                       # (format 1 only)
@@ -126,7 +164,9 @@ class Mod2:
             raise ModError('%s: relocation in %s' % (self.name, sec))
         if typ not in RTYPES:
             raise ModError('%s: relocation type %s' % (self.name, typ))
-        if off < 0 or off + (2 if typ == 'pc16' else 4) > self.sections[sec]['len']:
+        if (typ == 'dsp24') != bool(_dsp_tag(self.dev, sec)) or (typ == 'dsp24' and off % 3):
+            raise ModError('%s: a %s relocation in %s' % (self.name, typ, sec))
+        if off < 0 or off + RSIZE[typ] > self.sections[sec]['len']:
             raise ModError('%s: relocation at %s+%d is outside it' % (self.name, sec, off))
         if not (tgt == 'abs' or tgt.startswith('sym:') or tgt.startswith('sec:')):
             raise ModError('%s: relocation target %r' % (self.name, tgt))
@@ -143,6 +183,23 @@ class Mod2:
 
 # ---- checks ---------------------------------------------------------------------------
 
+def dsp_areas(mods, image):
+    """The DSP areas the mods free, by the name a mod claims: payload tag -> (lo, hi, main
+    OS address of P:lo, the mod, the area's name). One area a payload, the first claimed."""
+    dev, out = mods[0].dev, {}
+    for tag, lo, hi, nm, what in dev.dsp_areas:
+        owner = next((m for m in mods if nm in m.names), None)
+        if owner is not None and tag not in out:
+            out[tag] = (lo, hi, dsp.p_span(image, dev, tag, lo, hi), owner, nm)
+    return out
+
+
+def _dsp_needs(m):
+    """The payload tags a mod's DSP sections and DSP tables need an area in."""
+    return ({_dsp_tag(m.dev, s) for s in m.sections if _dsp_tag(m.dev, s)}
+            | {t for t, _h, _e in m.dsp_tables.values()})
+
+
 def check(mods, image):
     """Static checks that need no layout. -> [problems]."""
     spans = []
@@ -152,6 +209,12 @@ def check(mods, image):
         for c in m.contribute:
             for a, b in c['claims']:
                 spans.append((a, b, m, '%s entry (claims 0x%08x-0x%08x)' % (c['to'], a, b)))
+    areas = {}
+    if mods[0].dev.dsp_areas and len({(m.dev.key, m.rel.version) for m in mods}) == 1:
+        areas = dsp_areas(mods, image)
+        for tag, (lo, hi, at, owner, nm) in sorted(areas.items()):
+            spans.append((at, at + 3 * (hi - lo), owner,
+                          'DSP area %s (payload %s P:0x%04x-0x%04x)' % (nm, tag, lo, hi - 1)))
     bad = common_checks(mods, image, spans)
     if bad and bad[0].startswith('the mods are for different firmware'):
         return bad
@@ -164,6 +227,11 @@ def check(mods, image):
     if len(cores) != 1:
         bad.insert(0, 'exactly one mod must carry .boot (core); got %s'
                    % ([m.label() for m in cores] or 'none'))
+    else:
+        for m in mods:
+            if m.needs_core and version_key(cores[0].version) < version_key(m.needs_core):
+                bad.append('%s needs core %s or newer, and this build has core %s'
+                           % (m.label(), m.needs_core, cores[0].version))
     owner = {}
     for m in mods:
         for x in m.exports:
@@ -191,9 +259,22 @@ def check(mods, image):
             elif len(c['data']) % tables[c['to']][1]:
                 bad.append('%s: an entry for %s is not %d bytes'
                            % (m.label(), c['to'], tables[c['to']][1]))
+            else:
+                in_dsp = c['to'] in tables[c['to']][0].dsp_tables
+                for o, t, _g, _a in c['relocs']:
+                    if (t == 'dsp24') != in_dsp or (in_dsp and o % 3):
+                        bad.append('%s: an entry for %s has a %s relocation at +%d; %s'
+                                   % (m.label(), c['to'], t, o,
+                                      'a DSP table\'s entries take dsp24, at whole words'
+                                      if in_dsp else 'dsp24 is for DSP tables'))
         if m.size('.fast') and (not dev.fast_table or dev.fast_table not in tables):
             bad.append('%s has .fast code, which needs the mod that declares %s'
                        % (m.label(), dev.fast_table or 'a .fast copy table'))
+        for tag in sorted(_dsp_needs(m) - set(areas)):
+            free = [nm for t, _lo, _hi, nm, _w in dev.dsp_areas if t == tag]
+            bad.append('%s has DSP code for payload %s, which needs a mod that frees DSP memory '
+                       'there (one that claims %s)' % (m.label(), tag, ' or '.join(free) or
+                                                       'an area the %s does not have' % dev.name))
     regs = [(g['lo'], g['hi'], m, 'region ' + g['name']) for m in mods for g in m.regions]
     if dev.sram_code[1] > dev.sram_code[0]:
         regs.append((dev.sram_code[0], dev.sram_code[1], None, 'the .fast area'))
@@ -270,9 +351,17 @@ def link(mods, image):
 
     def table_len(c):
         n = sum(len(e[4]['data']) for e in entries[c])
+        if c in dsp_tables:                    # a DSP table: its head, its entries, its end
+            return len(dsp_tables[c][1]) + n + len(dsp_tables[c][2])
         if c == dev.fast_table:
             n += FAST_ENTRY * len(fast_mods)
         return n + tables[c][1]                # the zero entry
+
+    def table_count(c):
+        n = sum(len(e[4]['data']) for e in entries[c])
+        return n // tables[c][1] if c in dsp_tables else table_len(c) // tables[c][1] - 1
+
+    dsp_tables = {c: t for m in order for c, t in m.dsp_tables.items()}
 
     # layout
     base = {}                                  # (mod id, section) -> address
@@ -286,6 +375,8 @@ def link(mods, image):
             at += m.size('.run')
     tab_at = {}
     for c in sorted(tables):
+        if c in dsp_tables:
+            continue
         at = _align(at, 4)
         tab_at[c] = at
         at += table_len(c)
@@ -313,17 +404,45 @@ def link(mods, image):
         raise ModError('.fast code needs SRAM to 0x%08x, past 0x%08x' % (fast_at, fast_end))
     run_load = _align(image_end + boot_len, 16)
 
-    # symbols
-    addr, glob = {}, {}
+    # DSP: each payload's sections, then its tables, in the P words a mod frees (in words)
+    areas = dsp_areas(order, image) if dev.dsp_areas else {}
+    dsp_at, dsp_secs = {tag: a[0] for tag, a in areas.items()}, {}
+    for m in order:
+        for sec in m.sections:
+            tag = _dsp_tag(dev, sec)
+            if tag:
+                base[(m.id, sec)] = dsp_at[tag]
+                dsp_secs[(m.id, sec)] = tag
+                dsp_at[tag] += m.size(sec) // 3
+    for c in sorted(dsp_tables):
+        tag = dsp_tables[c][0]
+        tab_at[c] = dsp_at[tag]
+        dsp_at[tag] += table_len(c) // 3
+    for tag, (lo, hi, _a, _o, nm) in areas.items():
+        if dsp_at[tag] > hi:
+            raise ModError('the DSP code for payload %s needs P words to 0x%05x, past the %d '
+                           'words %s frees (%d over)' % (tag, dsp_at[tag], hi - lo, nm,
+                                                        dsp_at[tag] - hi))
+
+    # symbols (a DSP one is a word address: its section's base + its byte offset / 3)
+    addr, glob, dspsym = {}, {}, set()
     for m in order:
         for nm, (sec, off) in m.symbols.items():
-            v = off if sec == 'abs' else base[(m.id, sec)] + off
+            if sec in m.sections and _dsp_tag(dev, sec):
+                v = base[(m.id, sec)] + off // 3
+                dspsym.add((m.id, nm))
+            else:
+                v = off if sec == 'abs' else base[(m.id, sec)] + off
             addr[(m.id, nm)] = v
             if nm in m.exports:
                 glob[nm] = v
+                if (m.id, nm) in dspsym:
+                    dspsym.add((None, nm))
     for c in tables:
         glob[c] = tab_at[c]
-        glob[c + '_n'] = table_len(c) // tables[c][1] - 1
+        glob[c + '_n'] = table_count(c)
+        if c in dsp_tables:
+            dspsym.add((None, c))
     glob.update({'__run_load': run_load, '__run_start': ddr_base,
                  '__run_words': (run_end - ddr_base) // 4, '__bss_start': run_end,
                  '__bss_end': bss_end, '__bss_words': (bss_end - run_end) // 4})
@@ -345,8 +464,31 @@ def link(mods, image):
             return zero
         raise ModError('%s: %s refers to %s, which nothing defines' % (m.label(), where, nm))
 
+    def is_dsp(m, tgt):
+        """Is a relocation's target a DSP word address? None for "abs"."""
+        if tgt == 'abs':
+            return None
+        kind, nm = tgt.split(':', 1)
+        if kind == 'sec':
+            return bool(_dsp_tag(dev, nm))
+        if (m.id, nm) in addr and nm in m.symbols:
+            return (m.id, nm) in dspsym
+        return (None, nm) in dspsym
+
+    def place(m, buf, off, typ, tgt, add, p, where):
+        d = is_dsp(m, tgt)
+        if d is not None and d != (typ == 'dsp24'):
+            raise ModError('%s: %s is a %s reference to a %s address' % (
+                m.label(), where, 'DSP' if typ == 'dsp24' else 'ColdFire',
+                'DSP' if d else 'ColdFire'))
+        put(buf, off, typ, resolve(m, tgt, where) + add, p, where)
+
     def put(buf, off, typ, value, p, where):
-        if typ == 'abs32':
+        if typ == 'dsp24':                     # a DSP word, little-endian, as the payloads hold it
+            if not 0 <= value <= 0xFFFFFF:
+                raise ModError('%s: a DSP address out of range (0x%x)' % (where, value))
+            buf[off:off + 3] = bytes((value & 0xFF, (value >> 8) & 0xFF, value >> 16))
+        elif typ == 'abs32':
             struct.pack_into('>I', buf, off, value & 0xFFFFFFFF)
         elif typ == 'pc32':
             struct.pack_into('>i', buf, off, value - p)
@@ -358,22 +500,23 @@ def link(mods, image):
 
     content = {}
     for m in order:
-        for sec in ('.boot', '.run', '.fast'):
-            if m.size(sec):
+        for sec in m.sections:
+            if sec != '.bss' and m.size(sec):
                 content[(m.id, sec)] = parts_bytes(m.sections[sec]['parts'], image, dev)
         for sec, off, typ, tgt, add in m.relocs:
             where = '%s+0x%x' % (sec, off)
-            put(content[(m.id, sec)], off, typ, resolve(m, tgt, where) + add,
-                base[(m.id, sec)] + off, where)
+            place(m, content[(m.id, sec)], off, typ, tgt, add, base[(m.id, sec)] + off, where)
     tab = {}
     for c in tables:
-        buf = bytearray()
+        buf = bytearray(dsp_tables[c][1] if c in dsp_tables else b'')
         for _o, _id, _i, m, e in entries[c]:
             d = bytearray(e['data'])
             for off, typ, tgt, add in e['relocs']:
-                where = 'an entry of %s' % c
-                put(d, off, typ, resolve(m, tgt, where) + add, tab_at[c] + len(buf) + off, where)
+                place(m, d, off, typ, tgt, add, tab_at[c] + len(buf) + off, 'an entry of %s' % c)
             buf += d
+        if c in dsp_tables:
+            tab[c] = buf + dsp_tables[c][2]
+            continue
         if c == dev.fast_table:
             for m in fast_mods:
                 buf += struct.pack('>IIII', fload[m.id], base[(m.id, '.fast')],
@@ -389,18 +532,28 @@ def link(mods, image):
             o = fload[m.id] - ddr_base
             ddr[o:o + m.size('.fast')] = content[(m.id, '.fast')]
     for c in tables:
+        if c in dsp_tables:
+            continue
         o = tab_at[c] - ddr_base
         ddr[o:o + len(tab[c])] = tab[c]
     blob = bytearray(content[(core.id, '.boot')])
     blob += bytes(run_load - image_end - len(blob))
     blob += ddr
     img = bytearray(image)
+
+    def dsp_put(tag, word, data):              # P words of a payload's area: main OS bytes
+        lo, _hi, at, _o, _n = areas[tag]
+        o = at + 3 * (word - lo) - dev.main_load
+        img[o:o + len(data)] = data
+    for key, tag in dsp_secs.items():
+        dsp_put(tag, base[key], content.get(key, b''))
+    for c in dsp_tables:
+        dsp_put(dsp_tables[c][0], tab_at[c], tab[c])
     for m in order:
         for s in m.sites:
             new = bytearray(s['new'])
             for off, typ, tgt, add in s['relocs']:
-                where = 'site 0x%08x' % s['addr']
-                put(new, off, typ, resolve(m, tgt, where) + add, s['addr'] + off, where)
+                place(m, new, off, typ, tgt, add, s['addr'] + off, 'site 0x%08x' % s['addr'])
             o = s['addr'] - dev.main_load
             img[o:o + s['len']] = new
     img += blob
@@ -427,13 +580,21 @@ def link(mods, image):
     for nm, vs in uniq.items():
         if len(vs) == 1 and nm not in out.map:
             out.map[nm] = vs.pop()
-    out.tables = {c: (tab_at[c], table_len(c) // tables[c][1] - 1, tables[c][1]) for c in tables}
+    out.tables = {c: (tab_at[c], table_count(c), tables[c][1]) for c in tables}
     out.layout = {
         'boot': [image_end, image_end + boot_len], 'run_load': run_load,
         'ddr': [ddr_base, run_end], 'bss': [run_end, bss_end],
         'fast': [fast_base, fast_at], 'blob_len': len(blob),
-        'sections': {'%s %s' % k: v for k, v in sorted(base.items(), key=lambda kv: kv[1])},
+        'sections': {'%s %s' % k: v for k, v in sorted(base.items(), key=lambda kv: kv[1])
+                     if k not in dsp_secs},
         'ddr_spare': ddr_end - bss_end, 'fast_spare': fast_end - fast_at,
         'ddr_size': ddr_end - ddr_base, 'fast_size': fast_end - fast_base,
     }
+    if areas:                                  # words: P addresses of each payload's area
+        out.layout['dsp'] = {
+            tag: {'area': [lo, hi], 'used': [lo, dsp_at[tag]], 'name': nm,
+                  'sections': {'%s %s' % k: base[k] for k, t in sorted(dsp_secs.items())
+                               if t == tag},
+                  'tables': {c: tab_at[c] for c in sorted(dsp_tables) if dsp_tables[c][0] == tag}}
+            for tag, (lo, hi, _a, _o, nm) in sorted(areas.items())}
     return out

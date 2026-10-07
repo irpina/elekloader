@@ -1,20 +1,30 @@
 {
   "name": "elekloader",
   "version": "0.4.0",
-  "description": "elekloader's mod manager in TypeScript: Elektron OS files, .elemod checks, the linker and the build, byte for byte as elekloader's Python",
+  "description": "elekloader's mod manager in TypeScript: Elektron OS files, .elemod checks, the linker and the build, byte for byte as elekloader's Python, and the kit that puts it on any website",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./kit": "./src/kit/index.ts",
+    "./kit/worker": "./src/kit/worker.ts"
   },
-  "files": ["src", "LICENSE", "README.md"],
+  "files": [
+    "src",
+    "tools/build.ts",
+    "tools/kit.ts",
+    "examples/minimal",
+    "LICENSE",
+    "README.md"
+  ],
   "engines": {
     "node": ">=22.18"
   },
   "scripts": {
     "test": "node --test \"test/*.test.ts\"",
     "parity": "node tools/parity.ts",
-    "build": "node tools/build.ts"
+    "build": "node tools/build.ts",
+    "kit": "node tools/kit.ts"
   },
   "repository": {
     "type": "git",

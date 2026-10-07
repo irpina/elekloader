@@ -144,6 +144,15 @@ const desc = p => st.mods.find(d => d.path === p);
 // ---- the devices, and where Elektron publishes their stock OS ----
 
 const cmpVer = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
+// The core a build takes (elemod.pick_core): of these cores, the newest of the oldest major line that is at least
+// `need`, so a selection that needs nothing from core 3.0 stays on 2.x. -> a core, or undefined.
+function pickCore(cores, need) {
+  const major = c => parseInt(c.version, 10) || 0;
+  const ok = cores.filter(c => !need || cmpVer(c.version, need) >= 0);
+  if (!ok.length) return undefined;
+  const low = Math.min(...ok.map(major));
+  return ok.filter(c => major(c) === low).sort((a, b) => cmpVer(a.version, b.version)).pop();
+}
 const devices = () => (st.info ? st.info.devices : []);
 const deviceName = key => (devices().find(d => d.key === key) || {}).name || key;
 
@@ -270,11 +279,12 @@ function tickProfile(p, warn) {
   if (warn && missing.length) note('This profile also names mods that are not added here: ' + missing.join(', '));
 }
 
-// a profile's first ticks: the newest core, and (unless it starts empty) the mods you added that fit
+// a profile's first ticks: the core a build takes (pickCore), and (unless it starts empty) the mods you added that
+// fit; ticking one that needs a newer core swaps it (the engine's tick)
 async function freshTicks(withMods) {
   const fits = st.mods.filter(d => d.fits);
-  const cores = fits.filter(d => d.id === 'core').sort((a, b) => a.file.localeCompare(b.file));
-  let on = cores.length ? [cores[cores.length - 1].path] : [];
+  const core = pickCore(fits.filter(d => d.id === 'core').sort((a, b) => a.file.localeCompare(b.file)));
+  let on = core ? [core.path] : [];
   if (withMods) {
     for (const d of fits.filter(x => !x.builtin && x.format === 2 && x.id !== 'core')) {
       on = await engine.call('tick', { enabled: on, path: d.path });
@@ -416,9 +426,16 @@ async function addMod(name, data, tickIt = true) {
   return r;
 }
 
-// Tick a mod with what it requires (gui.with_requirements).
+// Tick a mod with what it requires (gui.with_requirements). The engine's tick swaps the core for a file whose own
+// resources.core asks for a newer one (the core pickCore takes for it): a build has one core.
 async function tickWithCore(p) {
+  const d = desc(p);
+  const coreOn = () => st.mods.find(x => x.id === 'core' && st.enabled.has(x.path));
+  const was = coreOn();
   st.enabled = new Set(await engine.call('tick', { enabled: [...st.enabled], path: p }));
+  const now = coreOn();
+  if (was && now && was.path !== now.path && d)
+    toast(`Core ${was.version} → ${now.version}: ${d.title} needs core ${d.needs_core || now.version} or newer.`);
 }
 
 async function addMods(files) {

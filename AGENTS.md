@@ -29,15 +29,18 @@ python -m elekloader.patch --stock <stock.syx> --mod <core.elemod> --mod <mod.el
 | `elekloader/elek.py` | the Octatrack's family (ELEK, legacy SysEx, the ELUP card file): the same |
 | `elekloader/elemod.py` | the mod format: shared validation, format 1, the instruction check, `summarize` |
 | `elekloader/link.py` | format 2: the linker and its checks |
+| `elekloader/dsp.py` | the DSP code inside a main OS (the Octatrack's payloads): the linker places mods' DSP code in it |
 | `elekloader/patch.py` | the command line; `build()` is what the window calls too |
 | `elekloader/gui.py` | the window (Tkinter); `LoaderModel` is its logic without Tk |
 | `elekloader/lint.py`, `elekloader/mkmod.py`, `elekloader/sdk/` | tools for mod authors; `sdk/octabam.py` converts octabam's modules |
 | `elekloader/codec/`, `elekloader/isa/` | code from digikit (GPL-2.0-or-later): change it only with a round-trip test |
 | `mods/core/`, `mods/core-dn1/`, `mods/core-dt2/` | the core mod (the hook bus every format-2 mod needs): one `core.s` (with `settings.s`, `render.s` and `fast.s` where the device uses them), each device's addresses and sites in its `mod.json`, each further OS version's in its `ports` |
 | `mods/core-ot/` | the Octatrack's core: its RAM reserve and `.boot`, and from 0.2 its own hook bus (`bus.s`, with the draw site's gate in `gate.s`) |
+| `mods/machine-pages/` | the Digitakt mk1's machine page companion (core 3.0): owns the SRC page's, the LFO page's and the render point's sites once, and draws every added machine's page from its descriptor's tail; `elekloader/sdk/include/digitakt-mk1/core3.h` and `core3.inc` describe it to mods |
 | `packaging/`, `.github/workflows/windows-build.yml`, `macos-build.yml` | the apps: `elekloader-<version>-windows.exe`, and `elekloader-<version>-macos.dmg` (signed and notarized), with core built in (`elekloader/bundled`, never committed) |
 | `js/` | the engine in TypeScript (GPL-3.0-or-later; js/README.md): the formats, the checks, the linker, the build and the web bridge, ported from the Python and matching it byte for byte, messages included (`js/tools/parity.ts` checks with your stock files) |
-| `web/`, `packaging/build_web.py`, `.github/workflows/pages.yml` | the web page (GitHub Pages): it builds from the user's own stock file and `.elemod` files (the mods are on Modwerk), with the TypeScript engine (js/) in a worker; `bridge.py` is the Python reference its bridge is compared with, not on the site (docs/WEB.md). Everything it loads comes from the site itself |
+| `js/src/kit/`, `js/tools/kit.ts`, `js/examples/minimal/`, `packaging/build_kit.py`, `.github/workflows/kit-build.yml` | the kit for websites (docs/INTEGRATING.md): the builder worker, the page's client, the catalog format and elekloader's curated catalog, the lock and its checks. It names no website |
+| `web/`, `packaging/build_web.py`, `.github/workflows/pages.yml` | the web page (GitHub Pages): it builds from the user's own stock file and `.elemod` files (the mods are on Modwerk), with the TypeScript engine (js/) in a worker; `bridge.py` is the Python reference its bridge is compared with, not on the site, and `catalog.json` is the kit's curated list, not the page's (docs/WEB.md). Everything it loads comes from the site itself |
 
 Tests:
 
@@ -74,6 +77,10 @@ Rules:
   the Python accepts, writes or says needs the same change in its js/ port,
   and `node --test "js/test/*.test.ts"` and the parity run (js/README.md) to
   pass.
+- **The kit stays site-agnostic.** Nothing in js/src/kit names a website,
+  its pages or its accounts. A change to a call or a reply raises `PROTOCOL`
+  (js/src/kit/protocol.ts); a change to the catalog format raises
+  `CATALOG_SCHEMA`. docs/INTEGRATING.md changes with them.
 - **A change to the file format** needs docs/FORMAT.md, docs/ADAPTING.md and
   tests updated with it. Keep reading older files: the legacy `.dtmod`
   extension and `"dtmod"` key are still accepted.
