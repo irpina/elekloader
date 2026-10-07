@@ -46,6 +46,9 @@ def test_versions_sort_and_the_core_a_build_takes():
     assert elemod.pick_core(['2.1', '3.0', '3.1'], '3.0') == 2
     assert elemod.pick_core(['2.1', '2.1']) == 1                 # the last of equals
     assert elemod.pick_core(['2.1', '3.0'], '3.1') is None
+    assert elemod.pick_core(['2.0a', '2.2', '2.3', '3.0']) == 2     # the Digitone's 2.x line
+    assert elemod.pick_core(['2.0a', '2.2', '2.3', '3.0'], '2.2') == 2
+    assert elemod.pick_core(['2.0a', '2.2', '2.3', '3.0'], '3.0') == 3
     assert elemod.pick_core([]) is None
 
 

@@ -85,6 +85,9 @@ test('versions sort as numbers, and pickCore takes the newest of the oldest line
   assert.equal(pickCore(['2.1', '3.0', '3.1'], '3.0'), 2)
   assert.equal(pickCore(['2.1', '2.1'], null), 1)                  // the last of equals, as gui does
   assert.equal(pickCore(['2.1', '3.0'], '3.1'), null)
+  assert.equal(pickCore(['2.0a', '2.2', '2.3', '3.0'], null), 2)     // the Digitone's 2.x line
+  assert.equal(pickCore(['2.0a', '2.2', '2.3', '3.0'], '2.2'), 2)
+  assert.equal(pickCore(['2.0a', '2.2', '2.3', '3.0'], '3.0'), 3)
   assert.equal(pickCore([], null), null)
 })
 
