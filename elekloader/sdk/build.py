@@ -21,6 +21,7 @@ mod.json:
      "name_string": "my-mod",                         optional: str_name = "<it> <version>"
      "sites": [{"addr", "stock", "op", "target" | "new", "addend"}],
      "subscribe": [{"event": "ev_draw", "fn": "my_draw", "order": 60}],
+     "machines": [{"id": 6, "descriptor": "my_machine"}],   SRC machines (Digitakt mk1)
      "collections": {"my_table": 8},                  tables you declare (entry size)
      "contribute": [{"to", "order", "data", "relocs", "claims"}],
      "weak": ["name"], "copied": [...],
@@ -44,6 +45,12 @@ A site's "op" says how its new bytes are made:
 
 With a target, `"addend": N` (optional) adds N bytes to its address.
 
+A `machines` entry adds an SRC machine (core 2.1's core_machines, Digitakt
+mk1): it contributes a pointer to the descriptor `descriptor` names and
+claims `machine:<id>`, as a `contribute` entry and a resource name would.
+Sources are compiled and assembled with this SDK's `include` folder on the
+include path too (`digitakt-mk1/core3.h` and `core3.inc`: core 3.0).
+
 A `fixed` source is placed at `addr` inside the stock image. It must be
 inside one of the device's free image areas (`image_free`, zero in stock).
 It may only have `.text`. `symbol` (optional) names its first byte. It
@@ -62,6 +69,7 @@ from ..mkmod import stock_parts
 from . import elf
 
 OPS = {'jsr': b'\x4e\xb9', 'jmp': b'\x4e\xf9'}
+INCLUDE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'include')
 KEEP = ('.boot', '.run', '.fast', '.bss')
 STOCK_MIN = 8
 LD_SCRIPT = """/* One mod's objects -> one relocatable object (ld -r), in the four sections
@@ -162,10 +170,10 @@ def build(mdir, stock_path, out_dir=None, extra=None):
     for s in srcs:
         o = os.path.join(work, os.path.basename(s) + '.o')
         if s.endswith('.c'):
-            run([prefix + 'gcc'] + tc['cflags'] + mod.get('cflags', []) + ['-I', mdir, '-c', s,
-                                                                            '-o', o])
+            run([prefix + 'gcc'] + tc['cflags'] + mod.get('cflags', []) + ['-I', mdir, '-I', INCLUDE,
+                                                                            '-c', s, '-o', o])
         else:
-            run([prefix + 'as'] + tc['asflags'] + ['-I', mdir] + defs + ['-o', o, s])
+            run([prefix + 'as'] + tc['asflags'] + ['-I', mdir, '-I', INCLUDE] + defs + ['-o', o, s])
         objs.append(o)
     fixed = {}                              # section name -> (address, source)
     for k, fx in enumerate(mod.get('fixed', [])):
@@ -327,6 +335,17 @@ def build(mdir, stock_path, out_dir=None, extra=None):
     for sub in mod.get('subscribe', []):
         contrib.append({'to': sub['event'], 'order': sub.get('order', 50), 'data': '00000000',
                         'relocs': [[0, 'abs32', 'sym:' + sub['fn'], 0]], 'claims': []})
+    resources = dict(mod.get('resources', {}))
+    for mc in mod.get('machines', []):
+        n = mc.get('id')
+        if not isinstance(n, int) or not 4 <= n <= 127 or not mc.get('descriptor'):
+            raise BuildError('mod.json: a machine is {"id": 4-127, "descriptor": "its symbol"}, '
+                             'not %r' % (mc,))
+        contrib.append({'to': 'core_machines', 'order': mc.get('order', 50), 'data': '00000000',
+                        'relocs': [[0, 'abs32', 'sym:' + mc['descriptor'], 0]], 'claims': []})
+        names = list(resources.get('names', []))
+        if 'machine:%d' % n not in names:
+            resources['names'] = names + ['machine:%d' % n]
     for c in mod.get('contribute', []) + list(extra.get('contribute', [])):
         contrib.append({'to': c['to'], 'order': c.get('order', 50), 'data': c['data'],
                         'relocs': c.get('relocs', []), 'claims': c.get('claims', [])})
@@ -348,7 +367,7 @@ def build(mdir, stock_path, out_dir=None, extra=None):
         'relocs': relocs, 'sites': sites,
         'collections': {k: {'entry': v} for k, v in mod.get('collections', {}).items()},
         'contribute': contrib, 'copied': mod.get('copied', []),
-        'resources': mod.get('resources', {}),
+        'resources': resources,
         'requires': mod.get('requires', []), 'conflicts': mod.get('conflicts', []),
         'build': {'sources': {os.path.basename(s): sha(open(s, 'rb').read()) for s in srcs}},
         'signature': None,

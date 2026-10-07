@@ -4,7 +4,8 @@
     python packaging/build_windows.py --core core-2.1.elemod [core-2.1-os1.54.elemod ...] [--out dist]
 
 Needs Windows and PyInstaller (packaging/requirements-build.txt). The core
-.elemod files (one per device and OS with linkable mods) are given, not built
+.elemod files (for each device and OS with linkable mods, one per core version:
+the app takes the one a selection needs) are given, not built
 here: building one needs the device's stock OS file (python -m
 elekloader.sdk.build mods/core --stock ...), which no build machine may
 hold. The release workflow takes them from the release it builds for.
@@ -37,7 +38,8 @@ def sha(path):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--core', required=True, nargs='+',
-                    help='the core .elemod files to build in, one per device and OS')
+                    help='the core .elemod files to build in: for each device and OS, one per version '
+                         '(the app takes the one a selection needs)')
     ap.add_argument('--out', default=os.path.join(ROOT, 'dist'), help='where the exe goes')
     a = ap.parse_args(argv)
     if sys.platform != 'win32':
@@ -50,8 +52,10 @@ def main(argv=None):
         name = os.path.basename(path)
         if name in cores:
             sys.exit('two cores named %s: give each device and OS its own file name' % name)
-        if any(c.dev.key == core.dev.key and c.rel == core.rel for c in cores.values()):
-            sys.exit('%s: a second core for the %s %s' % (path, core.dev.name, core.rel.version))
+        if any(c.dev.key == core.dev.key and c.rel == core.rel and c.version == core.version
+               for c in cores.values()):
+            sys.exit('%s: a second core %s for the %s %s'
+                     % (path, core.version, core.dev.name, core.rel.version))
         cores[name] = core
 
     build = os.path.join(ROOT, 'build', 'windows')

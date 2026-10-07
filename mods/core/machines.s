@@ -3,9 +3,11 @@
 | stock four through the table core_machines, and the sites below make the
 | firmware list, name, set, load, render and edit them (docs/ADAPTING.md,
 | "SRC machines"). Found in FINDINGS "How SRC machines are wired, and a
-| fifth one" and the survey after it. Digitakt mk1 only. The addresses in
-| the comments are OS 1.53's; the code takes them from mod.json's defsym
-| (M_* and the routines), one set per OS:
+| fifth one" and the survey after it. From core 3.0 a descriptor may also
+| describe its machine's page (core_machine_ui, at the end of .run below,
+| so core 2.1's code and data keep their places). Digitakt mk1 only. The
+| addresses in the comments are OS 1.53's; the code takes them from
+| mod.json's defsym (M_* and the routines), one set per OS:
 |   M_LIST_PUSH     the machine list's push       M_SET_REFUSE  the setter's refusal
 |   M_STEP_ON/SKIP  after a step: on, or skipped  M_OPEN_ON/SKIP  the same, on opening
 |   M_NAME_DEF      the long name past 3          M_SHORT_DEF   the short one
@@ -437,6 +439,37 @@ core_mnrpn:
         moveq   #3, %d1
         move.l  #M_NRPN_GENERIC, (%sp)
         rts
+
+| ---- core 3.0: a machine's page, described --------------------------------
+| From core 3.0 a descriptor may go on past its six longs with a tagged
+| tail (docs/ADAPTING.md, "Machine pages"):
+|   +24 tag     0x55493330, "UI30", when the tail is there
+|   +28 ui      its page, a struct cm_ui (elekloader/sdk/include/
+|               digitakt-mk1/core3.h), which the machine-pages mod draws
+| Core 2.1 reads the six longs only, so a machine with a tail registers
+| there too, and gets SLICE's page. Nothing in core acts on the tail: it
+| reads it for machine-pages, which owns the page's sites.
+        .equ    M_TAG,    24
+        .equ    M_UI,     28
+        .equ    UI_TAG,   0x55493330
+
+| core_machine_ui(id) -> the machine's page (its +28), or 0 when it has no
+| tail or no mod adds it. The four bytes after a 2.1 descriptor are read too
+| (they are in its mod's .run): only the exact tag counts. C: changes d0,
+| d1, a0, a1.
+        .globl  core_machine_ui
+core_machine_ui:
+        move.l  4(%sp), %d1
+        bsr.w   cm_find
+        beq.s   9f
+        movea.l %d0, %a0
+        move.l  M_TAG(%a0), %d1
+        cmpi.l  #UI_TAG, %d1
+        bne.s   8f
+        move.l  M_UI(%a0), %d0
+        rts
+8:      moveq   #0, %d0
+9:      rts
 
 | ============================ .bss ========================================
         .section .bss
