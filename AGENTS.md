@@ -1,7 +1,8 @@
 # Notes for coding agents
 
 elekloader builds custom firmware for Elektron devices from mods, on the
-user's machine, from the stock OS file they supply. Read README.md first.
+user's machine, from the stock OS file they supply. Read README.md first;
+the rest of the docs start at docs/README.md.
 
 ## If you are adapting or writing a mod
 

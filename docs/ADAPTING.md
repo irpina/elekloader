@@ -23,7 +23,8 @@ monolithic build; section 4 says how to go from A to B.
 - Python 3.9 or newer, and this repository (no dependencies).
 - The stock OS file for the device and release you target, exactly as the
   manufacturer publishes it. elekloader knows it by hash: the README lists
-  the supported releases, and `devices/` holds their profiles.
+  the supported releases, [INSTALL.md](INSTALL.md#the-stock-os-file) where
+  to get each file, and `devices/` holds their profiles.
 - For code (Path B with sources): the device's cross toolchain, from its
   profile's `toolchain`. For the Digitakt mk1 that is m68k binutils and
   gcc: on Debian or Ubuntu, `apt install binutils-m68k-linux-gnu
@@ -646,7 +647,7 @@ python -m elekloader.patch --stock Digitakt_OS1.53.syx --mod core-2.1.elemod \
 ```
 
 Expect `verified: ...` and `WROTE test.syx`. The file has passed every check
-in the README's "What a build guarantees".
+in [BUILDING.md](BUILDING.md#what-a-build-guarantees), "What a build guarantees".
 
 **3.8 Test before you flash.** A build that verifies is a well-formed
 file, not a proof that your code works. Run it in an emulator if one
