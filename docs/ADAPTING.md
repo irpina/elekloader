@@ -170,7 +170,7 @@ longs:
 
 | offset | field | |
 |---|---|---|
-| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>` (NEIGHBOR is 4, DIGISLICER 5) |
+| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>`. Taken so far: 4 NEIGHBOR, 5 DIGISLICER, 6 Digi Poly's POLY, 7 SOPHIE, 20-29 Digi Mono's (20-26 in use); pick another, and say which in your mod's README |
 | +4 | name | its name in the machine menu and the SRC page's title (10 characters fit) |
 | +8 | short | its 4-character name (the SRC page's `NAME: sample` title) |
 | +12 | icon | an 11 x 7 Bitmap for the menu, in the stock icons' format, or 0 |
@@ -180,17 +180,150 @@ longs:
 ```json
 "contribute": [{"to": "core_machines", "order": 50, "data": "00000000",
                 "relocs": [[0, "abs32", "sym:my_machine", 0]]}],
-"resources": {"names": ["machine:6"]}
+"resources": {"names": ["machine:30"]}
 ```
+
+or, with the SDK, the same in one line: `"machines": [{"id": 30,
+"descriptor": "my_machine"}]`.
 
 With it, the menu lists the machine after the stock four (added ones by
 id), with its name and icon; the setter takes it, and a loaded kit keeps
 it (stock loads any machine past 3 as ONESHOT, and so does core for an id
 no installed mod adds). The firmware gives any machine past 3 SLICE's SRC
-page; to change it, hook the page layout `0x400657cc` as digineighbor
-does. `core_track_machine[t]` (8 bytes) is each track's own machine as the
+page; from core 3.0 a machine describes its own instead ("Machine pages",
+below). `core_track_machine[t]` (8 bytes) is each track's own machine as the
 render last took it, for a mod whose machine renders as a stock one:
 `core_machine(id)` returns an added machine's descriptor, or 0.
+
+### Core 3.0 (Digitakt mk1)
+
+Core 3.0 is core 2.1 and more: the same 39 sites with the same bytes, the
+same events and tables, and every 2.1 symbol where 2.1 has it (2.1's code
+is the start of 3.0's). A mod built for 2.1 links with 3.0 too, and builds
+the same bytes it did with 2.1 apart from where the mods are placed.
+`tests/test_sdk.py` checks this against the released core 2.1. What 3.0
+adds patches nothing:
+- **firmware locations as exports**, so a mod can name them instead of
+  their addresses (below);
+- **`core_machine_ui(id)`**, the page a machine describes (the
+  machine-pages mod draws it: "Machine pages").
+
+A mod that needs 3.0 says so in `resources`, which elekloader 0.4.0 and older
+ignore:
+
+```json
+"resources": {"core": "3.0"}
+```
+
+The loader then refuses it beside an older core with *"needs core 3.0 or
+newer"*, and an older loader with the imports it cannot resolve.
+
+**Which core a build takes.** A builder (the app, the web page, the kit)
+takes, of the cores it has for the stock OS, the newest of the oldest major
+line that every selected mod's `resources.core` (the catalog's
+`needs_core`) allows. A selection that needs nothing from 3.0 builds with
+2.x, as it did before 3.0 existed; one that needs 3.0 builds with the
+newest 3.x. A core chosen by hand that is new enough is kept.
+
+### Firmware locations (core 3.0, Digitakt mk1)
+
+Core 3.0 exports the firmware data and routines machine mods use as
+absolute symbols, with each OS's value in its port. A mod that names them,
+and patches no site of its own, builds for another OS version with no
+change but a port entry with nothing in it. In C, `#include
+"digitakt-mk1/core3.h"` (the SDK has it on the include path); in assembly
+use the names as they are.
+
+| name | 1.53 | |
+|---|---|---|
+| `fw_track_blocks` | 0x80001a18 | the render's block of each track: 32 Q31 samples, 128 bytes a track |
+| `fw_render_machine` | 0x800018bc | the machine each track renders as, a byte a track |
+| `fw_voice_params` | 0x80002794 | the machine's 8 parameters A-H, 8.8, 106 bytes a track |
+| `fw_voice_note`, `fw_voice_vel` | 0x80001f28, 0x80001f18 | the trig's note (16.16) and velocity (8.8) |
+| `fw_voice_start` | 0x80001228 | bit t: track t starts a voice this block |
+| `fw_amp_env` | 0x4199df54 | the AMP envelope: phase +0, level +4, 12 bytes a track |
+| `fw_pitch_tab` | 0x4019b1c0 | 2^((i - 10752) / 2048) in Q29 |
+| `fw_active_track` | 0x4197b6b4 | the active track, 0-7 |
+| `fw_kit` | 0x4199dc44 | -> the UI kit: track t's sound at +0x20 + 0xa2 t, its machine at +0x7e |
+| `fw_slice_layout` | 0x4197cf5c | SLICE's SRC page layout |
+| `fw_set_param` | 0x400771e8 | `set_param(value, track, slot)`: a knob's path into the engine |
+| `fw_bitmap_vt` | 0x401b73b4 | a Bitmap's vtable (an icon's first long) |
+| `fw_fillrect`, `fw_framerect`, `fw_textf`, `fw_font5`, `fw_blit` | | drawing, as `mods/core/fw.s` lists them |
+| `fw_op_new` | 0x400d4180 | the firmware's heap |
+
+Each 1.54 value was found by the code that uses it (the render's
+locations are the same in both; the rest moved), and is in
+`mods/core/mod.json`'s port.
+
+### Machine pages (core 3.0 and machine-pages, Digitakt mk1)
+
+Every machine mod used to hook the SRC page itself (its layout, labels,
+value texts, knob graphics and ranges), the LFO page's names and the
+render point after playback, so no two could be in one build. The
+`machine-pages` mod (`mods/machine-pages`) owns those places once and
+answers each from what a machine describes. A descriptor goes on past
+its six longs with a tagged tail, which core 2.1 does not read:
+
+| offset | field | |
+|---|---|---|
+| +24 | tag | 0x55493330, `"UI30"` |
+| +28 | ui | its page, a `struct cm_ui` |
+
+The page (`struct cm_ui`, 336 bytes; `digitakt-mk1/core3.h`):
+
+| offset | field | |
+|---|---|---|
+| +0 | abi | `cm_ui_v3`, which machine-pages exports: the machine links only beside it |
+| +4 | page_from | the stock machine whose SRC page it copies (byte): 3 SLICE, 0 ONESHOT |
+| +5, +6 | | 0 |
+| +8 | group | the LFO page's group for its parameters, or 0 for the stock one |
+| +12 | on_switch | `void f(int track, int from, unsigned char *sound)`, called on the UI task when a track of the kit turns to the machine (the machine menu switches as its cursor moves), or 0 |
+| +16 | knob[8] | A-H, 40 bytes each |
+
+A knob (`struct cm_knob`); a 0 field is the stock one:
+
+| offset | field | |
+|---|---|---|
+| +0, +4 | name, lname | its label on the SRC page, and its long name (the pop-up) |
+| +8, +12 | lfo, lfo_long | its names on the LFO page: the DEST box's, and the DEST list's (0: name and lname; a blank knob reads "Unused") |
+| +16 | look | the parameter id whose UI record and graphic it borrows (byte): how a turn moves it, its knob |
+| +17 | flags | 1 blank (it shows and turns nothing), 2 the range min-max, 4 the default def, 8 knob D is not a sample (turning it does not open the sample list) |
+| +20, +24, +28 | min, max, def | 8.8 |
+| +32 | fmt | `int f(char *buf, int value, int ctx, int machine)`: its value's text into buf, returning nonzero (0: the stock text). ctx 0 is the value under a turning knob, about 5 characters; 1 the pop-up, up to 15 |
+| +36 | gfx | `int f(int value)`: the value its graphic shows (whole steps) |
+
+In assembly `digitakt-mk1/core3.inc` has `CM_MACHINE`, `CM_UI` and
+`CM_KNOB`; digineighbor 0.7, digislicer 2.3 and SOPHIE's core 3.0 build use
+them. `examples/sine-machine` is a whole machine in C to start from: a sine
+the trig's note plays and a SHAPE knob folds, its page, its icon, and no
+firmware address, so its 1.54 port is empty. A machine with a page needs
+core 3.0 and machine-pages:
+
+```json
+"machines": [{"id": 30, "descriptor": "my_machine"}],
+"requires": ["core", "machine-pages"],
+"resources": {"core": "3.0"}
+```
+
+Which machine a site answers for: the SRC page's sites, the machine whose
+layout the page asked for last (it asks with its track's machine before it
+draws or turns a knob); a range, the machine of the sound the parameter
+belongs to; the LFO page, the active track's machine. A parameter id is a
+knob by the ids of the stock machine the page copies (`0x6c + 8 page_from`
+onwards, A-H), or else of its params machine (the ids MIDI, the LFOs and
+Randomize use).
+
+**The render event.** machine-pages declares `ev_render_voices`,
+`void f(int *blocks)` with `blocks` = `fw_track_blocks`, called after
+playback has written every track's block and before the overdrive
+(0x40077fba): order 10-49 for a machine that makes a track's sound
+(SOPHIE: 20), 50-89 for one that takes or changes sound already made
+(NEIGHBOR: 60).
+
+What it took, and what each port was checked against, is in
+`mods/machine-pages/README.md`. A machine that keeps hooking the page
+itself (core 2.1's way) still links with core 3.0, but not beside
+machine-pages, whose sites it overlaps.
 
 ### Parameter slots (core-dn1 2.1, Digitone mk1)
 
@@ -400,6 +533,7 @@ small square in the top-right corner of every screen. For the Digitakt II,
 | `sites` | patches to the stock image: `{"addr", "stock", "op", "target" or "new"}` (below) |
 | `collections`, `contribute` | tables you declare, and entries you add to others' ([FORMAT.md](FORMAT.md)) |
 | `weak` | names you import that may be missing; they then read as zero |
+| `dsp`, `subscribe_dsp` | DSP code, on a device whose OS runs some (below, "DSP code") |
 | `resources`, `requires`, `conflicts` | rules 9 and 11 |
 | `ports` | the same mod for other OS versions of the device: per OS, the keys that differ there (3.10) |
 
@@ -417,9 +551,10 @@ entry. `stock` is the hex of the whole stock instruction(s) at `addr`;
 | `keep2` | the stock opcode word, then `target`'s address (a `jsr.l`/`lea.l` you redirect) |
 | `ptr` | `target`'s address (4 bytes of data, e.g. a vtable entry) |
 | `bytes` | `new`, in hex; add `"kind": "code"` if they are instructions |
+| `dsp_jsr` | `jsr >target` over one two-word DSP instruction (6 bytes) in a DSP payload |
 
 A site with a `target` may also give `"addend": N`: the address used is the
-target's plus N bytes.
+target's plus N bytes (N words for `dsp_jsr`).
 
 The routine a `jsr` site calls must do the displaced instruction's work
 and keep every register the surrounding code relies on.
@@ -439,6 +574,40 @@ This assembles `page.s` for that address.
   loads in any elekloader that loads format 2.
 - Use it when other code must find the code at a known address. Otherwise
   put code in `.run`.
+
+**DSP code (the Octatrack).** The Octatrack's main OS uploads code to its
+two DSP56300 cores at boot (payload A runs on core 0, B on core 1). A mod
+can carry DSP code too. It is placed in P memory that another mod frees:
+the profile lists those areas (`dsp_areas`), and the mod that frees one
+claims its name, for example `dsp:harvest:SPATIALIZER` (payload A's 261
+words at P:0xaa8, the SPATIALIZER effect's code). Without that mod, yours is
+refused.
+
+```json
+ "dsp": [{"source": "inject.asm", "payload": "A"}],
+ "subscribe_dsp": [{"event": "ev_dsp_rx", "fn": "inject", "order": 20}]
+```
+
+- The SDK assembles each source with octabam's `dsp_asm` (its
+  `vendor/dsp56300` build). Point `ELEKLOADER_DSP_ASM` at it, or put it on
+  the `PATH`. The syntax is dsp_asm's: one instruction a line, `;`
+  comments, `label:`.
+- Your labels become symbols of the mod, at DSP word addresses, so
+  `subscribe_dsp`, sites and other mods can name them.
+- The SDK assembles each source at two origins. A word that moves with the
+  origin holds an address in your code, so it becomes a relocation, and the
+  linker writes the address where the code lands. A short or packed address
+  (one that is not a whole word) cannot be moved, and the build refuses it.
+  Branches (`bra`, `bsr`, `bcc`) are relative and need nothing.
+- `subscribe_dsp` adds `jsr >fn` (plus `addend` words) to a DSP table, in
+  `order`. A DSP table is declared as `{"entry": 6, "space": "dsp.A",
+  "head": hex, "end": hex}` under `collections`: its words are the head,
+  the entries, then the end (FORMAT.md, "DSP code").
+- `dsp_jsr` hooks one two-word instruction of a payload: its `stock` is
+  those 6 bytes (24-bit little-endian words, as the payload holds them).
+  What it calls must do the displaced instruction's work.
+- Test DSP code under a DSP emulator before any hardware: octabam's
+  `ot_emu --dsp` runs both cores.
 
 **3.5 Build it.**
 
@@ -744,6 +913,7 @@ Some differences from an octabam build, by design:
 | `ends mid-instruction`, `sweeps land on the start`, `does not decode` | the site does not cover whole instructions | move or widen the site to instruction boundaries (disassemble the stock main OS) |
 | `... overlap (0x...-0x...)` | another mod patches or claims those bytes | subscribe to an event instead, or agree with that mod's author |
 | `X requires Y` / `core is not enabled` | a dependency is missing | add Y (with lint: `--with Y.elemod`) |
+| `X needs core 3.0 or newer, and this build has core 2.1` | the mod's `resources.core` asks for a newer core | build with that core (the app and the web page take it when you tick the mod); an older loader says `imports fw_..., which no given mod exports` instead |
 | `imports N, which no given mod exports` | a missing dependency, or a typo | add the mod that exports N, fix the name, or list N under `weak` |
 | `adds to table T, which no given mod declares` | the table's owner is missing, or the event name is wrong | add core (or the owner); check the event name |
 | `both export S` | two mods define the same global | prefix your globals with your mod id; make internals `static` |
@@ -754,6 +924,11 @@ Some differences from an octabam build, by design:
 | `PC-relative, inside ... copied block` | a site in FAST AUDIO's block branches relatively | use an absolute `jmp`/`jsr` |
 | `both claim N` | two mods use the same named resource | pick another SysEx id, row name or path |
 | `is a whole build: it cannot be combined` | a format-1 mod was mixed with format-2 mods | use one or the other; see section 4 |
+| `has DSP code for payload A, which needs a mod that frees DSP memory there` | nothing frees P memory for DSP code | add the mod that claims the name the message gives |
+| `the DSP code for payload A needs P words to ...` | the DSP code and tables do not fit in the freed words | shrink your DSP code |
+| `holds an address the linker cannot place` (SDK) | a label used as a short or packed operand | use a form that takes the address as a whole word (`>`); branches are relative |
+| `is a DSP reference to a ColdFire address` (or the reverse) | a `dsp24` relocation names a ColdFire symbol, or a ColdFire one a DSP label | name the right symbol; DSP labels are word addresses on the DSP |
+| `dsp_asm is not installed` | the SDK needs octabam's DSP assembler | build octabam's `vendor/dsp56300` and set `ELEKLOADER_DSP_ASM` |
 
 ## 6. Definition of done
 

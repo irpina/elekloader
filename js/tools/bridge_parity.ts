@@ -78,6 +78,14 @@ function plan(configPath: string, outPath: string) {
       { call: 'nope' },
     ] },
   ]
+  // core 3.0 beside core 2.1 (files.core3, optional): a mod that needs nothing from it ticks 2.1, one that needs it
+  // (tools/parity.ts's mut-needs-core-3, in the scratch folder) moves the build to 3.0
+  if (cfg.files.core3) {
+    sessions.push(flow('dt153: core 3.0 beside core 2.1', stock('dt153'),
+      [{ call: 'add_core', args: { name: 'core-3.0.elemod' }, sha: true, ...file(cfg.files.core3) },
+        mod(join(rel, 'digihealth-1.0.elemod'), true), mod(join(cfg.scratch, 'mut-needs-core-3.elemod'))],
+      [M('digihealth-1.0.elemod'), M('mut-needs-core-3.elemod')], 'C300'))
+  }
   writeFileSync(outPath, JSON.stringify({ sessions }, null, 1))
   console.log(`${sessions.length} sessions, ${sessions.reduce((n, s) => n + s.steps.length, 0)} calls -> ${outPath}`)
 }
