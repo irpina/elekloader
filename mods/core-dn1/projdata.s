@@ -10,7 +10,7 @@
 | record is at +0x200: the 480 bytes between are written and read with the
 | rest, and the firmware neither fills nor reads them.
 |
-| From 2.3 mods keep data there, saved and loaded with the project. A mod
+| From 2.1 mods keep data there, saved and loaded with the project. A mod
 | contributes to the table core_projdata a pointer to a descriptor:
 |   +0  tag      four characters, claimed as the resource projdata:<tag>
 |   +4  size     bytes, a multiple of 4

@@ -195,6 +195,7 @@ Cores come only from the catalog, at `init`. A page cannot add a core of its own
 
 - **What each file says about itself:** `file`, `sha256`, `id`, `version`, `device`, `os`, `license`, `requires` and `conflicts`. `kit.ts feed` reads them from the file with the engine.
 - **What a page shows:** `title`, `summary`, `description`, `category`, `author`, `needs_core` (the oldest core the mod links with) and `on_unit` (what has been checked on real hardware).
+- **Which core a build takes:** a catalog may list several cores for one device and OS (core 2.1 and 3.0 for the Digitakt mk1). `planBuild` takes the newest of the oldest major line that every selected mod's `needs_core` allows, so a selection that needs nothing from 3.0 builds with 2.1, byte for byte as before 3.0 was listed. The app and elekloader's page take the same core.
 - **Where the file comes from:** `source` is a GitHub release (`repo`, `tag`) or a commit (`repo`, the whole `commit`, `path`).
 - **File names are unique.** A site serves every file beside `catalog.json` under that name.
 
