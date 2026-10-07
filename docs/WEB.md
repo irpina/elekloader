@@ -79,7 +79,7 @@ disappears with the tab. The downloads are made in the page from the bytes
 the worker returns (`blob:` URLs).
 
 The page shows the device's recovery text before it lets you download.
-Flash the file yourself, as with any OS update ([README](../README.md#flash-it)).
+Flash the file yourself, as with any OS update ([BUILDING.md](BUILDING.md#flash-it)).
 The page never talks to a device: it has no Web MIDI and no USB access.
 
 ## The mod shop: the library's cards

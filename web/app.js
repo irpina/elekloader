@@ -643,7 +643,7 @@ function drawMotif(motif, en, { add, rnd, line, faint, dot, pt }) {
 
 // ---- the first visit: the three steps; then, with a stock file in, what's next ----
 
-// where Elektron publishes each device's stock OS (README, "You also need")
+// where Elektron publishes each device's stock OS (docs/INSTALL.md, "The stock OS file")
 const DOWNLOADS = {
   'digitakt-mk1': { label: 'Digitakt', url: 'https://www.elektron.se/support-downloads/digitakt' },
   'digitakt-mk2': { label: 'Digitakt II', url: 'https://www.elektron.se/support-downloads/digitakt-ii' },
