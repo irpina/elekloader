@@ -75,6 +75,11 @@ takes 3.0 only for a mod that needs it):
 | Digitone mk1, Digitone Keys | 1.44 | `core-dn1-2.0a-os1.44.elemod` |
 | Digitakt II | 1.17 | `core-dt2-1.0.elemod` |
 
+The Digitone's core 2.3, whose Mod Menu is a grid of icons ("Mods", below),
+is on the [core-dn1-v2.3](https://github.com/irpina/elekloader/releases/tag/core-dn1-v2.3) pre-release until the next release carries
+it: `core-dn1-2.3.elemod` for 1.43 and `core-dn1-2.3-os1.44.elemod` for 1.44.
+The web page's mod shop takes it from there.
+
 A mod is made for one OS version: one built for 1.53 is refused with a 1.54
 stock file, and its author has to build it for 1.54 (docs/ADAPTING.md,
 "Another OS version").
@@ -215,6 +220,15 @@ python -m elekloader.sdk.build mods/core-dt2 --stock Digitakt_II_OS1.17.syx     
 python -m elekloader.sdk.build mods/core-ot --stock OCTATRACK_OS1.40C.syx                    # the Octatrack's
 python -m elekloader.sdk.build mods/dspbus-ot --stock OCTATRACK_OS1.40C.syx                  # its DSP bus (optional)
 ```
+
+On the Digitone, core has a **Mod Menu**. Hold a track key (T1, say) on its
+own for about half a second, and it lists what your mods add to it, as a
+grid of icons from core-dn1 2.3. Move with the arrows or a knob and pick
+with YES, or pick with the entry's trig key; NO closes it. Here
+digitables 1.3 and a test mod with seven entries are linked, in digikit's
+emulator; [mods/core-dn1](mods/core-dn1) has more.
+
+![The Digitone's Mod Menu: four tiles, each an icon over a label with its trig key's number, TABLES selected, and a scroll bar](docs/img/dn-modmenu-grid.png)
 
 Files from before version 0.2 used the `.dtmod` extension; they still load.
 
