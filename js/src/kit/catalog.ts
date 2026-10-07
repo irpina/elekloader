@@ -3,6 +3,8 @@
 // serves beside catalog.json, with where that file comes from (an author's GitHub release, or their repository at a
 // commit). elekloader publishes its curated catalog in this format with each release; a site takes it whole, takes
 // part of it, or adds its own entries. docs/INTEGRATING.md describes it.
+import { cmpVersions, pickCore } from '../elemod.ts'
+
 export const CATALOG_SCHEMA = 1
 
 export type Source = { repo: string; tag: string } | { repo: string; commit: string; path: string }
@@ -84,7 +86,8 @@ export type Plan = { core?: Pin; mods: CatalogMod[]; missing: string[] }
 
 /** The catalog files for a selection of mod ids on one device and OS version. Each mod brings the catalog mods it
  * requires (digichain for Digi Mono), required ones first; ids with no file for that OS are `missing`. The core is
- * the newest for that OS, and at least as new as every chosen mod's needs_core. */
+ * the one pickCore takes for that OS and every chosen mod's needs_core: the newest of the oldest major line that is
+ * new enough, so a catalog that adds core 3.0 beside 2.1 builds every selection that does not need it as before. */
 export function planBuild(catalog: Catalog, device: string, os: string, ids: readonly string[]): Plan {
   const forOs = (p: Pin) => p.device === device && p.os === os
   const newest = (ps: CatalogMod[]) => ps.sort((a, b) => cmpVersion(b.version, a.version))[0] as CatalogMod | undefined
@@ -97,10 +100,10 @@ export function planBuild(catalog: Catalog, device: string, os: string, ids: rea
     mods.push(m)
   }
   for (const id of ids) add(id, [])
-  const need = mods.map(m => m.needs_core).filter((v): v is string => !!v).sort(cmpVersion).pop()
-  const core = catalog.cores.filter(c => forOs(c) && (!need || cmpVersion(c.version, need) >= 0))
-    .sort((a, b) => cmpVersion(b.version, a.version))[0]
-  return { core, mods, missing }
+  const need = mods.map(m => m.needs_core).filter((v): v is string => !!v).sort(cmpVersions).pop() ?? null
+  const cores = catalog.cores.filter(forOs)
+  const i = pickCore(cores.map(c => c.version), need)
+  return { core: i === null ? undefined : cores[i], mods, missing }
 }
 
 /** The OS versions a mod has a file for, on a device. */

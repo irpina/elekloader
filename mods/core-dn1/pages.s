@@ -13,7 +13,7 @@
 | counts them ("Amplitude (2/3)"). The views are built at boot, each by
 | VIEW_INIT(view, list, ...), which copies the list it is given.
 |
-| From 2.2 a mod adds a page by contributing to the table core_pages a
+| From 2.1 a mod adds a page by contributing to the table core_pages a
 | pointer to its descriptor (in .data: core writes its last two words):
 |   +0  idx     27-30, claimed as the resource page:<idx>
 |   +4  after   the stock page it follows in its key's list: 9 (AMP's second
