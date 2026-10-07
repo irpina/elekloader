@@ -29,9 +29,9 @@ There is one core file per device and OS:
 | Digitakt II | 1.17 | `core-dt2-1.0.elemod` | not released yet: build it ([below](#building-a-core)) |
 | Octatrack MKI, MKII | 1.40C | `core-ot-0.1.elemod` | the latest release (v0.4.0); 0.3 is in this repository |
 
-From core 3.0 the Digitakt mk1 has two lines, 2.1 and 3.0, and a build
-takes 3.0 only for a mod that needs it. Core 3.0 is in this repository and
-not released yet.
+From 3.0 the Digitakt mk1's core and the Digitone mk1's each have two
+lines, 2.x and 3.0, and a build takes 3.0 only for a mod that needs it.
+Both 3.0s are in this repository and not released yet.
 
 ## How a build picks one
 
@@ -39,7 +39,8 @@ A mod says which core it needs at least (`resources.core` in the file,
 `needs_core` in the shop's list). A build takes the newest core of the
 oldest major line that is new enough ([ADAPTING.md](ADAPTING.md), "Core
 3.0"). So a Digitakt mk1 selection stays on 2.1 unless a mod needs 3.0, and
-a Digitone selection takes 2.3, the newest of the 2.x line. The web page,
+a Digitone selection takes 2.3, the newest of the 2.x line, unless a mod
+needs core-dn1 3.0. The web page,
 the kit and the window (from source, and the apps after 0.4.0) tick that
 core for you and keep one. The 0.4.0 apps refuse a build with two cores
 ticked: there, untick the built-in one when you add a newer core.
@@ -55,7 +56,10 @@ ticked: there, untick the built-in one when you add a newer core.
 - **Digitone mk1** ([mods/core-dn1](../mods/core-dn1)): the same hook bus,
   plus a voice note-on event, parameter slots, mod pages and project data
   (2.1), and the Mod Menu (2.2, a grid of icons from 2.3):
-  [below](#the-digitones-mod-menu).
+  [below](#the-digitones-mod-menu). From 3.0 it also exports the firmware
+  locations Digitone mods use, so a mod that names only those builds for
+  1.43 and 1.44 unchanged ([ADAPTING.md](ADAPTING.md), "Firmware locations
+  (core-dn1 3.0)").
 - **Digitakt II** ([mods/core-dt2](../mods/core-dt2)): the hook bus's tick,
   draw, key and encoder events, and rows in SETTINGS > PERSONALIZE.
 - **Octatrack** ([mods/core-ot](../mods/core-ot)): a source of its own. It

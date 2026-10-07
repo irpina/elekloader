@@ -63,18 +63,27 @@ the Digitone needs it. On its own it changes nothing the unit does.
   ![The Mod Menu's first page: TABLES, SYNTH, DEMO TWO and NOTES, TABLES selected](../../docs/img/dn-modmenu-grid.png)
   ![The Mod Menu scrolled to its last row: DICE, a long label cut at 14 characters, HEART and SMILE, SMILE selected](../../docs/img/dn-modmenu-scrolled.png)
   ![TABLES picked: digitables' Table page, AMP's third page, with its TBL and SPD knobs](../../docs/img/dn-modmenu-tbl-page.png)
+- **From 3.0, firmware locations as exports** ([fw.s](fw.s)): the data and
+  routines Digitone mods use, as symbols. They cover the voices' pitch words,
+  parameters and lengths, the timeline, the LFOs, the note queue, the kit,
+  the slot ids, and drawing. 1.43's values are in mod.json and 1.44's in its
+  port. A mod that names them instead of addresses builds for both OS
+  versions unchanged (`elekloader/sdk/include/digitone-mk1/core3.h`;
+  docs/ADAPTING.md, "Firmware locations (core-dn1 3.0)"). Nothing else
+  changes: 3.0 is 2.3's code, sites and tables.
 - **OS 1.44:** every site has its port (`ports` in mod.json): the same
   code, moved, and RAM 0x1000 further on.
 
 Build it with the SDK (it needs m68k binutils):
 
 ```bash
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-2.3.elemod
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-2.3-os1.44.elemod
-python -m elekloader.lint mods/core-dn1/out/core-2.3-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-3.0.elemod
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-3.0-os1.44.elemod
+python -m elekloader.lint mods/core-dn1/out/core-3.0-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
 ```
 
-A release names them `core-dn1-2.3.elemod` and `core-dn1-2.3-os1.44.elemod`;
+A release names them `core-dn1-3.0.elemod` and `core-dn1-3.0-os1.44.elemod`
+(3.0 is not released yet);
 2.3's are on the [core-dn1-v2.3](https://github.com/irpina/elekloader/releases/tag/core-dn1-v2.3) pre-release.
 
 Checked by cold-booting it in digikit's emulator against stock (docs/DEVICES.md):

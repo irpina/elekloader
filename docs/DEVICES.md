@@ -191,7 +191,9 @@ below was found again in 1.17.
   (`projdata.s`): mods' blocks saved with the project, through five more.
   From 2.2 the Mod Menu (`menu.s`): holding a track key opens a menu of
   the mods' entries; the four UI sites go to its wrappers first. From 2.3
-  the menu is a grid of the entries' icons.
+  the menu is a grid of the entries' icons. From 3.0 (`fw.s`) it exports
+  the firmware locations mods use, with each OS's values, so a mod that
+  names only those has an empty port.
   1.44 has all of them, at its own addresses (`ports`).
 - **The DDR area** is the Digitakt's, `0x47BE0000-0x47C00000`:
   - The OS clears `0x4028E000-0x43229E60` at start, and its stack runs down

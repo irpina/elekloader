@@ -261,6 +261,45 @@ Each 1.54 value was found by the code that uses it (the render's
 locations are the same in both; the rest moved), and is in
 `mods/core/mod.json`'s port.
 
+### Firmware locations (core-dn1 3.0, Digitone mk1)
+
+core-dn1 3.0 is core-dn1 2.3 and the firmware locations Digitone mods use,
+as exports. It has the same code, sites, tables and symbols, so every mod
+built for 2.x links with it as before (`tests/test_sdk.py` checks it
+against the released 2.3). A mod that names only these and core-dn1's
+tables, and patches no site of its own, builds for 1.43 and 1.44 with an
+empty port entry, `"ports": {"1.44": {}}`; it says it needs 3.0 with
+`"resources": {"core": "3.0"}`. In C, `#include "digitone-mk1/core3.h"`. It
+also declares core-dn1's descriptors (`struct core_param`, `core_page`,
+`core_projdata`, `core_menu_item`) and `core_page_open` and
+`core_page_shown`. In assembly, use the names as they are. A build takes
+3.0 only for a mod that needs it ("Core 3.0" above), so the Digitone's 2.x
+line stays on 2.3.
+
+| name | 1.43 | 1.44 | |
+|---|---|---|---|
+| `fw_voice_pitch` | 0x41391f80 | 0x41392f80 | each voice's pitch word, the note << 16 (`ev_voice_on`) |
+| `fw_voice_params` | 0x800034c4 | the same | the render's copy of each voice's sound: slot k of voice v at +18 + 158 v + 2 k, 8.8 |
+| `fw_voice_len` | 0x80003f14 | the same | each voice's length left, in timeline units (0: none) |
+| `fw_gate_off` | 0x80001f74 | the same | bit v: voice v was released in the last block |
+| `fw_timeline` | 0x80004614 | the same | the render's timeline: 5,400,000 units a 16th, at any tempo |
+| `fw_transpose` | 0x80003fc4 | the same | the transposition, then each track's (+4 + 4 t) |
+| `fw_lfo_state` | 0x419ea314 | 0x419eb314 | each voice's LFOs, 0x50 bytes a voice: the destination slot at +0x40, the modulation at +0x44 |
+| `fw_ev_alloc`, `fw_ev_free`, `fw_ev_queue` | 0x400ffd7e, 0x400ffdb4, 0x400fff04 | 0x400ffff2, 0x40100028, 0x40100178 | the note queue: an event, freeing one, queueing one at a time on the timeline |
+| `fw_lock_alloc`, `fw_locks_free`, `fw_nodes_free` | 0x400ffd2e, 0x419ed230, 0x419ed234 | 0x400fffa2, 0x419ee230, 0x419ee234 | its p-lock lists, and the free lists of those and of its times |
+| `fw_kit` | 0x4138e220 | 0x4138f220 | -> the active kit: track t's sound slot k at +0x2c + 326 t + 2 k |
+| `fw_slot_ids` | 0x40528644 | 0x40529644 | each sound slot's parameter id |
+| `fw_str_amp`, `fw_str_empty` | 0x401d63c3, 0x401ddbcd | 0x401d6793, 0x401ddf9d | "Amp", and the empty string a parameter record's +60 names |
+| `fw_fillrect`, `fw_framerect`, `fw_textf`, `fw_font5`, `fw_blit` | | | drawing, as `mods/core-dn1/fw.s` lists them |
+| `fw_op_new` | 0x400e944c | 0x400e96c0 | the firmware's heap |
+
+Each 1.44 value was found by the code that uses it, which is the same in
+both versions but for the addresses in it. A routine was found by its own
+code and compared to its end; data was found through every piece of code
+that names it. The render's SRAM is where it was, and the RAM moved by
+0x1000. The values are in `mods/core-dn1/mod.json` and its port. The names
+are the Digitakt's (above) where they mean the same.
+
 ### Machine pages (core 3.0 and machine-pages, Digitakt mk1)
 
 Every machine mod used to hook the SRC page itself (its layout, labels,
@@ -351,7 +390,7 @@ table `core_params` a pointer to a descriptor:
 | +32, +36, +40 | | -1, -1, 0 |
 | +44, +48, +52 | name, group name, short name | the pop-up's `Name=value`, and the knob's label |
 | +56 | format | `void f(int value, char *buf)`: the value's text |
-| +60 | | the firmware's empty string, `0x401ddbcd` |
+| +60 | | the firmware's empty string: `fw_str_empty` (core-dn1 3.0), `0x401ddbcd` in 1.43 |
 | +64 | look | the stock parameter whose knob it borrows (graphic, how a turn moves the value, scale), or 0 for PTIM's (24): a plain knob in whole steps |
 
 To put it on a stock page, replace the instruction of the page's static
@@ -447,7 +486,7 @@ Each entry is a pointer to a descriptor:
 | +0 | name | its label in the menu, 14 characters (core-dn1 2.2's list showed about 20) |
 | +4 | open | `void open(void *brain, void *event, int track)`: picked. `event` is the key's that picked it, `track` the one held (0-3); with them a mod can open its page (`core_page_open`) or a screen of its own |
 | +8 | tag | from core-dn1 2.3, optional: `0x49434F4E` ("ICON") when an icon follows |
-| +12 | icon | 16 rows of 16 pixels, an `unsigned short` each: the top row first, bit 15 the left pixel. 0 for core's own |
+| +12 | icon | a pointer to the icon: 16 rows of 16 pixels, an `unsigned short` each, the top row first, bit 15 the left pixel. 0 for core's own |
 
 From core-dn1 2.3 the menu is a grid of tiles like an old PDA's launcher,
 two across and two down with a scroll bar beside them. A tile has the
