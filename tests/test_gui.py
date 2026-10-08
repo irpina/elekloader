@@ -155,10 +155,13 @@ def test_two_core_lines_a_first_run_takes_2_1_and_a_mod_that_needs_3_0_takes_3_0
     3.0 (machine-pages) swaps the build's core for 3.0, and the set checks."""
     need(STOCK, 'ELEKLOADER_STOCK')
     mods = need(MODS, 'ELEKLOADER_MODS')
-    files = [os.path.join(mods, n) for n in ('core-2.1.elemod', 'core-3.0.elemod',
-                                              'machine-pages-1.1.elemod')]
-    if not all(os.path.exists(f) for f in files):
-        raise Skip('ELEKLOADER_MODS lacks core-2.1, core-3.0 or machine-pages-1.1')
+    # the newest machine-pages for 1.53 there (machine-pages-<version>.elemod)
+    mps = sorted((p for p in glob.glob(os.path.join(mods, 'machine-pages-*.elemod'))
+                  if '-os' not in os.path.basename(p)),
+                 key=lambda p: [int(x) for x in os.path.basename(p)[14:-7].split('.') if x.isdigit()])
+    files = [os.path.join(mods, n) for n in ('core-2.1.elemod', 'core-3.0.elemod')] + mps[-1:]
+    if len(files) < 3 or not all(os.path.exists(f) for f in files):
+        raise Skip('ELEKLOADER_MODS lacks core-2.1, core-3.0 or a machine-pages')
     try:
         import tkinter as tk
         root = tk.Tk()
@@ -179,7 +182,7 @@ def test_two_core_lines_a_first_run_takes_2_1_and_a_mod_that_needs_3_0_takes_3_0
             mp = [p for p, d in w.descs.items() if d.get('id') == 'machine-pages'][0]
             w.toggle(mp)
             assert sorted(os.path.basename(p) for p in w.enabled) == [
-                'core-3.0.elemod', 'machine-pages-1.1.elemod']
+                'core-3.0.elemod', os.path.basename(files[2])]
             r = w.model.check(sorted(w.enabled))
             assert r['ok'], r
             w.toggle(mp)                            # off again: the core stays as chosen

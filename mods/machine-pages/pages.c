@@ -137,14 +137,15 @@ uint32_t mp_pop_text(uint32_t id, int32_t value)
 }
 
 /* The knob's graphic: a = its arguments from the id on, [id, value, flag, -, bmp, x, y]. -> nonzero when
- * the machine drew it (CM_DRAW); else a holds the borrowed look's id and the graphic's value. */
+ * the machine drew it (CM_DRAW); else a holds the borrowed look's id and the graphic's value. With CM_DRAW
+ * the slot at +36 is draw, never gfx: on a cm_ui_v3 page (which should name cm_ui_v31) it is not called. */
 int32_t mp_knob(int32_t *a)
 {
     const struct cm_knob *k = page_knob((uint32_t)a[0]);
     if (!k)
         return 0;
-    if ((k->flags & CM_DRAW) && page_now->ui->abi == cm_ui_v31) {
-        if (k->draw && k->draw((void *)a[4], a[5], a[6], a[1], a[2]))
+    if (k->flags & CM_DRAW) {
+        if (page_now->ui->abi == cm_ui_v31 && k->draw && k->draw((void *)a[4], a[5], a[6], a[1], a[2]))
             return 1;
     } else if (k->gfx)
         a[1] = k->gfx(a[1]);

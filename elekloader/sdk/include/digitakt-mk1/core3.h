@@ -48,13 +48,14 @@ enum {
     CM_RANGE      = 2,      /* min and max replace the stock range */
     CM_DEFAULT    = 4,      /* def replaces the stock default (a switch to the machine, a new sound) */
     CM_NOT_SAMPLE = 8,      /* knob D: turning it changes it, and does not open the sample list */
-    CM_DRAW       = 16,     /* draw, not gfx: the machine draws the knob's graphic (a page naming cm_ui_v31) */
+    CM_DRAW       = 16,     /* draw, not gfx: the machine draws the knob's graphic (a page naming cm_ui_v31;
+                               on a cm_ui_v3 page the stock graphic is drawn and +36 is not called) */
 };
 
 /* A value's text: write it into buf and return nonzero, or return 0 for the stock text. ctx is 0 for the
  * value under a turning knob (about 5 characters) and 1 for the pop-up (up to 15); value is 8.8. */
 typedef int32_t (*cm_fmt)(char *buf, int32_t value, int32_t ctx, int32_t machine);
-/* The value the knob's graphic shows, from the one the firmware gives it (whole steps). */
+/* The value the knob's graphic shows, from the one the firmware gives it; both are 8.8. */
 typedef int32_t (*cm_gfx)(int32_t value);
 /* With CM_DRAW: draw the knob's graphic into bmp, the page's Bitmap, and return nonzero, or return 0 for the
  * stock graphic. It spans x + 1 to x + 17 and y to y + 16 (y = 0 is the screen's bottom row); value is 8.8,

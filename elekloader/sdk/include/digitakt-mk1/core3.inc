@@ -44,8 +44,19 @@
         .endm
 
 | One knob, A-H in order. Everything left out is 0: stock. draw (with
-| flags=CM_DRAW) takes gfx's place: give one of them.
+| flags=CM_DRAW, on a page whose CM_UI has abi=cm_ui_v31) takes gfx's place:
+| give one of them. draw= without CM_DRAW, or gfx= with it, is an error.
         .macro  CM_KNOB name=0, lname=0, lfo=0, lfo_long=0, look=0, flags=0, min=0, max=0, def=0, fmt=0, gfx=0, draw=0
+        .ifnc   \draw,0
+        .if     ((\flags) & CM_DRAW) == 0
+        .error  "CM_KNOB: draw= needs flags=CM_DRAW (and CM_UI abi=cm_ui_v31)"
+        .endif
+        .endif
+        .ifnc   \gfx,0
+        .if     (\flags) & CM_DRAW
+        .error  "CM_KNOB: with CM_DRAW, +36 is draw: give draw=, not gfx="
+        .endif
+        .endif
         .long   \name, \lname, \lfo, \lfo_long
         .byte   \look, \flags
         .short  0

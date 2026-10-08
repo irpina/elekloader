@@ -284,7 +284,8 @@ def test_a_machine_in_c_describes_its_page():
 def test_a_knob_that_draws_itself_needs_machine_pages_1_1():
     """A page that names cm_ui_v31 may give a knob CM_DRAW and a draw function
     in gfx's place (the same 40-byte knob). It imports cm_ui_v31, which only
-    machine-pages 1.1 and newer export, and links beside it."""
+    machine-pages 1.1 and newer export, and links beside it. Beside 1.0, which
+    exports cm_ui_v3 alone and would call draw as a gfx, it is refused."""
     tc = devices.devices()[0].toolchain
     if not shutil.which(os.environ.get('ELEKLOADER_CROSS', tc['prefix']) + 'gcc'):
         raise Skip('no m68k cross compiler')
@@ -308,11 +309,27 @@ def test_a_knob_that_draws_itself_needs_machine_pages_1_1():
                        'requires': ['core', 'machine-pages'], 'resources': {'core': '3.0'}}, fh)
         path, m = build.build(d, stock(), tmp)
         assert set(m.imports) == {'cm_ui_v31', 'fw_active_track', 'fw_fillrect', 'fw_voice_params'}
+        # knob F: flag 16, and draw (pg_draw) at +36, where a gfx would be
+        s, dev, _rel = formats.load(stock())
+        run = bytes(elemod.parts_bytes(m.sections['.run']['parts'], formats.main_image(s, dev), dev))
+        knob = m.symbols['pg_page'][1] + 16 + 5 * 40
+        assert run[knob + 17] == 16, run[knob + 17]
+        draw = [r[3:] for r in m.relocs if r[:3] == ('.run', knob + 36, 'abs32')]
+        assert draw in ([('sec:.run', m.symbols['pg_draw'][1])], [('sym:pg_draw', 0)]), draw
         mp = machine_pages(stock(), tmp)
         with open(mp) as fh:
-            assert json.load(fh)['version'] == '1.1'
+            doc = json.load(fh)
+        assert {'cm_ui_v3', 'cm_ui_v31'} <= set(doc['exports'])
         rc, r = lint_json(path, '--stock', stock(), '--with', built_core(), '--with', mp)
         assert rc == 0, r['problems']
+        # machine-pages 1.0: the same mod but for the marker
+        doc.update(version='1.0', exports=[x for x in doc['exports'] if x != 'cm_ui_v31'])
+        mp10 = os.path.join(tmp, 'machine-pages-1.0.elemod')
+        with open(mp10, 'w') as fh:
+            json.dump(doc, fh)
+        rc, r = lint_json(path, '--stock', stock(), '--with', built_core(), '--with', mp10)
+        assert rc == 1 and r['problems'] == [
+            'drawtest 1.0 imports cm_ui_v31, which no given mod exports'], r['problems']
 
 
 def test_the_sine_machine_example_builds_for_each_os_unchanged():
