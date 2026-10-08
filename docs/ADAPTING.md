@@ -297,8 +297,10 @@ line stays on 2.3.
 | `fw_gate_on` (3.1) | 0x80001f70 | the same | bit v: voice v started in the last block |
 | `fw_active_track` (3.1) | 0x41367ce0 | 0x41368ce0 | the active track, 0-3 the synth tracks |
 | `fw_params`, `fw_uirecs` (3.1) | 0x4018d104, 0x4136b9fc | 0x4018d454, 0x4136c9fc | the parameter records (60 bytes an id) and their UI records (84 bytes an id) |
+| `fw_tempo` (3.2) | 0x40241c94 | 0x40242094 | the tempo the sequencer runs at, x 120 (87.0 BPM: 10440); the timeline moves twice this every block |
 
-A name marked 3.1 needs core-dn1 3.1 (`"resources": {"core": "3.1"}`).
+A name marked 3.1 or 3.2 needs that core-dn1 (`"resources": {"core": "3.1"}`,
+or `"3.2"`).
 
 Each 1.44 value was found by the code that uses it, which is the same in
 both versions but for the addresses in it. A routine was found by its own
@@ -669,6 +671,70 @@ down. It names no firmware address, so its 1.44 port is empty:
 
 The machines mod claims sound slot 0 as the resource `soundslot:0`; what it
 does not do yet is in its README.
+
+### Exclusive audio (core-dn1 3.2, Digitone mk1)
+
+A mod can take the whole output: the audio inputs in, and everything the
+Digitone plays out, with the synths silent. After the voices' filters and
+their mix, the render (vector 191) calls its master stage (0x40096e14),
+which mixes the voices and the inputs, runs chorus, delay, reverb and the
+master drive, and writes the output and the USB block. In digikit's
+emulator that stage takes a third of every block (31.9% of the 166,667
+core cycles of a 667 us block at 250 MHz), and the voices' filters and mix
+another tenth (10.2%).
+
+A mod contributes to the table `core_audio` a pointer to a record (`struct
+core_audio_owner` in `digitone-mk1/core3.h`):
+
+| offset | field | |
+|---|---|---|
+| +0 | on | nonzero: the mod has the output from the next block on; set and cleared from the UI task |
+| +4 | render | `void render(int32_t *out, const int32_t *in)`: `in` is the block's input, 32 frames L,R in Q1.31 (the codec's 24 bits, left first on a Keys too); `render` writes all of `out`, 32 frames L,R in Q1.31 |
+| +8 | flags | `CORE_AUDIO_MUTE_VOICES` (1): skip the voices' filters and mix as well |
+
+Each block, before the voices' filters, core takes the first record whose
+`on` is set, in the table's order. While there is one, the master stage
+does not run: core hands the owner the input, and sends what it returns to
+the codec and to the USB block's main pair (the four effect buses silent,
+the inputs where the master stage puts them). On a Keys it also clears the
+Keys' second buffer at 0x80001000. With `CORE_AUDIO_MUTE_VOICES` the
+voices' filter loop and the voice mix are skipped too: the second CPU still
+renders FM, but nothing hears it and the main CPU does not pay for it. With
+no record on, every block is stock. `render` runs at interrupt level inside
+the render, which uses the EMAC: a mod that uses it leaves MACSR as it
+found it. In the emulator a render that skips all three leaves 14.2% of a
+block in use, so an owner has about 70,000 core cycles a block at stock's
+load. The emulator's tables assume zero-wait memory, so expect a unit to
+run slower.
+
+A build may hold several such mods, and their buffers can be large. The
+Digitone profile has an area for them, `bulk` (0x44000000-0x47BE0000,
+about 60 MB), which the OS never touches and never clears. A mod claims
+its piece as a region, so the linker keeps two mods' buffers apart:
+
+```json
+"resources": {"core": "3.2",
+              "regions": [{"name": "my buffers", "lo": "0x44000000", "hi": "0x44400000"}]}
+```
+
+It clears what it reads before it has written it. `fw_tempo` (3.2) is the
+tempo the sequencer runs at, x 120: a mod in time with the Digitone takes
+its grid from it and from `fw_timeline`.
+
+`examples/dn-thru` is the smallest such mod. THRU in the Mod Menu takes
+the output, and the inputs go straight to it at knob A's level; NO gives
+it back. It names no firmware address, so its 1.44 port is empty:
+
+```json
+"contribute": [{"to": "core_audio", "order": 50, "data": "00000000",
+                "relocs": [[0, "abs32", "sym:thru_owner", 0]]}],
+"resources": {"core": "3.2"}
+```
+
+Core-dn1 3.2 owns three more sites: 0x4009e07e (`core_voices_gate`, by jmp
+over the 14 bytes before the voices' filter loop), 0x4009e0f6
+(`core_render_vmix`, by jsr) and 0x4009e146 (`core_render_master`, by jsr);
+in 1.44 they are 0x4009e09e, 0x4009e116 and 0x4009e166.
 
 The addresses in these sections are OS 1.43's. In 1.44 the same
 routines are there, unchanged but moved, and RAM is 0x1000 further on:

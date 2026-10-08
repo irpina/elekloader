@@ -1,10 +1,10 @@
 {
- "id": "core", "version": "3.1",
+ "id": "core", "version": "3.2",
  "license": "GPL-2.0-or-later",
  "title": "core", "category": "Framework", "author": "irpina",
- "description": "The boot copier and the hook bus for the Digitone mk1 and Digitone Keys: every other mod needs it. From 2.1 also the voice note-on event, parameter slots, mod pages and project data, from 2.2 the Mod Menu (hold a track key), from 2.3 its grid of icons, from 3.0 the firmware locations mods use, as exports, so a mod that names only them builds for 1.43 and 1.44 alike, and from 3.1 what machines need: the voices' sound before the filter (ev_render_voices), stock parameters a mod relabels for its tracks (core_param_override), sound edits the voices hear (core_sound_set) and submenus in the Mod Menu. On its own it changes nothing the unit does.",
+ "description": "The boot copier and the hook bus for the Digitone mk1 and Digitone Keys: every other mod needs it. From 2.1 also the voice note-on event, parameter slots, mod pages and project data, from 2.2 the Mod Menu (hold a track key), from 2.3 its grid of icons, from 3.0 the firmware locations mods use, as exports, so a mod that names only them builds for 1.43 and 1.44 alike, and from 3.1 what machines need: the voices' sound before the filter (ev_render_voices), stock parameters a mod relabels for its tracks (core_param_override), sound edits the voices hear (core_sound_set) and submenus in the Mod Menu, and from 3.2 exclusive audio: one mod may take the output from the master stage, with the voices muted if it likes (core_audio), and the tempo (fw_tempo). On its own it changes nothing the unit does.",
  "device": "digitone-mk1", "os": "1.43",
- "sources": ["../core/core.s", "../core/settings.s", "../core/render.s", "voice.s", "params.s", "pages.s", "projdata.s", "menu.s", "fw.s", "voices.s"],
+ "sources": ["../core/core.s", "../core/settings.s", "../core/render.s", "voice.s", "params.s", "pages.s", "projdata.s", "menu.s", "fw.s", "voices.s", "audio.s"],
  "defsym": {
   "DRAWALL": "0x400e5c9a",
   "KEYDISP": "0x40016fc0",
@@ -55,7 +55,14 @@
   "FW_VOICES": "0x80004110",
   "FW_VOICE_TRACK": "0x80003f8c",
   "FW_GATE_ON": "0x80001f70",
-  "FW_ACTIVE_TRACK": "0x41367ce0"
+  "FW_ACTIVE_TRACK": "0x41367ce0",
+  "VOICES_LOOP": "0x4009e08c",
+  "VOICES_DONE": "0x4009e0e6",
+  "VMIX": "0x40096a6c",
+  "MASTER": "0x40096e14",
+  "MODEL_FLAGS": "0x402292f0",
+  "USB_BLOCK": "0x8000f270",
+  "FW_TEMPO": "0x40241c94"
  },
  "sites": [
   {"addr": "0x40000538", "stock": "4eb940001df4", "op": "jsr", "target": "core_dn_boot"},
@@ -79,6 +86,9 @@
   {"addr": "0x40010cfa", "stock": "2f044ebadaf6", "op": "jsr", "target": "core_proj_import"},
   {"addr": "0x4001570e", "stock": "4fefffec48d70c1c", "op": "jmp", "target": "core_proj_init"},
   {"addr": "0x4009e078", "stock": "4eb940098fa4", "op": "jsr", "target": "core_render_voices"},
+  {"addr": "0x4009e07e", "stock": "2c0a284a0686000000304fef000c", "op": "jmp", "target": "core_voices_gate"},
+  {"addr": "0x4009e0f6", "stock": "4eb940096a6c", "op": "jsr", "target": "core_render_vmix"},
+  {"addr": "0x4009e146", "stock": "4eb940096e14", "op": "jsr", "target": "core_render_master"},
   {"addr": "0x400207b8", "stock": "4e56fffc222e000c", "op": "jmp", "target": "core_param_short"},
   {"addr": "0x4000eb10", "stock": "4fefffd448d77cfc", "op": "jmp", "target": "core_proj_save"},
   {"addr": "0x400078e4", "stock": "0c80000000b6", "op": "bytes", "new": "0c80000000b9", "kind": "code"},
@@ -192,7 +202,14 @@
     "FW_VOICES": "0x80004110",
     "FW_VOICE_TRACK": "0x80003f8c",
     "FW_GATE_ON": "0x80001f70",
-    "FW_ACTIVE_TRACK": "0x41368ce0"
+    "FW_ACTIVE_TRACK": "0x41368ce0",
+    "VOICES_LOOP": "0x4009e0ac",
+    "VOICES_DONE": "0x4009e106",
+    "VMIX": "0x40096a8c",
+    "MASTER": "0x40096e34",
+    "MODEL_FLAGS": "0x402296f0",
+    "USB_BLOCK": "0x8000f270",
+    "FW_TEMPO": "0x40242094"
    },
    "sites": [
     {"addr": "0x40000538", "stock": "4eb940001df4", "op": "jsr", "target": "core_dn_boot"},
@@ -216,6 +233,9 @@
     {"addr": "0x40010cfa", "stock": "2f044ebadaf6", "op": "jsr", "target": "core_proj_import"},
     {"addr": "0x4001570e", "stock": "4fefffec48d70c1c", "op": "jmp", "target": "core_proj_init"},
     {"addr": "0x4009e098", "stock": "4eb940098fc4", "op": "jsr", "target": "core_render_voices"},
+    {"addr": "0x4009e09e", "stock": "2c0a284a0686000000304fef000c", "op": "jmp", "target": "core_voices_gate"},
+    {"addr": "0x4009e116", "stock": "4eb940096a8c", "op": "jsr", "target": "core_render_vmix"},
+    {"addr": "0x4009e166", "stock": "4eb940096e34", "op": "jsr", "target": "core_render_master"},
     {"addr": "0x400207b8", "stock": "4e56fffc222e000c", "op": "jmp", "target": "core_param_short"},
     {"addr": "0x4000eb10", "stock": "4fefffd448d77cfc", "op": "jmp", "target": "core_proj_save"},
     {"addr": "0x400078e4", "stock": "0c80000000b6", "op": "bytes", "new": "0c80000000b9", "kind": "code"},
@@ -282,7 +302,7 @@
  "collections": {
   "ev_tick": 4, "ev_draw": 4, "ev_key": 4, "ev_enc": 4, "ev_settings": 4,
   "ev_render_in": 4, "ev_render_out": 4, "ev_voice_on": 4, "core_params": 4, "core_pages": 4, "core_projdata": 4,
-  "ev_hold": 4, "core_menu": 4, "ev_render_voices": 4, "core_param_override": 4
+  "ev_hold": 4, "core_menu": 4, "ev_render_voices": 4, "core_param_override": 4, "core_audio": 4
  },
  "resources": {"names": ["timer:DTIM0"]}
 }

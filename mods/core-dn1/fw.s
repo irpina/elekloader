@@ -49,6 +49,9 @@
 |   fw_active_track  0x41367ce0  the active track (a long), 0-3 the synth tracks
 |   fw_params        0x4018d104  the parameter records, 60 bytes an id
 |   fw_uirecs        0x4136b9fc  their UI records, 84 bytes an id
+| From 3.2:
+|   fw_tempo         0x40241c94  the tempo x 120 (87.0 BPM: 10440), a long: the
+|                                timeline moves twice this every block
 
         .macro  FW name, value
         .globl  \name
@@ -84,3 +87,4 @@
         FW      fw_active_track, FW_ACTIVE_TRACK
         FW      fw_params, PARAMS
         FW      fw_uirecs, UIRECS
+        FW      fw_tempo, FW_TEMPO

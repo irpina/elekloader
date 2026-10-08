@@ -98,19 +98,30 @@ the Digitone needs it. On its own it changes nothing the unit does.
   3.1 keeps everything 2.3 and 3.0 have: their sites, tables, code paths
   and exports, so every 2.x and 3.0 mod links with it (`tests/test_sdk.py`
   checks it against the released 2.3). It adds two sites and two tables.
+- **From 3.2, exclusive audio** ([audio.s](audio.s); docs/ADAPTING.md,
+  "Exclusive audio"): a mod may take the whole output while it wants to.
+  Each block core takes the first record in the table `core_audio` whose
+  `on` is set. While there is one, the render's master stage (the inputs'
+  mix, chorus, delay, reverb and drive, called at 0x4009e146) does not run,
+  and the owner's `render(out, in)` gets the input and writes the output.
+  With `CORE_AUDIO_MUTE_VOICES` the voices' filters and mix (0x4009e07e,
+  0x4009e0f6) are skipped too, so the synths are silent. Also `fw_tempo`,
+  the tempo x 120. The profile's `bulk` area (0x44000000-0x47BE0000) holds
+  such mods' large buffers, as regions they claim.
+  [examples/dn-thru](../../examples/dn-thru) is the smallest such mod.
 - **OS 1.44:** every site has its port (`ports` in mod.json): the same
   code, moved, and RAM 0x1000 further on.
 
 Build it with the SDK (it needs m68k binutils):
 
 ```bash
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-3.1.elemod
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-3.1-os1.44.elemod
-python -m elekloader.lint mods/core-dn1/out/core-3.1-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-3.2.elemod
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-3.2-os1.44.elemod
+python -m elekloader.lint mods/core-dn1/out/core-3.2-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
 ```
 
-A release names them `core-dn1-3.1.elemod` and `core-dn1-3.1-os1.44.elemod`
-(3.0 and 3.1 are not released yet);
+A release names them `core-dn1-3.2.elemod` and `core-dn1-3.2-os1.44.elemod`
+(3.0, 3.1 and 3.2 are not released yet);
 2.3's are on the [core-dn1-v2.3](https://github.com/irpina/elekloader/releases/tag/core-dn1-v2.3) pre-release.
 
 Checked by cold-booting it in digikit's emulator against stock (docs/DEVICES.md):

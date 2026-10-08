@@ -31,7 +31,7 @@ There is one core file per device and OS:
 
 From 3.0 the Digitakt mk1's core and the Digitone mk1's each have two
 lines, 2.x and 3.x, and a build takes the 3.x line only for a mod that
-needs it. The Digitakt's 3.0 and the Digitone's 3.1 are in this repository
+needs it. The Digitakt's 3.0 and the Digitone's 3.2 are in this repository
 and not released yet.
 
 ## How a build picks one
@@ -41,7 +41,7 @@ A mod says which core it needs at least (`resources.core` in the file,
 oldest major line that is new enough ([ADAPTING.md](ADAPTING.md), "Core
 3.0"). So a Digitakt mk1 selection stays on 2.1 unless a mod needs 3.0, and
 a Digitone selection takes 2.3, the newest of the 2.x line, unless a mod
-needs core-dn1 3.0 or 3.1, and then it takes 3.1. The web page,
+needs core-dn1 3.0, 3.1 or 3.2, and then it takes 3.2. The web page,
 the kit and the window (from source, and the apps after 0.4.0) tick that
 core for you and keep one. The 0.4.0 apps refuse a build with two cores
 ticked: there, untick the built-in one when you add a newer core.
@@ -65,6 +65,9 @@ ticked: there, untick the built-in one when you add a newer core.
   edits the voices hear and submenus in the Mod Menu. With
   [machines](../mods/machines-dn1), a sound plays a machine mod's voice in
   place of FM ([ADAPTING.md](ADAPTING.md), "Machines on the Digitone").
+  From 3.2 a mod may take the whole output, with the synths silent, and
+  keep large buffers in the profile's `bulk` area ([ADAPTING.md](ADAPTING.md),
+  "Exclusive audio").
 - **Digitakt II** ([mods/core-dt2](../mods/core-dt2)): the hook bus's tick,
   draw, key and encoder events, and rows in SETTINGS > PERSONALIZE.
 - **Octatrack** ([mods/core-ot](../mods/core-ot)): a source of its own. It

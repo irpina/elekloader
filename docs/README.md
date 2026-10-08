@@ -48,6 +48,8 @@ docs match its code.
     address, so its OS 1.54 port is empty;
   - `dn-sine-machine`, the same for the Digitone mk1: a machine for the
     machines mod and core-dn1 3.1, with an empty OS 1.44 port;
+  - `dn-thru`, the smallest Digitone mk1 mod that takes the whole output
+    (core-dn1 3.2): the audio inputs straight through, the synths silent;
   - `dsp-tone-ot`, the smallest mod with code on the Octatrack's DSP: a quiet
     sawtooth in place of input A, through the DSP bus.
 

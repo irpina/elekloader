@@ -202,6 +202,9 @@ below was found again in 1.17.
     stack.
   - In a settled emulator run, no DDR page from `0x43400000` to
     `0x47C00000` is ever mapped.
+  - So the profile has a second area, `bulk` (`0x44000000-0x47BE0000`), for
+    mods' large buffers: a mod claims a piece as a region and uses it at
+    run time. Nothing is placed there, and the OS never clears it.
 - **Checked in the emulator:** with core alone, the build passes every
   stage, with every screen identical to stock.
   - The audio is identical to stock up to PLAY.
