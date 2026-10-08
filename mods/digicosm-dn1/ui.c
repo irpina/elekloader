@@ -6,7 +6,8 @@
  *                    VERB FADE;  pushing a knob: its default
  *   trig keys 1-11   the engines; 12 HOLD; 13-16 the variation, A-D
  *   T1 the looper: record, play, overdub (held: undo);  T2 stop (held: erase);  T3 reverse;  T4 bypass
- *   YES SETUP, NO back (from the main page: close);  PLAY, STOP, RECORD, TEMPO and LEVEL/DATA stay stock */
+ *   YES SETUP, NO back (from the main page: close);  PLAY, STOP, RECORD, TEMPO and LEVEL/DATA stay stock
+ *   presets: in SETUP a trig key saves the page as that preset (1-16); FUNC + a trig key recalls one */
 #pragma GCC optimize ("no-tree-loop-distribute-patterns")
 #include "dcosm.h"
 
@@ -51,18 +52,23 @@ static const char *const cfg_val[G_COUNT][2] = { { "STEREO", "MONO" }, { "POST-F
                                                  { "REC-PLAY", "REC-DUB" } };
 
 static u8 ui_open, ui_page, ui_func, ui_ready, ui_inited, ui_row;
+static u8 ui_msg_ticks, ui_msg_preset, ui_msg_kind;   /* a message for a second: 1 saved, 2 recalled, 3 empty */
 static u32 clear_at;                        /* the next address to clear, 0 when nothing is */
 static u32 bclear_at;                       /* the overdub layer's clearing, in frames */
 static s32 enc_acc[8];
 
-/* ---- project data: what the page shows, saved with the project ---------------------------------- */
+/* ---- project data: the page and sixteen presets, saved with the project ------------------------------
+ * 132 bytes: the gap mods share in a project holds 480, and digitables' tables take 328 of it with its
+ * header. A preset is the engine, the variation and the eight knobs, 6 bits each (FUNC's knobs and
+ * SETUP stay the project's). */
+#define NPRESET 16
 struct dc_save {
-    u32 ver;
-    u8 engine, var, pad0, pad1;
-    u8 knob[8], shift[8], cfg[8];
-};
+    u8 ver, engine, var, cfg;           /* cfg: a bit a SETUP row */
+    u8 knob[8], shift[8];
+    u8 preset[NPRESET][7];              /* [0]: engine | var << 4 | 0x80 once saved; [1-6]: the knobs */
+} __attribute__((aligned(4)));
 static struct dc_save save;
-#define SAVE_VER 0x44430001u                /* "DC" 1 */
+#define SAVE_VER 2
 
 static void defaults(void)
 {
@@ -79,16 +85,19 @@ static void defaults(void)
 
 static void dcosm_loaded(int found)
 {
-    int i;
+    int i, j;
     if (!found || save.ver != SAVE_VER || save.engine >= E_COUNT || save.var > 3) {
         defaults();
+        for (i = 0; i < NPRESET; i++)
+            for (j = 0; j < 7; j++)
+                save.preset[i][j] = 0;
     } else {
         for (i = 0; i < 8; i++) {
             dcosm.knob[i] = save.knob[i] & 127;
             dcosm.shift[i] = save.shift[i] & 127;
         }
         for (i = 0; i < G_COUNT; i++)
-            dcosm.cfg[i] = save.cfg[i] & 1;
+            dcosm.cfg[i] = (save.cfg >> i) & 1;
         dcosm.engine = save.engine;
         dcosm.var = save.var;
     }
@@ -98,9 +107,10 @@ static void dcosm_loaded(int found)
 const struct core_projdata dcosm_projdata = { 0x4443534Du /* "DCSM" */, sizeof(struct dc_save), &save,
                                               dcosm_loaded };
 
-static void keep_save(void)
+static void keep_save(void)                 /* the page into the project's copy (the presets are there) */
 {
     int i;
+    u8 cfg = 0;
     save.ver = SAVE_VER;
     save.engine = dcosm.engine;
     save.var = dcosm.var;
@@ -109,7 +119,51 @@ static void keep_save(void)
         save.shift[i] = dcosm.shift[i];
     }
     for (i = 0; i < G_COUNT; i++)
-        save.cfg[i] = dcosm.cfg[i];
+        cfg |= (u8)((dcosm.cfg[i] & 1) << i);
+    save.cfg = cfg;
+}
+
+static void preset_save(int n)
+{
+    u8 *p = save.preset[n];
+    u32 hi = 0, lo = 0;
+    int i;
+    for (i = 0; i < 4; i++)
+        hi = (hi << 6) | (u32)(dcosm.knob[i] >> 1);
+    for (i = 4; i < 8; i++)
+        lo = (lo << 6) | (u32)(dcosm.knob[i] >> 1);
+    p[0] = (u8)(dcosm.engine | dcosm.var << 4 | 0x80);
+    p[1] = (u8)(hi >> 16), p[2] = (u8)(hi >> 8), p[3] = (u8)hi;
+    p[4] = (u8)(lo >> 16), p[5] = (u8)(lo >> 8), p[6] = (u8)lo;
+}
+
+static int preset_recall(int n)             /* -> 0 when the slot is empty */
+{
+    const u8 *p = save.preset[n];
+    u32 hi, lo, v;
+    int i;
+    if (!(p[0] & 0x80) || (p[0] & 15) >= E_COUNT)
+        return 0;
+    hi = (u32)p[1] << 16 | (u32)p[2] << 8 | p[3];
+    lo = (u32)p[4] << 16 | (u32)p[5] << 8 | p[6];
+    for (i = 3; i >= 0; i--, hi >>= 6) {
+        v = hi & 63;
+        dcosm.knob[i] = (u8)(v == 63 ? 127 : v << 1);    /* 64 stays 64, 127 stays 127 */
+    }
+    for (i = 7; i >= 4; i--, lo >>= 6) {
+        v = lo & 63;
+        dcosm.knob[i] = (u8)(v == 63 ? 127 : v << 1);    /* 64 stays 64, 127 stays 127 */
+    }
+    dcosm.engine = (u8)(p[0] & 15);
+    dcosm.var = (u8)((p[0] >> 4) & 3);
+    return 1;
+}
+
+static void message(int kind, int n)
+{
+    ui_msg_kind = (u8)kind;
+    ui_msg_preset = (u8)(n + 1);
+    ui_msg_ticks = 30;
 }
 
 /* ---- opening and closing -------------------------------------------------------------------------- */
@@ -155,13 +209,13 @@ int dcosm_key(void *brain, void *ev)
     (void)brain;
     if (!ui_open)
         return 0;
-    if (key == KEY_FUNC) {
-        if (press)
-            ui_func = 1;
-        else if (released)
-            ui_func = 0;
+    if (key == KEY_FUNC) {                  /* down: flags 1 (5 for a double press); up: 0x10, or 0 after
+                                               another key went down meanwhile */
+        ui_func = (u8)(fl & 1);
         return 1;
     }
+    if (fl & 2)                             /* another key's event: FUNC is held */
+        ui_func = 1;
     if (key == KEY_PLAY || key == KEY_STOP || key == KEY_TEMPO || key == KEY_RECORD)
         return 0;                           /* the sequencer and its tempo stay the Digitone's */
     if (released) {
@@ -173,7 +227,15 @@ int dcosm_key(void *brain, void *ev)
     }
     if (!press)
         return 1;                           /* repeats; ev_hold sees the track keys held */
-    if (key >= KEY_STEP1 && key < KEY_STEP1 + E_COUNT) {
+    if (key >= KEY_STEP1 && key < KEY_STEP1 + NPRESET && (ui_page || ui_func)) {
+        int n = (int)(key - KEY_STEP1);
+        if (ui_page) {                      /* SETUP: save the page as preset n */
+            preset_save(n);
+            message(1, n);
+        } else {                            /* FUNC: recall it */
+            message(preset_recall(n) ? 2 : 3, n);
+        }
+    } else if (key >= KEY_STEP1 && key < KEY_STEP1 + E_COUNT) {
         dcosm.engine = (u8)(key - KEY_STEP1);
     } else if (key == KEY_STEP1 + 11) {
         dcosm.hold = dcosm.cfg[G_HOLDMOM] ? 1 : !dcosm.hold;
@@ -272,6 +334,8 @@ void dcosm_tick(void *ctrl)
     dcosm.meter[0] = (u16)(dcosm.meter[0] - (dcosm.meter[0] >> 3));
     dcosm.meter[1] = (u16)(dcosm.meter[1] - (dcosm.meter[1] >> 3));
     keep_save();
+    if (ui_msg_ticks)
+        ui_msg_ticks--;
     if (ui_open)
         *((unsigned char *)ctrl + 0x20) = 1;
 }
@@ -311,7 +375,7 @@ static void value_text(void *bmp, int x, int y, int i, int func)
 static void draw_setup(void *bmp)
 {
     int i;
-    TEXTF(bmp, FONT5, 1, 57, -1, "DIGICOSM SETUP");
+    TEXTF(bmp, FONT5, 1, 57, -1, "SETUP   TRIG: SAVE");
     FILLRECT(bmp, 0, 54, 127, 54, 1);
     for (i = 0; i < G_COUNT; i++) {
         int y = 46 - 7 * i;
@@ -340,7 +404,10 @@ void dcosm_draw(void *bmp, void *ctrl)
     TEXTF(bmp, FONT5, 2, 57, -1, "%s %c", dcosm_engine_names[dcosm.engine], 'A' + dcosm.var);
     FILLRECT(bmp, 0, 56, 56, 63, -1);
     TEXTF(bmp, FONT5, 60, 57, -1, "%d.%d", t / 120, (t % 120) / 12);
-    if (s == L_REC)
+    if (ui_msg_ticks)
+        TEXTF(bmp, FONT5, 88, 57, -1, "%s P%d", ui_msg_kind == 1 ? "SAVED" : ui_msg_kind == 2 ? "LOAD" : "EMPTY",
+              ui_msg_preset);
+    else if (s == L_REC)
         TEXTF(bmp, FONT5, 88, 57, -1, "REC %d.%d", dcosm.lrec / 48000, (dcosm.lrec % 48000) / 4800);
     else if (s == L_EMPTY)
         TEXTF(bmp, FONT5, 88, 57, -1, "LOOP --");

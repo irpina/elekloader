@@ -28,6 +28,7 @@ STOP and TEMPO still work.
 | Looper: Stop, hold to erase | T2; hold T2 to erase |
 | Reverse | T3 |
 | Bypass (with trails) | T4 |
+| 16 user presets | FUNC + trig key 1-16 recalls one; in SETUP a trig key saves the page as that preset (the engine, the variation and knobs A-H). They are saved with the project |
 | Global configuration | YES opens SETUP (input mono/stereo, loop route, looper only, quantize, burst, hold mode, loop order); UP and DOWN pick a row, LEFT or RIGHT changes it |
 | Tap tempo | the Digitone's own tempo (TEMPO) |
 
@@ -73,8 +74,11 @@ core-dn1's render; the UI (`ui.c`) runs in the Digitone's UI task.
 - **CPU:** DigiCosm times its own render with DMA timer 0 and shows its share
   of a block in the corner (`C`). Over 45% it starts fewer new grains; under
   30% it allows more again, up to sixteen heads.
-- **Project data:** the engine, the variation, the knobs and SETUP are saved
-  with the project (tag `DCSM`, 32 bytes). Loops are not.
+- **Project data:** the page (engine, variation, knobs, FUNC's knobs, SETUP)
+  and the sixteen presets are saved with the project (tag `DCSM`, 132 bytes:
+  a preset keeps the knobs at 6 bits). Mods share 480 bytes there;
+  digitables' tables take 328 of them, and DigiCosm fits beside them. Loops
+  are not saved.
 
 ## Build
 
@@ -112,16 +116,27 @@ unit yet.
   fifth gone), reverse, stop with its fade, and erase.
 - **Hold.** MOSAIC and HAZE keep sounding with the input silent while Hold
   is on, and fall silent once it is off.
+- **Presets.** A page saved as preset 5 from SETUP comes back exactly with
+  FUNC + trig 5 after the engine, variation and knobs have changed; an
+  empty preset changes nothing. The page and its presets fit in the
+  project beside digitables' tables.
+- **The Digitone Keys.** With the Keys bit set in the emulator, core-dn1 3.2
+  hands the inputs left first as on a Keys and keeps the Keys' own output
+  buffer silent. Nothing has run on a Keys.
 
 ## Not yet
 
-- User presets (the Microcosm's 16) and saving loops: they need +Drive files
-  from a mod, which core-dn1 does not offer yet.
+- Saving loops: they need +Drive files from a mod. The Digitakt's +Drive
+  calls (which digislicer uses) are not the same code in the Digitone, so
+  core-dn1 cannot offer them yet.
 - The Microcosm's MIDI CC and program-change map: core-dn1 has no MIDI CC
-  event yet (Tone+FX patches the CC router itself).
+  event yet. Tone+FX patches the CC router's entry (0x400ed94e) itself; a
+  core site a few instructions in would sit beside it, but MIDI input does
+  not reach the Digitone's parser in digikit's emulator yet, so it could not
+  be checked.
 - An expression pedal (the Digitone Keys has an input for one).
-- The Digitone Keys: core-dn1 3.2 handles its inputs, but nothing has been
-  run on one.
+- A run on a Digitone Keys: only the code path was checked, in the
+  emulator.
 
 ## Licence
 
