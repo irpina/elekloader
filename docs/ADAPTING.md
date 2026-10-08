@@ -339,10 +339,10 @@ A knob (`struct cm_knob`); a 0 field is the stock one:
 | +0, +4 | name, lname | its label on the SRC page, and its long name (the pop-up) |
 | +8, +12 | lfo, lfo_long | its names on the LFO page: the DEST box's, and the DEST list's (0: name and lname; a blank knob reads "Unused") |
 | +16 | look | the parameter id whose UI record and graphic it borrows (byte): how a turn moves it, its knob |
-| +17 | flags | 1 blank (it shows and turns nothing), 2 the range min-max, 4 the default def, 8 knob D is not a sample (turning it does not open the sample list), 16 the machine draws the knob's graphic (`draw`; a `cm_ui_v31` page) |
+| +17 | flags | 1 blank (it shows and turns nothing), 2 the range min-max, 4 the default def, 8 knob D is not a sample (turning it does not open the sample list), 16 the machine draws the knob's graphic (`draw`; a `cm_ui_v31` page: on a `cm_ui_v3` page the stock graphic is drawn, and +36 is not called) |
 | +20, +24, +28 | min, max, def | 8.8 |
 | +32 | fmt | `int f(char *buf, int value, int ctx, int machine)`: its value's text into buf, returning nonzero (0: the stock text). ctx 0 is the value under a turning knob, about 5 characters; 1 the pop-up, up to 15 |
-| +36 | gfx | `int f(int value)`: the value its graphic shows (whole steps) |
+| +36 | gfx | `int f(int value)`: the value its graphic shows, from the one the firmware gives it (both 8.8) |
 | +36 | draw | with flag 16, in gfx's place: `int f(void *bmp, int x, int y, int value, int flag)` draws the knob's graphic into the page's Bitmap, in x + 1 to x + 17 and y to y + 16 (y = 0 is the bottom row), from its value (8.8), and returns nonzero; 0 draws the stock graphic. flag is the firmware's, for a stock drawer it calls |
 
 In assembly `digitakt-mk1/core3.inc` has `CM_MACHINE`, `CM_UI` and

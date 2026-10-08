@@ -67,9 +67,11 @@ missing instead of building a stock-looking page.
 flag)`: machine-pages calls it at the knob-graphic site with the page's
 Bitmap, and the stock graphic is not drawn when it returns nonzero. Such a
 page names `cm_ui_v31` instead of `cm_ui_v3`, so it links only beside
-machine-pages 1.1 and newer (1.0 would read `draw` as a `gfx`). 1.1 still
-reads every `cm_ui_v3` page as 1.0 did; there, flag 16 means nothing.
-DT-FM's ALGO diagram and OP number are drawn this way.
+machine-pages 1.1 and newer (1.0 would read `draw` as a `gfx`). DT-FM's
+ALGO diagram and OP number are drawn this way. 1.1 still reads every
+`cm_ui_v3` page as 1.0 did. A knob with flag 16 on a `cm_ui_v3` page (one
+that forgot `cm_ui_v31`) gets the stock graphic: its +36 is never called,
+as a `gfx` or as a `draw`.
 
 ## Whose machine a site answers for
 
