@@ -109,6 +109,13 @@ the Digitone needs it. On its own it changes nothing the unit does.
   the tempo x 120. The profile's `bulk` area (0x44000000-0x47BE0000) holds
   such mods' large buffers, as regions they claim.
   [examples/dn-thru](../../examples/dn-thru) is the smallest such mod.
+- **From 3.2, `ev_midi_cc`** ([midi.s](midi.s)): each MIDI CC the unit
+  receives on a track's channel (1-9 by default) or the auto channel, as
+  `f(track, cc, value, flags)`, before the stock applies it; a handler
+  that returns nonzero takes it. The site is the CC router's track check
+  at 0x400ed96e (0x400edbe2 in 1.44), 32 bytes past the router's entry,
+  which Tone+FX patches: the two link together, and a CC Tone+FX lets
+  through comes to core next.
 - **OS 1.44:** every site has its port (`ports` in mod.json): the same
   code, moved, and RAM 0x1000 further on.
 
@@ -150,3 +157,14 @@ screen is identical, and the audio is identical up to PLAY. With THRU
 pattern plays, the inputs reach the output at their own level and the FM
 does not; after NO the FM is back. Its two new sites are the same code
 in 1.44, 0x20 bytes later, as are the routines they call.
+
+`ev_midi_cc` was checked with CCs sent into the emulator's MIDI input on
+1.43 and 1.44, with a mod's handler that takes the CCs it maps: a CC it
+takes stops at core's site, and one it lets go, or any CC while it has
+nothing to take, goes on into the stock router. With the default
+channels, channels 1-9 came as tracks 0-8 (all nine on 1.43, 1 and 4 on
+1.44), the auto channel as the active track with `CORE_MIDI_CC_AUTO`,
+and channel 12, which no track uses, never reached the site. The site's
+six bytes and the router's exit are the same code in 1.44, 0x274 bytes
+later. Core 3.2 links beside Tone+FX 3.0a, which patches the router's
+entry.

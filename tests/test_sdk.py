@@ -385,8 +385,9 @@ def test_digitone_core_builds_and_links():
     182-184), pages.s (mod pages, 27-30), projdata.s (mods' data saved with
     the project), menu.s (the Mod Menu, a grid of icons from 2.3, submenus
     from 3.1), fw.s (firmware locations as exports, from 3.0) and voices.s
-    (ev_render_voices, for machines, from 3.1) and audio.s (exclusive audio,
-    from 3.2), the last eight Digitone only."""
+    (ev_render_voices, for machines, from 3.1), audio.s (exclusive audio,
+    from 3.2) and midi.s (ev_midi_cc, from 3.2), the last nine Digitone
+    only."""
     with tempfile.TemporaryDirectory() as tmp:
         path = dn_core(tmp)
         with open(path) as fh:
@@ -397,17 +398,17 @@ def test_digitone_core_builds_and_links():
         # table moves, 2 UI record lookups, 58 raised id bounds and the short
         # name), the mod pages' 2 (the page record lookup and the views'
         # builder), the project data's 5 (the serializer, two loads, two new
-        # projects), the voices' block and exclusive audio's 2 (the voices'
-        # filters, the master stage).
-        assert dn['target']['device'] == 'digitone-mk1' and len(dn['sites']) == 83
+        # projects), the voices' block, exclusive audio's 2 (the voices'
+        # filters, the master stage) and the CC router's.
+        assert dn['target']['device'] == 'digitone-mk1' and len(dn['sites']) == 84
         assert sorted(dn['collections']) == sorted(
             HOOK_BUS + ['core_menu', 'core_pages', 'core_params', 'core_projdata',
                         'ev_hold', 'ev_voice_on', 'core_param_override', 'ev_render_voices',
-                        'core_audio'])
+                        'core_audio', 'ev_midi_cc'])
         # The same core.s as core 2.1's, with the Digitone's addresses, and
         # each of its labels where core 2.1 has it.
-        assert sorted(dn['build']['sources']) == ['audio.s', 'core.s', 'fw.s', 'menu.s', 'pages.s',
-                                                  'params.s', 'projdata.s', 'render.s',
+        assert sorted(dn['build']['sources']) == ['audio.s', 'core.s', 'fw.s', 'menu.s', 'midi.s',
+                                                  'pages.s', 'params.s', 'projdata.s', 'render.s',
                                                   'settings.s', 'voice.s', 'voices.s']
         assert dn['build']['sources']['core.s'] == dt['build']['sources']['core.s']
         placed = {k: v for k, v in dn['symbols'].items() if v[0] != 'abs'}
@@ -419,7 +420,7 @@ def test_digitone_core_builds_and_links():
                 'core_proj_init', 'core_dn_key', 'core_dn_enc', 'core_dn_tick',
                 'core_dn_draw', 'core_menu_open', 'core_param_short', 'core_param_ui_make',
                 'core_sound_set', 'core_render_voices', 'core_voices_gate',
-                'core_render_master'} <= set(placed) - set(shared)
+                'core_render_master', 'core_midi_cc'} <= set(placed) - set(shared)
         # voice.s follows core.s's code in .run.
         last = max(off for sec, off in shared.values() if sec == '.run')
         assert placed['core_voice_on'][0] == '.run' and placed['core_voice_on'][1] > last
@@ -444,7 +445,7 @@ FW_DN = ['fw_active_track', 'fw_blit', 'fw_ev_alloc', 'fw_ev_free', 'fw_ev_queue
          'fw_lock_alloc', 'fw_locks_free', 'fw_nodes_free', 'fw_op_new', 'fw_params', 'fw_slot_ids',
          'fw_str_amp', 'fw_str_empty', 'fw_textf', 'fw_timeline', 'fw_transpose', 'fw_uirecs',
          'fw_tempo', 'fw_voice_len', 'fw_voice_params', 'fw_voice_pitch', 'fw_voice_track', 'fw_voices']
-CORE_DN3 = ['core_menu_open', 'core_param_short', 'core_param_ui_make', 'core_render_master',
+CORE_DN3 = ['core_menu_open', 'core_midi_cc', 'core_param_short', 'core_param_ui_make', 'core_render_master',
             'core_render_voices', 'core_sound_set', 'core_voices_gate']
 
 
@@ -452,7 +453,8 @@ def check_dn_superset(old_path, new_path):
     """core-dn1 3.2 keeps all of 2.3: its sites, tables, contributions,
     resources and exports, and every symbol in the same section; it adds
     the firmware exports, the machines' hooks (3.1: two sites, two tables),
-    exclusive audio (3.2: two sites, a table) and their calls."""
+    exclusive audio and the MIDI CCs (3.2: three sites, two tables) and
+    their calls."""
     with open(old_path) as fh:
         old = json.load(fh)
     with open(new_path) as fh:
@@ -461,9 +463,9 @@ def check_dn_superset(old_path, new_path):
     for k in ('target', 'contribute', 'resources'):
         assert new[k] == old[k], k
     assert all(s in new['sites'] for s in old['sites'])
-    assert len(new['sites']) == len(old['sites']) + 4
+    assert len(new['sites']) == len(old['sites']) + 5
     assert sorted(set(new['collections']) - set(old['collections'])) == [
-        'core_audio', 'core_param_override', 'ev_render_voices']
+        'core_audio', 'core_param_override', 'ev_midi_cc', 'ev_render_voices']
     assert all(new['collections'][k] == v for k, v in old['collections'].items())
     assert sorted(set(new['exports']) - set(old['exports'])) == sorted(CORE_DN3 + FW_DN)
     assert all(new['symbols'][k][0] == v[0] for k, v in old['symbols'].items())
@@ -709,7 +711,7 @@ def test_digitone_core_port_to_144_is_the_same_core():
 
         def what(d):                # each site's new bytes and targets, not where it is
             return [(s['len'], s['kind'], s['new'], s.get('relocs')) for s in d['sites']]
-        assert len(new['sites']) == 83 and what(new) == what(old)
+        assert len(new['sites']) == 84 and what(new) == what(old)
         rc, r = lint_json(path, '--stock', DN_STOCK_144)
         assert rc == 0, r['problems']
         rc, r = lint_json(old_path, '--stock', DN_STOCK_144)
