@@ -1,0 +1,15 @@
+{
+ "id": "dnsine", "version": "1.0",
+ "license": "GPL-2.0-or-later",
+ "title": "SINE (Digitone machine)", "category": "Sound", "author": "irpina",
+ "description": "SINE, the smallest machine for the Digitone mk1: a sine at the note, which FOLD folds into brighter waves, with a sub-oscillator an octave down (SUB) and the octave on OCT, on its sounds' SYN1 page. A template for a machine mod: it names no firmware address, so its OS 1.44 port is empty (docs/ADAPTING.md, \"Machines on the Digitone\"). Needs the machines mod and core-dn1 3.0.",
+ "device": "digitone-mk1", "os": "1.43",
+ "ports": {"1.44": {}},
+ "sources": ["sine.c"],
+ "contribute": [
+  {"to": "dn_machines", "order": 50, "data": "00000000",
+   "relocs": [[0, "abs32", "sym:sine_machine", 0]]}
+ ],
+ "resources": {"names": ["dnmachine:2"], "core": "3.1"},
+ "requires": ["core", "machines"]
+}

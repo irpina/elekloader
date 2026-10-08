@@ -33,7 +33,8 @@ docs match its code.
   bytes ([ADAPTING.md](ADAPTING.md), section 4b).
 - **The cores' own pages:** [mods/core](../mods/core) (Digitakt mk1),
   [mods/machine-pages](../mods/machine-pages) (its SRC machines' pages, core
-  3.0), [mods/core-dn1](../mods/core-dn1) (Digitone mk1),
+  3.0), [mods/core-dn1](../mods/core-dn1) (Digitone mk1) with
+  [mods/machines-dn1](../mods/machines-dn1) (its machines, core-dn1 3.1),
   [mods/core-dt2](../mods/core-dt2) (Digitakt II), and
   [mods/core-ot](../mods/core-ot) with [mods/dspbus-ot](../mods/dspbus-ot)
   (Octatrack).
@@ -45,6 +46,8 @@ docs match its code.
     without [FUNC];
   - `sine-machine`, an SRC machine for core 3.0 that names no firmware
     address, so its OS 1.54 port is empty;
+  - `dn-sine-machine`, the same for the Digitone mk1: a machine for the
+    machines mod and core-dn1 3.1, with an empty OS 1.44 port;
   - `dsp-tone-ot`, the smallest mod with code on the Octatrack's DSP: a quiet
     sawtooth in place of input A, through the DSP bus.
 

@@ -41,6 +41,14 @@
 |   fw_font5         0x402315c8  the stock 5-pixel font
 |   fw_blit          0x400de24c  blit(dst, src, x, y, centre)
 |   fw_op_new        0x400e944c  operator new(size) -> d0, 0 when the heap is full
+| From 3.1, for machines (ev_render_voices) and their pages:
+|   fw_voices        0x80004110  the render's copy of the DSP's eight voices: 32
+|                                samples a voice, Q1.31, 128 bytes a voice
+|   fw_voice_track   0x80003f8c  each voice's track, a long a voice
+|   fw_gate_on       0x80001f70  bit v: voice v started in the render's last block
+|   fw_active_track  0x41367ce0  the active track (a long), 0-3 the synth tracks
+|   fw_params        0x4018d104  the parameter records, 60 bytes an id
+|   fw_uirecs        0x4136b9fc  their UI records, 84 bytes an id
 
         .macro  FW name, value
         .globl  \name
@@ -70,3 +78,9 @@
         FW      fw_font5, FONT5
         FW      fw_blit, FW_BLIT
         FW      fw_op_new, OP_NEW
+        FW      fw_voices, FW_VOICES
+        FW      fw_voice_track, FW_VOICE_TRACK
+        FW      fw_gate_on, FW_GATE_ON
+        FW      fw_active_track, FW_ACTIVE_TRACK
+        FW      fw_params, PARAMS
+        FW      fw_uirecs, UIRECS

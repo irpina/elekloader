@@ -16,6 +16,12 @@
 | The menu is a grid of tiles, two across and two down, each the entry's
 | icon over its label and the trig key that picks it in the corner, with a
 | scroll bar on the right; the selected tile is drawn inverted.
+| From 3.1 an entry's open() may show a list of its own in the same grid
+| (a submenu): core_menu_open(list, sel, pick) takes a list of descriptors
+| like core_menu's, ending in 0, the entry to select first, and
+| pick(brain, event, track, index), which a pick calls in place of the
+| entry's open(); the menu closes first, so pick may open another list.
+| Holding a track key opens the menu at its root, as before.
 | In the menu: the arrows or any knob move, YES or trig key N picks, NO or
 | holding a track key again closes, a page key (TRIG ... LFO) closes and
 | goes on to its page; PLAY, STOP, FUNC and the track keys still work.
@@ -126,7 +132,8 @@ core_dn_key:
         tst.l   %d0
         beq.s   7b
         bra.s   taken
-8:      bsr.w   menu_count              | then the menu, if there is one
+8:      bsr.w   menu_root               | then the menu, from its root,
+        bsr.w   menu_count              | if there is one
         tst.l   %d0
         beq.s   pass
         moveq   #0, %d1
@@ -177,9 +184,51 @@ others_down:
         or.l    keys_down, %d0
         rts
 
-| menu_count -> d0 = the entries in core_menu.
+| menu_root: the menu shows core_menu again, at the entry it had (after a
+| submenu). Changes d0 and a0.
+menu_root:
+        movea.l menu_list, %a0
+        cmpa.l  #core_menu, %a0
+        beq.s   1f
+        move.l  #core_menu, %d0
+        move.l  %d0, menu_list
+        clr.l   menu_pick
+        move.b  menu_rsel, %d0
+        move.b  %d0, menu_sel
+        clr.b   menu_top
+1:      rts
+
+| core_menu_open(list, sel, pick): the menu shows another list (above). C
+| convention, from the UI task (an entry's open()).
+        .globl  core_menu_open
+core_menu_open:
+        movea.l menu_list, %a0
+        cmpa.l  #core_menu, %a0
+        bne.s   1f
+        move.b  menu_sel, %d0           | the root's entry, for later
+        move.b  %d0, menu_rsel
+1:      move.l  4(%sp), %d0
+        move.l  %d0, menu_list
+        move.l  12(%sp), %d0
+        move.l  %d0, menu_pick
+        bsr.s   menu_count
+        move.l  8(%sp), %d1
+        cmp.l   %d0, %d1
+        bcs.s   2f
+        moveq   #0, %d1                 | past the last (or none): the first
+2:      move.b  %d1, menu_sel
+        clr.b   menu_top
+        clr.l   enc_acc
+        tst.l   %d0
+        beq.s   3f                      | an empty list: no menu
+        moveq   #1, %d0
+        move.b  %d0, menu_open
+3:      rts
+
+| menu_count -> d0 = the entries in the list shown (core_menu, or a
+| submenu's).
 menu_count:
-        lea     core_menu, %a0
+        movea.l menu_list, %a0
         moveq   #0, %d0
 1:      tst.l   (%a0)+
         beq.s   2f
@@ -262,7 +311,21 @@ menu_key:
         bcc.w   mk_take
         move.b  %d0, menu_sel
 pick:   clr.b   menu_open               | d0 = the entry: closed, then open()
-        lea     core_menu, %a0
+        move.l  menu_pick, %d1          | a submenu's: its pick(), the root back
+        beq.s   1f
+        move.l  %d0, -(%sp)             | the index
+        move.l  %d1, -(%sp)
+        bsr.w   menu_root
+        movea.l (%sp)+, %a0
+        moveq   #0, %d1
+        move.b  menu_track, %d1
+        move.l  %d1, -(%sp)             | track
+        move.l  32(%sp), -(%sp)         | event
+        move.l  32(%sp), -(%sp)         | brain
+        jsr     (%a0)
+        lea     16(%sp), %sp
+        bra.s   mk_take
+1:      movea.l menu_list, %a0
         movea.l (%a0,%d0.l*4), %a0
         movea.l 4(%a0), %a0
         moveq   #0, %d1
@@ -459,7 +522,7 @@ core_dn_draw:
         bcs.s   9f
         bsr.w   draw_slot               | past the last entry: an empty slot
         bra.s   10f
-9:      lea     core_menu, %a0
+9:      movea.l menu_list, %a0
         movea.l (%a0,%d5.l*4), %a3      | a3 its descriptor
         bsr.w   draw_tile
         cmp.l   %d2, %d5
@@ -696,6 +759,10 @@ slot_marks:
         .word   TILE_W - 1, 1 - TILE_H, TILE_W - 1, 4 - TILE_H
 
         .balign 4
+menu_list:
+        .long   core_menu               | the list shown: core_menu, or a submenu
+menu_pick:
+        .long   0                       | a submenu's pick(), or 0
 | The keys down, by key id (0-63), from every key event.
 keys_down:
         .long   0, 0
@@ -711,6 +778,8 @@ menu_track:
         .byte   0
 menu_top:
         .byte   0                       | the grid's top row on screen
+menu_rsel:
+        .byte   0                       | the root's entry, under a submenu
 lbuf:
         .space  LABEL_MAX + 1           | a label, cut to fit
         .balign 4

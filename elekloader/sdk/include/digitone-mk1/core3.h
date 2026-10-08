@@ -1,15 +1,16 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-/* core-dn1 3.0 for the Digitone mk1, in C: the firmware locations core exports, and core-dn1's own
- * tables and calls (docs/ADAPTING.md, "Firmware locations", "Parameter slots", "Mod pages", "Project
- * data" and "The Mod Menu"). The SDK puts this folder on the include path:
+/* core-dn1 3.0 and 3.1 for the Digitone mk1, in C: the firmware locations core exports, and core-dn1's
+ * own tables and calls (docs/ADAPTING.md, "Firmware locations", "Parameter slots", "Mod pages", "Project
+ * data", "The Mod Menu" and "Machines and stock parameters"). The SDK puts this folder on the include
+ * path:
  *
  *     #include "digitone-mk1/core3.h"
  *
  * Every fw_ name here is resolved by the linker against the core in the build, so a mod that uses only
  * these rebuilds for another OS version without a change (its port in mod.json is empty). Declaring one
- * makes the mod need core-dn1 3.0: say so with "resources": {"core": "3.0"}. digitone-mk1/core3.inc has
- * the same for assembly. Functions that return a pointer are declared to return uint32_t: the firmware
- * returns it in d0, where gcc for m68k looks in a0. */
+ * makes the mod need core-dn1 3.0, or 3.1 for the names marked 3.1: say so with "resources": {"core":
+ * "3.0"} (or "3.1"). digitone-mk1/core3.inc has the same for assembly. Functions that return a pointer
+ * are declared to return uint32_t: the firmware returns it in d0, where gcc for m68k looks in a0. */
 #ifndef ELEKLOADER_DIGITONE_MK1_CORE3_H
 #define ELEKLOADER_DIGITONE_MK1_CORE3_H
 
@@ -41,6 +42,11 @@ extern volatile uint32_t fw_nodes_free;         /* the queue's free times: with 
 /* ---- the UI task ------------------------------------------------------------------------------ */
 extern uint8_t *volatile fw_kit;                /* the active kit: */
 #define FW_SOUND_SLOT(kit, t, k)  (*(volatile int16_t *)((kit) + 0x2c + 326 * (t) + 2 * (k)))
+/* To change a sound slot, call core_sound_set (from 3.1): a voice keeps the sound it loaded last and
+ * loads it again only for another sound, so a write to the kit alone is not heard on a voice that has
+ * played the track before, until a stock edit or a sound change reloads it. core_sound_set writes the kit
+ * as a stock edit does, and then the track's voices. Track 0-3, slot 0-78, value 8.8; the UI task. */
+extern void core_sound_set(int32_t track, int32_t slot, int32_t value);
 extern volatile uint32_t fw_slot_ids[];         /* [k]: sound slot k's parameter id */
 extern const char fw_str_amp[];                 /* "Amp", a parameter group's name */
 extern const char fw_str_empty[];               /* "", a parameter record's +60 */
@@ -50,6 +56,19 @@ extern int32_t fw_textf(void *bmp, const void *font, int32_t x, int32_t y, int32
 extern const char fw_font5[];
 extern void fw_blit(void *dst, const void *src, int32_t x, int32_t y, int32_t centre);
 extern uint32_t fw_op_new(uint32_t size);       /* the firmware's heap; 0 when it is full */
+extern volatile int32_t fw_active_track;        /* 3.1: the active track, 0-3 the synth tracks */
+extern const uint8_t fw_params[];               /* 3.1: the parameter records, 60 bytes an id (slot at +4,
+                                                   min +8, max +12, default +16, names +40 +44 +48) */
+extern uint8_t fw_uirecs[];                     /* 3.1: their UI records, 84 bytes an id */
+
+/* ---- 3.1: the voices, for machines (ev_render_voices) ------------------------------------------- */
+extern int32_t fw_voices[];                     /* [32 * v + i]: the DSP's voice v this block, Q1.31 */
+extern volatile int32_t fw_voice_track[];       /* [v]: the voice's track */
+extern volatile uint32_t fw_gate_on;            /* bit v: voice v started in the last block */
+/* Each block, after the DSP's voices land in fw_voices and before the render's filters: a handler may
+ * write any voice's 32 samples, which are then that voice's sound through its filter and the mix. The
+ * DSP applies the amp envelope before its output: what is written here has none. Interrupt level. */
+typedef void (*ev_render_voices_fn)(int32_t *voices);
 
 /* ---- core-dn1's tables (core 2.1-2.3): what a mod contributes points to one of these ------------ */
 struct core_param {                 /* core_params: parameter slots 182-184 */
@@ -91,6 +110,27 @@ struct core_menu_item {             /* core_menu: the Mod Menu's entries */
     const uint16_t *icon;           /* +12 -> its icon, 16 rows of 16 pixels, the top row first and
                                        bit 15 the left pixel; 0 for core's own */
 } __attribute__((aligned(4)));
+
+/* 3.1: from an entry's open(), show another list in the Mod Menu's grid (a submenu). list: entries as
+ * core_menu's, ending in 0; sel: the one to select first; a pick calls pick(brain, event, track, index)
+ * in place of the entry's open(), the menu closed first (so pick may open another list). */
+extern void core_menu_open(const void *const *list, int32_t sel,
+                           void (*pick)(void *brain, void *event, int32_t track, int32_t index));
+
+/* core_param_override: a mod answering for a stock parameter, while it wants to (from 3.1). ui returns a UI
+ * record (84 bytes, the stock layout: the value text's formatter at +0x14, the knob graphic) or 0 for
+ * the stock one; name returns the label for field 0x30 or 0. Either may be 0; the first answer wins. */
+struct core_param_override {
+    void *(*ui)(int32_t id);
+    const char *(*name)(int32_t id, int32_t field);
+} __attribute__((aligned(4)));
+
+/* Make a UI record for an override's ui() (from 3.1): stock parameter id's, which says how a turn moves
+ * its value (its steps and speed), with the knob graphic of the stock parameter look (0: PTIM, a plain
+ * knob; CORE_LOOK_NONE: id 0's, the firmware's 'none') and fmt as its value text (0 keeps id's). ui: 84
+ * bytes, 4-aligned, the mod's; build it once, outside the render. */
+#define CORE_LOOK_NONE  (-1)
+extern void core_param_ui_make(void *ui, int32_t id, int32_t look, void (*fmt)(int32_t value, char *buf));
 
 /* Open a mod page from a key handler (its key's code: AMP 24, say); 0 when the view was never built. */
 extern int32_t core_page_open(void *brain, void *event, int32_t key, void *page);
