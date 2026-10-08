@@ -292,6 +292,13 @@ line stays on 2.3.
 | `fw_str_amp`, `fw_str_empty` | 0x401d63c3, 0x401ddbcd | 0x401d6793, 0x401ddf9d | "Amp", and the empty string a parameter record's +60 names |
 | `fw_fillrect`, `fw_framerect`, `fw_textf`, `fw_font5`, `fw_blit` | | | drawing, as `mods/core-dn1/fw.s` lists them |
 | `fw_op_new` | 0x400e944c | 0x400e96c0 | the firmware's heap |
+| `fw_voices` (3.1) | 0x80004110 | the same | the render's copy of the DSP's eight voices this block: 32 samples a voice, Q1.31, 128 bytes apart (`ev_render_voices`) |
+| `fw_voice_track` (3.1) | 0x80003f8c | the same | each voice's track (an idle voice reads 0) |
+| `fw_gate_on` (3.1) | 0x80001f70 | the same | bit v: voice v started in the last block |
+| `fw_active_track` (3.1) | 0x41367ce0 | 0x41368ce0 | the active track, 0-3 the synth tracks |
+| `fw_params`, `fw_uirecs` (3.1) | 0x4018d104, 0x4136b9fc | 0x4018d454, 0x4136c9fc | the parameter records (60 bytes an id) and their UI records (84 bytes an id) |
+
+A name marked 3.1 needs core-dn1 3.1 (`"resources": {"core": "3.1"}`).
 
 Each 1.44 value was found by the code that uses it, which is the same in
 both versions but for the addresses in it. A routine was found by its own
@@ -532,7 +539,137 @@ On the Digitone the four UI sites (0x4001900c, 0x40019072, 0x40019d9c and
 `core_dn_key` and `core_dn_enc` (`menu.s`), which see to the menu and go on
 to core.s's handlers, so core.s stays the Digitakt's.
 
-The addresses in these four sections are OS 1.43's. In 1.44 the same
+**Submenus (core-dn1 3.1).** From an entry's `open()`, `void
+core_menu_open(const void *const *list, int sel, void (*pick)(void *brain,
+void *event, int track, int index))` shows another list in the same grid:
+`list` holds descriptors like `core_menu`'s, ending in 0, and `sel` is the
+one selected first. A pick then calls `pick` with the entry's index in place
+of the entry's `open()`, after the menu has closed and gone back to its
+root, so `pick` may open another list. NO closes a submenu like the menu, and
+holding a track key always opens the root. The machines mod's MACHINES
+entry opens one (below).
+
+### Machines and stock parameters (core-dn1 3.1, Digitone mk1)
+
+On the Digitone mk1 the DSP (a second ColdFire) renders the eight FM voices,
+and the main CPU's audio render (vector 191) runs each through its
+multimode filter, then mixes them with the tracks' levels, pans and effect
+sends. Core-dn1 3.1 adds what a mod needs to play its own sound in a voice's
+place and to show its own parameters on a sound's pages.
+
+**`ev_render_voices`.** At 0x4009e078 (0x4009e098 in 1.44) the render calls
+a routine (0x40098fa4) just before its loop over the voices. By then eDMA
+channel 47 has copied the DSP's eight voices for the block to SRAM at
+0x80004110 (`fw_voices`): 32 samples a voice, signed Q1.31, 128 bytes apart.
+Core makes that call itself, then calls each handler, `void f(int32_t
+*voices)` with `voices` = `fw_voices`. A handler may write any voice's
+block: what it writes is the voice's sound from there on, through its filter
+(the FLTR page), the mixer and the effects. The DSP applies the AMP page's
+envelope before its output, so a block written here has none of its own.
+Interrupt level, 1500 blocks a second, inside the render, which uses the
+EMAC: a handler that uses it leaves MACSR as it found it. For a voice v,
+`fw_voice_track[v]` is its track, `FW_VOICE_PARAM(v, k)` its sound's slot k
+(the locked values of the trig it plays), `fw_voice_pitch[v]` its pitch,
+and bit v of `fw_gate_on` and `fw_gate_off` says it started or was released
+in the last block. `ev_voice_on` passes the note event, whose +0x10 is the
+velocity << 8.
+
+**`core_param_override`.** A mod may answer for a stock parameter while it
+wants to (on its own tracks, say) by contributing to the table
+`core_param_override` a pointer to a descriptor:
+
+| offset | field | |
+|---|---|---|
+| +0 | ui | `void *ui(int id)`: a UI record (84 bytes, the stock layout) for the id, or 0 for the stock one |
+| +4 | name | `const char *name(int id, int field)`: the label for field 0x30 (the knob's short name), or 0 |
+
+Either may be 0; the first mod that answers wins. The value, its sound slot
+and its range stay the stock parameter's. A UI record holds the knob's kind
+at +0, how a turn moves the value at +4 to +0x10 (its stepper: ALGO steps
+once every few detents, DTUN in fine steps), the value text's formatter at
++0x14 (`void f(int value, char *buf)`, the value 8.8) and three draw
+delegates from +0x1c (the graphic, the value, the pop-up).
+`core_param_ui_make(ui, id, look, fmt)` builds one: id's turn, the graphic
+of the stock parameter look (0 for PTIM, a plain knob; -1 for id 0, the
+firmware's 'none') and fmt as its text (0 keeps id's). A whole record copied
+from another parameter brings that parameter's turn along: a plain knob's
+over ALGO jumps two algorithms a detent. Core consults the table in the UI
+record lookups (0x400899c8 and 0x400899e6) and replaces the routine that
+makes a knob's label (0x400207b8, by jmp; the same address in 1.44). The
+pop-up's long name, the LFO destination lists and a page's group headings
+read the parameter records on their own and keep the stock names, and a
+page view's own drawing stays (SYN1's algorithm diagram, SYN2's envelope
+graphs).
+
+**`core_sound_set`.** `void core_sound_set(int track, int slot, int value)`
+sets the sound slot (0-78) of synth track `track` (0-3) to `value` (8.8)
+as a stock edit does: in the kit, then in the voices playing the track (the
+stock setter's last step, 0x4009c972; 0x4009c992 in 1.44). A write to the
+kit alone (`FW_SOUND_SLOT`) is not enough: a voice keeps a pointer to the
+sound it loaded last (0x80003f5c + 4 v) and loads it again only for another
+sound, so a voice that played the track before keeps the old value until a
+stock edit or another sound reloads it. From the UI task.
+
+Core-dn1 3.1 owns two more sites: 0x4009e078 (`core_render_voices`, by jsr)
+and 0x400207b8 (`core_param_short`, by jmp).
+
+### Machines on the Digitone (machines, Digitone mk1)
+
+The `machines` mod (`mods/machines-dn1`) makes core-dn1 3.1's pieces into
+machines: sounds that play a machine mod's voice in place of FM. A sound's
+machine is its slot 0, which no stock parameter uses: the machine's id << 8,
+0 for FM. The voice loads it with the rest of the sound at each note.
+MACHINES in the Mod Menu opens a submenu of FM and the machines in the
+build; picking one sets the held track's sound slot 0 (with
+`core_sound_set`) and its SYN knobs to the machine's defaults, or to FM's
+for FM. On a machine track the SYN1 and SYN2 knobs are the machine's
+(`core_param_override`): its labels and value texts, on plain knobs that
+turn as the stock ones do. SYN1's and SYN2's second pages are FM's alone and
+show no labels. Each block (`ev_render_voices`) a voice playing a machine
+gets the machine's render in place of the FM voice, then the AMP page's
+envelope (ATK, DEC, SUS and REL, the voice's slots 66-69) and the note's
+velocity.
+
+A machine mod contributes to the machines mod's table `dn_machines` a
+pointer to a `struct dnm_machine` (`digitone-mk1/machines.h`):
+
+| offset | field | |
+|---|---|---|
+| +0 | id | 1-127: claim it as the resource `dnmachine:<id>` |
+| +4 | name | its label in the submenu, 14 characters |
+| +8 | icon | 16 rows of 16 pixels for its tile, or 0 |
+| +12 | knobs | 16 `struct dnm_knob`: SYN1 A-H, then SYN2 A-H |
+| +16 | render | `void f(int voice, int *block, const struct dnm_voice *v)`: the voice's 32 samples, Q1.31; `block` holds the FM voice's on entry |
+| +20 | flags | 1 (`DNM_OWN_ENV`): the machine applies its own envelope |
+| +24 | defaults | 16 values (8.8; -1 leaves one) set when a track switches to it, or 0 |
+
+A knob is a label (5 characters; 0 leaves the knob unused), a formatter for
+its value text (0: the number) and a stock id whose graphic it borrows (0: a
+plain knob). Its value is the stock parameter's, in that parameter's range:
+SYN1 A ALGO 0-7, B-D the ratios (as indices), E HARM -26..26, F DTUN 0-127,
+G FDBK 0-127, H MIX -63..63, and SYN2 A-H 0-127. `dnm_knob(voice, k)`
+reads knob k for a voice; `dnm_phase_inc(pitch)` and `dnm_sin(phase)` are a
+phase step a sample at 48 kHz and a sine. A voice that peaks at `DNM_PEAK`
+(0x08000000) is about as loud as an FM voice at the stock defaults. The
+render runs at interrupt level for every voice playing the machine, every
+block (667 us): in digikit's emulator SINE takes about 3,000 instructions a
+voice a block.
+
+`examples/dn-sine-machine` is a whole machine in C to start from: a sine at
+the note that OCT shifts by octaves, FOLD folds and SUB doubles an octave
+down. It names no firmware address, so its 1.44 port is empty:
+
+```json
+"contribute": [{"to": "dn_machines", "order": 50, "data": "00000000",
+                "relocs": [[0, "abs32", "sym:sine_machine", 0]]}],
+"requires": ["core", "machines"],
+"resources": {"names": ["dnmachine:2"], "core": "3.1"}
+```
+
+The machines mod claims sound slot 0 as the resource `soundslot:0`; what it
+does not do yet is in its README.
+
+The addresses in these sections are OS 1.43's. In 1.44 the same
 routines are there, unchanged but moved, and RAM is 0x1000 further on:
 `mods/core-dn1/mod.json`'s `ports` has every one of core-dn1's sites for it.
 

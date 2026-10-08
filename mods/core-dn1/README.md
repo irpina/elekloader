@@ -71,19 +71,46 @@ the Digitone needs it. On its own it changes nothing the unit does.
   versions unchanged (`elekloader/sdk/include/digitone-mk1/core3.h`;
   docs/ADAPTING.md, "Firmware locations (core-dn1 3.0)"). Nothing else
   changes: 3.0 is 2.3's code, sites and tables.
+- **From 3.1, what machines need** (docs/ADAPTING.md, "Machines and stock
+  parameters"):
+  - `ev_render_voices` ([voices.s](voices.s)): each block, the DSP's eight
+    voices (32 samples each, `fw_voices`) after they reach SRAM and before
+    the render's multimode filter, at 0x4009e078 (0x4009e098 in 1.44). A
+    handler may write a voice's block: that is the voice's sound through
+    its filter, the mixer and the effects. The machines mod
+    ([../machines-dn1](../machines-dn1)) plays its machines there.
+  - `core_param_override` ([params.s](params.s)): a mod answers for a stock
+    parameter while it wants to: its UI record (value text, knob graphic,
+    how a turn moves it) and its label. Core consults the table in its UI
+    record lookups, and replaces the routine that makes a knob's label
+    (0x400207b8, the same in 1.44). `core_param_ui_make` builds a UI
+    record from a stock parameter's turn and another one's graphic.
+  - `core_sound_set(track, slot, value)`: a sound slot changed as a stock
+    edit changes it, the kit and then the track's voices. A voice keeps the
+    sound it loaded last and loads it again only for another sound, so a
+    write to the kit alone is not heard on a track's voices until a stock
+    edit reloads them.
+  - `core_menu_open(list, sel, pick)` ([menu.s](menu.s)): an entry's open()
+    shows a list of its own in the Mod Menu's grid, a submenu.
+  - Six more firmware locations: `fw_voices`, `fw_voice_track`,
+    `fw_gate_on`, `fw_active_track`, `fw_params` and `fw_uirecs`.
+
+  3.1 keeps everything 2.3 and 3.0 have: their sites, tables, code paths
+  and exports, so every 2.x and 3.0 mod links with it (`tests/test_sdk.py`
+  checks it against the released 2.3). It adds two sites and two tables.
 - **OS 1.44:** every site has its port (`ports` in mod.json): the same
   code, moved, and RAM 0x1000 further on.
 
 Build it with the SDK (it needs m68k binutils):
 
 ```bash
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-3.0.elemod
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-3.0-os1.44.elemod
-python -m elekloader.lint mods/core-dn1/out/core-3.0-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-3.1.elemod
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-3.1-os1.44.elemod
+python -m elekloader.lint mods/core-dn1/out/core-3.1-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
 ```
 
-A release names them `core-dn1-3.0.elemod` and `core-dn1-3.0-os1.44.elemod`
-(3.0 is not released yet);
+A release names them `core-dn1-3.1.elemod` and `core-dn1-3.1-os1.44.elemod`
+(3.0 and 3.1 are not released yet);
 2.3's are on the [core-dn1-v2.3](https://github.com/irpina/elekloader/releases/tag/core-dn1-v2.3) pre-release.
 
 Checked by cold-booting it in digikit's emulator against stock (docs/DEVICES.md):
@@ -97,3 +124,11 @@ every stage passes, and every screen is identical. It is the same code with
 each routine it calls was found again by its own code, with the addresses
 in it masked, and checked against the code that calls it. It lints and
 links, and a build with it verifies, depacking in place.
+
+3.1 was checked the same way on 1.43 and 1.44: every stage passes and every
+screen is identical. With the machines mod, SINE and digitables 1.4, on both
+versions, SINE plays at the note through the filter and the AMP envelope
+while the other tracks stay FM ([../machines-dn1](../machines-dn1)). Its two
+new sites are the same code in 1.44 (the voices' site calls the routine
+it calls at its new address), and the setter's last step, `SOUND_LIVE`, was
+found again by its own code.

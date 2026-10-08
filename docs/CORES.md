@@ -30,8 +30,9 @@ There is one core file per device and OS:
 | Octatrack MKI, MKII | 1.40C | `core-ot-0.1.elemod` | the latest release (v0.4.0); 0.3 is in this repository |
 
 From 3.0 the Digitakt mk1's core and the Digitone mk1's each have two
-lines, 2.x and 3.0, and a build takes 3.0 only for a mod that needs it.
-Both 3.0s are in this repository and not released yet.
+lines, 2.x and 3.x, and a build takes the 3.x line only for a mod that
+needs it. The Digitakt's 3.0 and the Digitone's 3.1 are in this repository
+and not released yet.
 
 ## How a build picks one
 
@@ -40,7 +41,7 @@ A mod says which core it needs at least (`resources.core` in the file,
 oldest major line that is new enough ([ADAPTING.md](ADAPTING.md), "Core
 3.0"). So a Digitakt mk1 selection stays on 2.1 unless a mod needs 3.0, and
 a Digitone selection takes 2.3, the newest of the 2.x line, unless a mod
-needs core-dn1 3.0. The web page,
+needs core-dn1 3.0 or 3.1, and then it takes 3.1. The web page,
 the kit and the window (from source, and the apps after 0.4.0) tick that
 core for you and keep one. The 0.4.0 apps refuse a build with two cores
 ticked: there, untick the built-in one when you add a newer core.
@@ -59,7 +60,11 @@ ticked: there, untick the built-in one when you add a newer core.
   [below](#the-digitones-mod-menu). From 3.0 it also exports the firmware
   locations Digitone mods use, so a mod that names only those builds for
   1.43 and 1.44 unchanged ([ADAPTING.md](ADAPTING.md), "Firmware locations
-  (core-dn1 3.0)").
+  (core-dn1 3.0)"). From 3.1 it has what machines need: the voices' sound
+  before the filter, stock parameters a mod relabels for its tracks, sound
+  edits the voices hear and submenus in the Mod Menu. With
+  [machines](../mods/machines-dn1), a sound plays a machine mod's voice in
+  place of FM ([ADAPTING.md](ADAPTING.md), "Machines on the Digitone").
 - **Digitakt II** ([mods/core-dt2](../mods/core-dt2)): the hook bus's tick,
   draw, key and encoder events, and rows in SETTINGS > PERSONALIZE.
 - **Octatrack** ([mods/core-ot](../mods/core-ot)): a source of its own. It

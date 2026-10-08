@@ -1,0 +1,22 @@
+{
+ "id": "machines", "version": "0.1",
+ "license": "GPL-2.0-or-later",
+ "title": "machines", "category": "Framework", "author": "irpina",
+ "description": "Machines for the Digitone mk1 and Digitone Keys: sounds that play a machine mod's voice in place of FM, through the Digitone's own filter, mixer and effects, with the AMP page's envelope. MACHINES in core-dn1's Mod Menu (hold a track key) picks the held track's machine; a machine track's SYN1 and SYN2 knobs are the machine's parameters, relabelled. On its own it adds the menu and nothing else: machines come in mods of their own. Needs core-dn1 3.1.",
+ "device": "digitone-mk1", "os": "1.43",
+ "ports": {"1.44": {}},
+ "sources": ["machines.c"],
+ "subscribe": [
+  {"event": "ev_voice_on", "fn": "dnm_voice_on", "order": 20},
+  {"event": "ev_render_voices", "fn": "dnm_render", "order": 50}
+ ],
+ "contribute": [
+  {"to": "core_menu", "order": 40, "data": "00000000",
+   "relocs": [[0, "abs32", "sym:dnm_menu", 0]]},
+  {"to": "core_param_override", "order": 50, "data": "00000000",
+   "relocs": [[0, "abs32", "sym:dnm_override", 0]]}
+ ],
+ "collections": {"dn_machines": 4},
+ "resources": {"names": ["soundslot:0"], "core": "3.1"},
+ "requires": ["core"]
+}
