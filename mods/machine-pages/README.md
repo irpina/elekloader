@@ -15,7 +15,7 @@ machine mod), it changes nothing the unit does.
 |---|---|
 | needs | core 3.0 (`resources.core`), and refuses beside digichain, which owns the same places |
 | sites | 20, listed in `mod.json`: 7 on the SRC page, 4 range lookups, 5 on the LFO page, 2 SAMP compares, the machine menu's icon row and the render point 0x40077fba |
-| exports | `cm_ui_v3`, the marker a machine's page names |
+| exports | `cm_ui_v3` and, from 1.1, `cm_ui_v31`: the markers a machine's page names |
 | declares | `ev_render_voices`, the render event |
 | RAM | 2.4 KB code, 2 KB for up to 32 machines' pages |
 
@@ -62,6 +62,15 @@ Because the page names `cm_ui_v3`, a machine with a page links only beside
 this mod: against core 2.1, or without it, the loader says which is
 missing instead of building a stock-looking page.
 
+**A knob that draws itself (1.1).** A knob with `CM_DRAW` in its flags has
+`draw` in gfx's place, `int draw(void *bmp, int x, int y, int value, int
+flag)`: machine-pages calls it at the knob-graphic site with the page's
+Bitmap, and the stock graphic is not drawn when it returns nonzero. Such a
+page names `cm_ui_v31` instead of `cm_ui_v3`, so it links only beside
+machine-pages 1.1 and newer (1.0 would read `draw` as a `gfx`). 1.1 still
+reads every `cm_ui_v3` page as 1.0 did; there, flag 16 means nothing.
+DT-FM's ALGO diagram and OP number are drawn this way.
+
 ## Whose machine a site answers for
 
 - **The SRC page** (layout, labels, values, graphics, UI records, the
@@ -90,13 +99,15 @@ track's sound, as digichain arranged it.
 
 It links beside every Digitakt mod of the shop that adds no machine (Digi
 EQ, Digi Matrix, Digi utilities, digihealth, digistring), on OS 1.53 and
-1.54. The machine mods built for core 2.1 (SOPHIE 1.1.13, NEIGHBOR 0.6,
-DIGISLICER 2.2, digichain 1.6 and the Digi Mono and Digi Poly builds that
-need it) hook the same places themselves, so the loader refuses them beside
-it; they still link with core 3.0 without it, as they did with 2.1. Their
-builds for machine-pages (NEIGHBOR 0.7, DIGISLICER 2.3, and SOPHIE's,
-Digi Mono's and Digi Poly's, which are their authors' to publish) all link
-together: with digihealth, 100,012 of the 131,072 bytes of RAM.
+1.54. The machine mods built for core 2.1 (SOPHIE 1.1.13, DT-FM 1.1.0,
+NEIGHBOR 0.6, DIGISLICER 2.2, digichain 1.6 and the Digi Mono and Digi Poly
+builds that need it) hook the same places themselves, so the loader refuses
+them beside it; they still link with core 3.0 without it, as they did with
+2.1. Their builds for machine-pages (NEIGHBOR 0.7, DIGISLICER 2.3, and
+SOPHIE's, Digi Mono's and Digi Poly's, which are their authors' to publish)
+all link together: with digihealth, 100,012 of the 131,072 bytes of RAM.
+DT-FM 1.2.0, built for 1.1, links beside it with each shop mod that does,
+on OS 1.53 and 1.54.
 
 | mod | sites with core 2.1 | built for machine-pages |
 |---|---|---|

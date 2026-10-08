@@ -176,7 +176,7 @@ longs:
 
 | offset | field | |
 |---|---|---|
-| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>`. Taken so far: 4 NEIGHBOR, 5 DIGISLICER, 6 Digi Poly's POLY, 7 SOPHIE, 20-29 Digi Mono's (20-26 in use); pick another, and say which in your mod's README |
+| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>`. Taken so far: 4 NEIGHBOR, 5 DIGISLICER, 6 Digi Poly's POLY, 7 SOPHIE, 8 STRING, 9 DT-FM, 20-29 Digi Mono's (20-26 in use); pick another, and say which in your mod's README |
 | +4 | name | its name in the machine menu and the SRC page's title (10 characters fit) |
 | +8 | short | its 4-character name (the SRC page's `NAME: sample` title) |
 | +12 | icon | an 11 x 7 Bitmap for the menu, in the stock icons' format, or 0 |
@@ -325,7 +325,7 @@ The page (`struct cm_ui`, 336 bytes; `digitakt-mk1/core3.h`):
 
 | offset | field | |
 |---|---|---|
-| +0 | abi | `cm_ui_v3`, which machine-pages exports: the machine links only beside it |
+| +0 | abi | `cm_ui_v3`, which machine-pages exports: the machine links only beside it; `cm_ui_v31` for a page with a knob that draws itself (`CM_DRAW`), which only machine-pages 1.1 and newer export |
 | +4 | page_from | the stock machine whose SRC page it copies (byte): 3 SLICE, 0 ONESHOT |
 | +5, +6 | | 0 |
 | +8 | group | the LFO page's group for its parameters, or 0 for the stock one |
@@ -339,10 +339,11 @@ A knob (`struct cm_knob`); a 0 field is the stock one:
 | +0, +4 | name, lname | its label on the SRC page, and its long name (the pop-up) |
 | +8, +12 | lfo, lfo_long | its names on the LFO page: the DEST box's, and the DEST list's (0: name and lname; a blank knob reads "Unused") |
 | +16 | look | the parameter id whose UI record and graphic it borrows (byte): how a turn moves it, its knob |
-| +17 | flags | 1 blank (it shows and turns nothing), 2 the range min-max, 4 the default def, 8 knob D is not a sample (turning it does not open the sample list) |
+| +17 | flags | 1 blank (it shows and turns nothing), 2 the range min-max, 4 the default def, 8 knob D is not a sample (turning it does not open the sample list), 16 the machine draws the knob's graphic (`draw`; a `cm_ui_v31` page) |
 | +20, +24, +28 | min, max, def | 8.8 |
 | +32 | fmt | `int f(char *buf, int value, int ctx, int machine)`: its value's text into buf, returning nonzero (0: the stock text). ctx 0 is the value under a turning knob, about 5 characters; 1 the pop-up, up to 15 |
 | +36 | gfx | `int f(int value)`: the value its graphic shows (whole steps) |
+| +36 | draw | with flag 16, in gfx's place: `int f(void *bmp, int x, int y, int value, int flag)` draws the knob's graphic into the page's Bitmap, in x + 1 to x + 17 and y to y + 16 (y = 0 is the bottom row), from its value (8.8), and returns nonzero; 0 draws the stock graphic. flag is the firmware's, for a stock drawer it calls |
 
 In assembly `digitakt-mk1/core3.inc` has `CM_MACHINE`, `CM_UI` and
 `CM_KNOB`; digineighbor 0.7, digislicer 2.3 and SOPHIE's core 3.0 build use

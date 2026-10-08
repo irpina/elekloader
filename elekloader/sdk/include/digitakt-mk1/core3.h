@@ -48,6 +48,7 @@ enum {
     CM_RANGE      = 2,      /* min and max replace the stock range */
     CM_DEFAULT    = 4,      /* def replaces the stock default (a switch to the machine, a new sound) */
     CM_NOT_SAMPLE = 8,      /* knob D: turning it changes it, and does not open the sample list */
+    CM_DRAW       = 16,     /* draw, not gfx: the machine draws the knob's graphic (a page naming cm_ui_v31) */
 };
 
 /* A value's text: write it into buf and return nonzero, or return 0 for the stock text. ctx is 0 for the
@@ -55,6 +56,10 @@ enum {
 typedef int32_t (*cm_fmt)(char *buf, int32_t value, int32_t ctx, int32_t machine);
 /* The value the knob's graphic shows, from the one the firmware gives it (whole steps). */
 typedef int32_t (*cm_gfx)(int32_t value);
+/* With CM_DRAW: draw the knob's graphic into bmp, the page's Bitmap, and return nonzero, or return 0 for the
+ * stock graphic. It spans x + 1 to x + 17 and y to y + 16 (y = 0 is the screen's bottom row); value is 8.8,
+ * and flag is the firmware's, for a stock drawer it calls. */
+typedef int32_t (*cm_draw)(void *bmp, int32_t x, int32_t y, int32_t value, int32_t flag);
 
 struct cm_knob {                    /* 40 bytes; knobs A-H by their place on the page */
     const char *name;               /* +0  its label on the SRC page; 0 for the stock one */
@@ -66,11 +71,14 @@ struct cm_knob {                    /* 40 bytes; knobs A-H by their place on the
     uint16_t reserved;              /* +18 0 */
     int32_t min, max, def;          /* +20 8.8, with CM_RANGE and CM_DEFAULT */
     cm_fmt fmt;                     /* +32 its value's text; 0 for the stock one */
-    cm_gfx gfx;                     /* +36 its graphic's value; 0 for the value itself */
+    union {
+        cm_gfx gfx;                 /* +36 its graphic's value; 0 for the value itself */
+        cm_draw draw;               /* +36 with CM_DRAW: its graphic, drawn by the machine */
+    };
 } __attribute__((aligned(4)));
 
 struct cm_ui {                      /* 336 bytes */
-    const void *abi;                /* +0  cm_ui_v3: links only with a machine-pages that reads this layout */
+    const void *abi;                /* +0  cm_ui_v3, or cm_ui_v31 for CM_DRAW: links only beside a machine-pages that reads it */
     uint8_t page_from;              /* +4  the stock machine whose SRC page it copies: 0 ONESHOT ... 3 SLICE */
     uint8_t flags;                  /* +5  0 */
     uint16_t reserved;              /* +6  0 */
@@ -89,6 +97,7 @@ struct cm_machine {                 /* what a mod contributes to core_machines p
 } __attribute__((aligned(4)));
 
 extern const char cm_ui_v3[];                       /* machine-pages' marker (cm_ui.abi) */
+extern const char cm_ui_v31[];                      /* machine-pages 1.1's: a page with CM_DRAW names it */
 extern volatile uint8_t core_track_machine[8];      /* each track's own machine, as the render last took it */
 extern uint32_t core_machine(int32_t id);           /* -> its struct cm_machine, or 0 */
 extern uint32_t core_machine_ui(int32_t id);        /* core 3.0: -> its struct cm_ui, or 0 */

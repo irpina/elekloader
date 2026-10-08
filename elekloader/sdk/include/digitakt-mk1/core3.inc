@@ -22,6 +22,7 @@
         .equ    CM_RANGE,       2
         .equ    CM_DEFAULT,     4
         .equ    CM_NOT_SAMPLE,  8
+        .equ    CM_DRAW,        16              | draw, not gfx (a page whose abi is cm_ui_v31)
         .equ    CM_KNOB_SIZE,   40              | struct cm_knob
         .equ    CM_UI_SIZE,     336             | struct cm_ui: 16 + 8 knobs
 
@@ -32,19 +33,21 @@
         .endm
 
 | A page's head: the stock machine whose SRC page it copies (0-3), the LFO
-| page's group for its parameters (0: stock) and on_switch (0: none).
-        .macro  CM_UI page_from, group=0, on_switch=0
+| page's group for its parameters (0: stock), on_switch (0: none) and its abi
+| (abi=cm_ui_v31 for a page with CM_DRAW, which needs machine-pages 1.1).
+        .macro  CM_UI page_from, group=0, on_switch=0, abi=cm_ui_v3
         .balign 4
-        .long   cm_ui_v3
+        .long   \abi
         .byte   \page_from, 0
         .short  0
         .long   \group, \on_switch
         .endm
 
-| One knob, A-H in order. Everything left out is 0: stock.
-        .macro  CM_KNOB name=0, lname=0, lfo=0, lfo_long=0, look=0, flags=0, min=0, max=0, def=0, fmt=0, gfx=0
+| One knob, A-H in order. Everything left out is 0: stock. draw (with
+| flags=CM_DRAW) takes gfx's place: give one of them.
+        .macro  CM_KNOB name=0, lname=0, lfo=0, lfo_long=0, look=0, flags=0, min=0, max=0, def=0, fmt=0, gfx=0, draw=0
         .long   \name, \lname, \lfo, \lfo_long
         .byte   \look, \flags
         .short  0
-        .long   \min, \max, \def, \fmt, \gfx
+        .long   \min, \max, \def, \fmt, \gfx + \draw
         .endm
