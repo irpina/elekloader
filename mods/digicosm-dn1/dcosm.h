@@ -38,7 +38,7 @@ enum { K_ACT, K_REP, K_SHP, K_FLT, K_MIX, K_TIME, K_SPC, K_LOOP };          /* t
 enum { S_GAIN, S_MDEP, S_MRATE, S_RESO, S_FXVOL, S_LSPEED, S_VERB, S_FADE }; /* FUNC + A-H */
 enum { L_EMPTY, L_REC, L_PLAY, L_DUB, L_STOP };                             /* the looper */
 enum { C_NONE, C_T1, C_STOP, C_UNDO, C_ERASE, C_BURST_DOWN, C_BURST_UP };   /* looper commands */
-enum { G_MONO, G_PRE, G_ONLY, G_QUANT, G_BURST, G_HOLDMOM, G_ORDER, G_COUNT }; /* SETUP's rows */
+enum { G_MONO, G_PRE, G_ONLY, G_QUANT, G_BURST, G_HOLDMOM, G_ORDER, G_MIDI, G_COUNT }; /* SETUP's rows */
 
 /* What the UI sets and the render reads, and what the render reports. */
 struct dc_state {

@@ -4,7 +4,7 @@ An effects engine for the Digitone mk1's two audio inputs, after the
 [Hologram Microcosm](https://www.hologramelectronics.com/pages/microcosm):
 eleven engines with four variations each, a 60-second looper, Hold, Reverse,
 a resonant filter, pitch modulation and a reverb with four rooms, all in time
-with the Digitone's tempo. DigiCosm is an elekloader mod for core-dn1 3.2. It
+with the Digitone's tempo, and the Microcosm's MIDI CCs. DigiCosm is an elekloader mod for core-dn1 3.2. It
 is not affiliated with Hologram Electronics and uses none of its code; the
 engines are rebuilt from the Microcosm's public manual.
 
@@ -29,12 +29,43 @@ STOP and TEMPO still work.
 | Reverse | T3 |
 | Bypass (with trails) | T4 |
 | 16 user presets | FUNC + trig key 1-16 recalls one; in SETUP a trig key saves the page as that preset (the engine, the variation and knobs A-H). They are saved with the project |
-| Global configuration | YES opens SETUP (input mono/stereo, loop route, looper only, quantize, burst, hold mode, loop order); UP and DOWN pick a row, LEFT or RIGHT changes it |
+| Global configuration | YES opens SETUP (input mono/stereo, loop route, looper only, quantize, burst, hold mode, loop order, MIDI channel); UP and DOWN pick a row, LEFT or RIGHT changes it |
+| MIDI CCs | the same CC numbers, on the Digitone's auto channel (see MIDI below) |
 | Tap tempo | the Digitone's own tempo (TEMPO) |
 
 Pushing a knob sets it back to its default. Time picks a bar, 1/2, 1/4,
 1/8, 1/16 or 1/32 of the Digitone's tempo, and when the sequencer plays the
 engines' grid is its timeline.
+
+## MIDI
+
+While DigiCosm's page is open, it takes the Microcosm's CCs that come on the
+Digitone's auto channel (MIDI CONFIG > CHANNELS > AUTO CHANNEL), through
+core-dn1 3.2's `ev_midi_cc`; with SETUP's MIDI CC on ANY CH it takes them on
+a track's channel too. The Digitone does not apply a CC DigiCosm takes; every
+other CC, and every CC while the page is closed, goes on to the Digitone.
+MIDI CONFIG > PORT CONFIG > INPUT FROM has to let them in (MIDI, USB or
+both).
+
+| CC | | CC | |
+|---|---|---|---|
+| 5 | Subdivision (Time) | 17, 18 | Loop Speed (FUNC + F) |
+| 6 | Activity (A) | 19 | Mod Depth (FUNC + B) |
+| 7 | Shape (C) | 20 | Space type (FUNC + G) |
+| 8 | Filter (D) | 21 | Loop Fade (FUNC + H) |
+| 9 | Mix (E) | 23, 47 | Reverse: on from 64 |
+| 10 | Time (F) | 24-27 | SETUP's loop route (PRE-FX), looper only, burst, quantize: on from 64 |
+| 11 | Repeats (B) | 28 | Record: starts a loop, closes it, or starts a new take |
+| 12 | Space (G) | 29 | Play: closes a recording, restarts a stopped loop, ends an overdub |
+| 13 | Loop Level (H) | 30 | Overdub, on and off |
+| 14 | Mod Rate (FUNC + C) | 31 | Stop |
+| 15 | Resonance (FUNC + D) | 34, 35 | Erase, undo |
+| 16 | Effect Volume (FUNC + E) | 48 | Hold: on from 64 |
+| | | 102 | Bypass below 64, on from 64 |
+
+The looper's CCs act on a value of 64 or more. Program changes (the
+Microcosm's preset recall) are not mapped: core-dn1 passes DigiCosm the
+CCs only.
 
 ## Engines
 
@@ -120,6 +151,13 @@ unit yet.
   FUNC + trig 5 after the engine, variation and knobs have changed; an
   empty preset changes nothing. The page and its presets fit in the
   project beside digitables' tables.
+- **MIDI.** CCs sent into the emulator's MIDI input on 1.43 and 1.44: while
+  the page is open, the mapped ones on the auto channel set DigiCosm (the
+  knobs, FUNC's knobs, Reverse, Hold, Bypass, SETUP's rows, and the looper
+  through record, play, overdub, stop and erase) and do not reach the
+  Digitone's own CC handling; an unmapped CC, a CC on a track's channel (with
+  AUTO CH) and every CC while the page is closed go on to it. With ANY CH a
+  track's channel works too.
 - **The Digitone Keys.** With the Keys bit set in the emulator, core-dn1 3.2
   hands the inputs left first as on a Keys and keeps the Keys' own output
   buffer silent. Nothing has run on a Keys.
@@ -129,11 +167,8 @@ unit yet.
 - Saving loops: they need +Drive files from a mod. The Digitakt's +Drive
   calls (which digislicer uses) are not the same code in the Digitone, so
   core-dn1 cannot offer them yet.
-- The Microcosm's MIDI CC and program-change map: core-dn1 has no MIDI CC
-  event yet. Tone+FX patches the CC router's entry (0x400ed94e) itself; a
-  core site a few instructions in would sit beside it, but MIDI input does
-  not reach the Digitone's parser in digikit's emulator yet, so it could not
-  be checked.
+- Program changes: the Microcosm recalls presets with them, but core-dn1
+  has no event for them.
 - An expression pedal (the Digitone Keys has an input for one).
 - A run on a Digitone Keys: only the code path was checked, in the
   emulator.

@@ -726,8 +726,8 @@ tempo the sequencer runs at, x 120: a mod in time with the Digitone takes
 its grid from it and from `fw_timeline`.
 
 `mods/digicosm-dn1` (DigiCosm) is a whole one: an effects engine for the
-inputs, with eleven engines, a looper and its own page, and buffers in the
-bulk area. `examples/dn-thru` is the smallest such mod. THRU in the Mod Menu takes
+inputs, with eleven engines, a looper and its own page, buffers in the
+bulk area, and the Microcosm's MIDI CCs through `ev_midi_cc`. `examples/dn-thru` is the smallest such mod. THRU in the Mod Menu takes
 the output, and the inputs go straight to it at knob A's level; NO gives
 it back. It names no firmware address, so its 1.44 port is empty:
 

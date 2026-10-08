@@ -2,7 +2,7 @@
  "id": "digicosm", "version": "0.1",
  "license": "GPL-2.0-or-later",
  "title": "DigiCosm", "category": "Effect", "author": "irpina",
- "description": "A Microcosm-style effects engine for the Digitone mk1's audio inputs: eleven engines (MOSAIC, SEQ, GLIDE, HAZE, TUNNEL, STRUM, BLOCKS, INTERRUPT, ARP, PATTERN, WARP) with four variations each, a 60-second looper with overdub and undo, Hold, Reverse, a resonant filter, pitch modulation and a reverb with four rooms, in time with the Digitone's tempo. DIGICOSM in core-dn1's Mod Menu (hold a track key) opens its page; while it is open it owns the audio engine (the synths are muted) and the screen, and NO gives both back. Needs core-dn1 3.2.",
+ "description": "A Microcosm-style effects engine for the Digitone mk1's audio inputs: eleven engines (MOSAIC, SEQ, GLIDE, HAZE, TUNNEL, STRUM, BLOCKS, INTERRUPT, ARP, PATTERN, WARP) with four variations each, a 60-second looper with overdub and undo, Hold, Reverse, a resonant filter, pitch modulation and a reverb with four rooms, in time with the Digitone's tempo, and the Microcosm's MIDI CCs. DIGICOSM in core-dn1's Mod Menu (hold a track key) opens its page; while it is open it owns the audio engine (the synths are muted) and the screen, and NO gives both back. Needs core-dn1 3.2.",
  "device": "digitone-mk1", "os": "1.43",
  "ports": {"1.44": {}},
  "sources": ["dsp.c", "ui.c"],
@@ -10,6 +10,7 @@
   {"event": "ev_key", "fn": "dcosm_key", "order": 5},
   {"event": "ev_enc", "fn": "dcosm_enc", "order": 5},
   {"event": "ev_hold", "fn": "dcosm_hold", "order": 5},
+  {"event": "ev_midi_cc", "fn": "dcosm_cc", "order": 50},
   {"event": "ev_tick", "fn": "dcosm_tick", "order": 60},
   {"event": "ev_draw", "fn": "dcosm_draw", "order": 90}
  ],

@@ -7,7 +7,8 @@
  *   trig keys 1-11   the engines; 12 HOLD; 13-16 the variation, A-D
  *   T1 the looper: record, play, overdub (held: undo);  T2 stop (held: erase);  T3 reverse;  T4 bypass
  *   YES SETUP, NO back (from the main page: close);  PLAY, STOP, RECORD, TEMPO and LEVEL/DATA stay stock
- *   presets: in SETUP a trig key saves the page as that preset (1-16); FUNC + a trig key recalls one */
+ *   presets: in SETUP a trig key saves the page as that preset (1-16); FUNC + a trig key recalls one
+ *   MIDI: the Microcosm's CCs, on the auto channel (or any, in SETUP), while the page is open */
 #pragma GCC optimize ("no-tree-loop-distribute-patterns")
 #include "dcosm.h"
 
@@ -46,10 +47,10 @@ static const char *const times[6] = { "BAR", "1/2", "1/4", "1/8", "1/16", "1/32"
 static const char *const speeds[5] = { "1/4X", "1/2X", "1X", "2X", "4X" };
 static const char *const rooms[4] = { "ROOM", "DARK", "HALL", "AMBI" };
 static const char *const cfg_lbl[G_COUNT] = { "INPUT", "LOOP ROUTE", "LOOPER ONLY", "QUANTIZE", "BURST",
-                                              "HOLD", "LOOP ORDER" };
+                                              "HOLD", "LOOP ORDER", "MIDI CC" };
 static const char *const cfg_val[G_COUNT][2] = { { "STEREO", "MONO" }, { "POST-FX", "PRE-FX" }, { "OFF", "ON" },
                                                  { "OFF", "ON" }, { "OFF", "ON" }, { "LATCH", "MOMENT" },
-                                                 { "REC-PLAY", "REC-DUB" } };
+                                                 { "REC-PLAY", "REC-DUB" }, { "AUTO CH", "ANY CH" } };
 
 static u8 ui_open, ui_page, ui_func, ui_ready, ui_inited, ui_row;
 static u8 ui_msg_ticks, ui_msg_preset, ui_msg_kind;   /* a message for a second: 1 saved, 2 recalled, 3 empty */
@@ -63,7 +64,7 @@ static s32 enc_acc[8];
  * SETUP stay the project's). */
 #define NPRESET 16
 struct dc_save {
-    u8 ver, engine, var, cfg;           /* cfg: a bit a SETUP row */
+    u8 ver, engine, var, cfg;           /* cfg: a bit a SETUP row (eight rows) */
     u8 knob[8], shift[8];
     u8 preset[NPRESET][7];              /* [0]: engine | var << 4 | 0x80 once saved; [1-6]: the knobs */
 } __attribute__((aligned(4)));
@@ -297,6 +298,57 @@ int dcosm_enc(void *brain, void *ev)
     return 1;
 }
 
+/* ---- MIDI: the Microcosm's CC map (core-dn1 3.2's ev_midi_cc, the MIDI task) -------------------------------
+ * While the page is open, the CCs below are DigiCosm's when they come on the auto channel (SETUP's MIDI CC:
+ * ANY CH, on a track's channel too): the Digitone does not apply them. Every other CC, and every CC while
+ * the page is closed, goes on to the Digitone. A switch is on from 64; a looper CC acts from 64. */
+static const u8 cc_knob[8] = { K_ACT, K_SHP, K_FLT, K_MIX, K_TIME, K_REP, K_SPC, K_LOOP };          /* CC 6-13 */
+static const u8 cc_shift[8] = { S_MRATE, S_RESO, S_FXVOL, S_LSPEED, S_LSPEED, S_MDEP, S_VERB, S_FADE }; /* 14-21 */
+static const u8 cc_cfg[4] = { G_PRE, G_ONLY, G_BURST, G_QUANT };                                    /* 24-27 */
+
+int dcosm_cc(int track, int cc, int value, int flags)
+{
+    int on = value >= 64, s = dcosm.lstate;
+    (void)track;
+    if (!ui_open || !ui_ready || (!(flags & CORE_MIDI_CC_AUTO) && !dcosm.cfg[G_MIDI]))
+        return 0;
+    if (value < 0 || value > 127)
+        return 0;
+    if (cc == 5) {                              /* Subdivision */
+        dcosm.knob[K_TIME] = (u8)value;
+    } else if (cc >= 6 && cc <= 13) {
+        dcosm.knob[cc_knob[cc - 6]] = (u8)value;
+    } else if (cc >= 14 && cc <= 21) {          /* 17 Loop Speed, 18 its stepped twin: the same steps here */
+        dcosm.shift[cc_shift[cc - 14]] = (u8)value;
+    } else if (cc == 23 || cc == 47) {          /* Reverse */
+        dcosm.reverse = (u8)on;
+    } else if (cc >= 24 && cc <= 27) {          /* the looper's settings */
+        dcosm.cfg[cc_cfg[cc - 24]] = (u8)on;
+    } else if (cc >= 28 && cc <= 35 && cc != 32 && cc != 33) {
+        if (!on)
+            return 1;
+        if (cc == 28)                           /* Record: start; close; or a new take */
+            dcosm.lcmd = s == L_EMPTY || s == L_REC ? C_T1 : C_BURST_DOWN;
+        else if (cc == 29)                      /* Play */
+            dcosm.lcmd = s == L_REC ? C_BURST_UP : s == L_STOP || s == L_DUB ? C_T1 : C_NONE;
+        else if (cc == 30)                      /* Overdub, on and off */
+            dcosm.lcmd = s == L_PLAY || s == L_DUB ? C_T1 : C_NONE;
+        else if (cc == 31)
+            dcosm.lcmd = C_STOP;
+        else if (cc == 34)
+            dcosm.lcmd = C_ERASE;
+        else
+            dcosm.lcmd = C_UNDO;
+    } else if (cc == 48) {                      /* Hold */
+        dcosm.hold = (u8)on;
+    } else if (cc == 102) {                     /* Bypass: below 64 bypassed */
+        dcosm.bypass = (u8)!on;
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
 /* ---- the UI task: clearing, the owner, redraws ---------------------------------------------------------- */
 void dcosm_tick(void *ctrl)
 {
@@ -378,11 +430,11 @@ static void draw_setup(void *bmp)
     TEXTF(bmp, FONT5, 1, 57, -1, "SETUP   TRIG: SAVE");
     FILLRECT(bmp, 0, 54, 127, 54, 1);
     for (i = 0; i < G_COUNT; i++) {
-        int y = 46 - 7 * i;
+        int y = 47 - 6 * i;
         TEXTF(bmp, FONT5, 3, y, -1, "%s", cfg_lbl[i]);
         TEXTF(bmp, FONT5, 76, y, -1, "%s", cfg_val[i][dcosm.cfg[i] & 1]);
         if (i == ui_row)
-            FILLRECT(bmp, 1, y - 1, 126, y + 5, -1);
+            FILLRECT(bmp, 1, y - 1, 126, y + 4, -1);
     }
 }
 
