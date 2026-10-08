@@ -4,7 +4,6 @@
 |
 |   VOICES_LOOP  the render's loop over the eight voices' filters
 |   VOICES_DONE  just past that loop
-|   VMIX         the render's voice mix (the voices' levels, pans and sends)
 |   MASTER       the render's master stage: the inputs, chorus, delay,
 |                reverb, the master drive, the output and the USB block
 |   MODEL_FLAGS  the boot flags: bit 19 set on a Digitone Keys
@@ -14,9 +13,9 @@
 | The render (vector 191) runs the voices through their filters, mixes them
 | and then calls its master stage (0x40096e14 in 1.43) with the output's
 | half of the SSI double buffer, a buffer of the Keys', the half of the input
-| ring the codec last filled, and the mixer. Core takes three places: the
-| instructions just before the voices' filter loop (0x4009e07e), the call to
-| the voice mix (0x4009e0f6) and the call to the master stage (0x4009e146).
+| ring the codec last filled, and the mixer. Core takes two places: the
+| instructions just before the voices' filter loop (0x4009e07e) and the call
+| to the master stage (0x4009e146).
 |
 | A mod contributes a pointer to its owner record to the table core_audio.
 | A build may have several; the first one whose on is set has the output:
@@ -24,8 +23,10 @@
 |   +4 render  render(int32_t *out, const int32_t *in): in is the block's
 |              input, 32 frames L,R, Q1.31 (left first on a Keys too); out
 |              is 32 frames L,R, Q1.31, all of which render writes
-|   +8 flags   bit 0, CORE_AUDIO_MUTE_VOICES: skip the voices' filters and
-|              the voice mix as well
+|   +8 flags   bit 0, CORE_AUDIO_MUTE_VOICES: skip the voices' filters as
+|              well. The voice mix still runs: skipping it would leave a
+|              note that started meanwhile silent after the owner lets go,
+|              until its next note.
 | Each block, before the voices' filters, core takes the first record whose
 | on is set. While there is one, the master stage does not run: core hands
 | the owner the input and writes what it returns to the output and to the
@@ -71,14 +72,6 @@ core_voices_gate:
         bne.s   1f
         jmp     VOICES_LOOP
 1:      jmp     VOICES_DONE
-
-| 0x4009e0f6, the voice mix's call: the voice mix, unless the voices are muted.
-        .globl  core_render_vmix
-core_render_vmix:
-        tst.l   core_audio_mute
-        bne.s   1f
-        jmp     VMIX
-1:      rts
 
 | 0x4009e146, the master stage's call: the stock stage, or the owner's.
 |   4(sp) the output's half (32 frames L,R, 24-bit), 8(sp) the Keys' buffer's

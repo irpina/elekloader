@@ -680,8 +680,8 @@ their mix, the render (vector 191) calls its master stage (0x40096e14),
 which mixes the voices and the inputs, runs chorus, delay, reverb and the
 master drive, and writes the output and the USB block. In digikit's
 emulator that stage takes a third of every block (31.9% of the 166,667
-core cycles of a 667 us block at 250 MHz), and the voices' filters and mix
-another tenth (10.2%).
+core cycles of a 667 us block at 250 MHz), and the voices' filters another
+7.9%.
 
 A mod contributes to the table `core_audio` a pointer to a record (`struct
 core_audio_owner` in `digitone-mk1/core3.h`):
@@ -690,7 +690,7 @@ core_audio_owner` in `digitone-mk1/core3.h`):
 |---|---|---|
 | +0 | on | nonzero: the mod has the output from the next block on; set and cleared from the UI task |
 | +4 | render | `void render(int32_t *out, const int32_t *in)`: `in` is the block's input, 32 frames L,R in Q1.31 (the codec's 24 bits, left first on a Keys too); `render` writes all of `out`, 32 frames L,R in Q1.31 |
-| +8 | flags | `CORE_AUDIO_MUTE_VOICES` (1): skip the voices' filters and mix as well |
+| +8 | flags | `CORE_AUDIO_MUTE_VOICES` (1): skip the voices' filters as well |
 
 Each block, before the voices' filters, core takes the first record whose
 `on` is set, in the table's order. While there is one, the master stage
@@ -698,12 +698,15 @@ does not run: core hands the owner the input, and sends what it returns to
 the codec and to the USB block's main pair (the four effect buses silent,
 the inputs where the master stage puts them). On a Keys it also clears the
 Keys' second buffer at 0x80001000. With `CORE_AUDIO_MUTE_VOICES` the
-voices' filter loop and the voice mix are skipped too: the second CPU still
-renders FM, but nothing hears it and the main CPU does not pay for it. With
-no record on, every block is stock. `render` runs at interrupt level inside
+voices' filter loop is skipped too: the second CPU still renders FM, but
+nothing hears it and the main CPU does not filter it. The voice mix keeps
+running (2.3% of a block): skipping it would leave a note that started
+meanwhile silent after the owner lets go, until its next note. With no
+record on, every block is stock. `render` runs at interrupt level inside
 the render, which uses the EMAC: a mod that uses it leaves MACSR as it
-found it. In the emulator a render that skips all three leaves 14.2% of a
-block in use, so an owner has about 70,000 core cycles a block at stock's
+found it. In the emulator, with the factory pattern playing, the stock
+render takes 56.6% of a block and the render with THRU (below) owning the
+output 17.9%, so an owner has about 64,000 core cycles a block at stock's
 load. The emulator's tables assume zero-wait memory, so expect a unit to
 run slower.
 
@@ -731,10 +734,9 @@ it back. It names no firmware address, so its 1.44 port is empty:
 "resources": {"core": "3.2"}
 ```
 
-Core-dn1 3.2 owns three more sites: 0x4009e07e (`core_voices_gate`, by jmp
-over the 14 bytes before the voices' filter loop), 0x4009e0f6
-(`core_render_vmix`, by jsr) and 0x4009e146 (`core_render_master`, by jsr);
-in 1.44 they are 0x4009e09e, 0x4009e116 and 0x4009e166.
+Core-dn1 3.2 owns two more sites: 0x4009e07e (`core_voices_gate`, by jmp
+over the 14 bytes before the voices' filter loop) and 0x4009e146
+(`core_render_master`, by jsr); in 1.44 they are 0x4009e09e and 0x4009e166.
 
 The addresses in these sections are OS 1.43's. In 1.44 the same
 routines are there, unchanged but moved, and RAM is 0x1000 further on:

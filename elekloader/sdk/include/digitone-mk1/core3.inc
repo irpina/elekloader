@@ -27,4 +27,4 @@
         .equ    CORE_AUDIO_ON,     0             | nonzero: this mod has the output
         .equ    CORE_AUDIO_RENDER, 4             | render(out, in), each block
         .equ    CORE_AUDIO_FLAGS,  8
-        .equ    CORE_AUDIO_MUTE_VOICES, 1        | skip the voices' filters and mix too
+        .equ    CORE_AUDIO_MUTE_VOICES, 1        | skip the voices' filters too

@@ -81,9 +81,11 @@ extern volatile int32_t fw_tempo;               /* 3.2: the tempo x 120 (87.0 BP
  * drive) does not run. render(out, in) gets the block's input, 32 frames
  * L,R in Q1.31 (the codec's 24 bits, left first on a Keys too), and writes all 64 words of out, 32 frames
  * L,R in Q1.31: core sends them to the codec and to USB's main pair. With CORE_AUDIO_MUTE_VOICES the
- * voices' filters and mix are skipped too, so the synths are silent and cost the main CPU nothing (the
- * second CPU still renders them). Interrupt level, inside the render: keep it short, and keep MACSR as
- * it was if the EMAC is used. Set and clear on from the UI task; it takes effect at the next block. */
+ * voices' filters are skipped too, so the synths are silent and are not filtered (the second CPU still
+ * renders them, and the voice mix still runs: skipping it would leave a note that started meanwhile
+ * silent after the owner lets go, until its next note). Interrupt level, inside the render: keep it
+ * short, and keep MACSR as it was if the EMAC is used. Set and clear on from the UI task; it takes effect
+ * at the next block. */
 struct core_audio_owner {
     volatile int32_t on;            /* +0 nonzero: this mod has the output */
     void (*render)(int32_t *out, const int32_t *in);    /* +4 each block it has it */
