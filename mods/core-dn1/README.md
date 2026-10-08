@@ -143,3 +143,10 @@ while the other tracks stay FM ([../machines-dn1](../machines-dn1)). Its two
 new sites are the same code in 1.44 (the voices' site calls the routine
 it calls at its new address), and the setter's last step, `SOUND_LIVE`, was
 found again by its own code.
+
+3.2 was checked the same way on 1.43 and 1.44: every stage passes, every
+screen is identical, and the audio is identical up to PLAY. With THRU
+([../../examples/dn-thru](../../examples/dn-thru)) open while the factory
+pattern plays, the inputs reach the output at their own level and the FM
+does not; after NO the FM is back. Its three new sites are the same code
+in 1.44, 0x20 bytes later, as are the routines they call.
