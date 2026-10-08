@@ -164,9 +164,11 @@ unit yet.
 
 ## Not yet
 
-- Saving loops: they need +Drive files from a mod. The Digitakt's +Drive
-  calls (which digislicer uses) are not the same code in the Digitone, so
-  core-dn1 cannot offer them yet.
+- Saving loops. The Digitone's +Drive is not a file system but a fixed
+  store of slots (a project slot is 4 MB, the 128 of them from 256 MB on,
+  with other regions below and above), so a mod has no file to write, and
+  no part of the card is known to be free. Loops stay in memory and are
+  lost at power-off.
 - Program changes: the Microcosm recalls presets with them, but core-dn1
   has no event for them.
 - An expression pedal (the Digitone Keys has an input for one).
