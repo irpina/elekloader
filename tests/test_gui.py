@@ -156,9 +156,9 @@ def test_two_core_lines_a_first_run_takes_2_1_and_a_mod_that_needs_3_0_takes_3_0
     need(STOCK, 'ELEKLOADER_STOCK')
     mods = need(MODS, 'ELEKLOADER_MODS')
     files = [os.path.join(mods, n) for n in ('core-2.1.elemod', 'core-3.0.elemod',
-                                              'machine-pages-1.0.elemod')]
+                                              'machine-pages-1.1.elemod')]
     if not all(os.path.exists(f) for f in files):
-        raise Skip('ELEKLOADER_MODS lacks core-2.1, core-3.0 or machine-pages-1.0')
+        raise Skip('ELEKLOADER_MODS lacks core-2.1, core-3.0 or machine-pages-1.1')
     try:
         import tkinter as tk
         root = tk.Tk()
@@ -179,7 +179,7 @@ def test_two_core_lines_a_first_run_takes_2_1_and_a_mod_that_needs_3_0_takes_3_0
             mp = [p for p, d in w.descs.items() if d.get('id') == 'machine-pages'][0]
             w.toggle(mp)
             assert sorted(os.path.basename(p) for p in w.enabled) == [
-                'core-3.0.elemod', 'machine-pages-1.0.elemod']
+                'core-3.0.elemod', 'machine-pages-1.1.elemod']
             r = w.model.check(sorted(w.enabled))
             assert r['ok'], r
             w.toggle(mp)                            # off again: the core stays as chosen

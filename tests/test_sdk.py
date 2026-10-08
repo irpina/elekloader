@@ -268,7 +268,7 @@ def test_a_machine_in_c_describes_its_page():
             rc, r = lint_json(path, '--stock', stock(), '--with', CORE_21, '--with', mp)
             assert rc == 1 and set(r['problems']) == {
                 'pagetest 1.0 needs core 3.0 or newer, and this build has core 2.1',
-                'machine-pages 1.0 needs core 3.0 or newer, and this build has core 2.1'}, r['problems']
+                'machine-pages 1.1 needs core 3.0 or newer, and this build has core 2.1'}, r['problems']
         if STOCK_154 and os.path.exists(STOCK_154):
             path4, m4 = build.build(d, STOCK_154, tmp)
             assert path4.endswith('pagetest-1.0-os1.54.elemod')
@@ -279,6 +279,40 @@ def test_a_machine_in_c_describes_its_page():
             def sizes(x):
                 return {s: v.get('len', v.get('size')) for s, v in x['sections'].items()}
             assert sizes(a) == sizes(b) and a['relocs'] == b['relocs'] and a['symbols'] == b['symbols']
+
+
+def test_a_knob_that_draws_itself_needs_machine_pages_1_1():
+    """A page that names cm_ui_v31 may give a knob CM_DRAW and a draw function
+    in gfx's place (the same 40-byte knob). It imports cm_ui_v31, which only
+    machine-pages 1.1 and newer export, and links beside it."""
+    tc = devices.devices()[0].toolchain
+    if not shutil.which(os.environ.get('ELEKLOADER_CROSS', tc['prefix']) + 'gcc'):
+        raise Skip('no m68k cross compiler')
+    src = C_MACHINE.replace('.abi = cm_ui_v3,', '.abi = cm_ui_v31,').replace(
+        '[5] = { .look = 0x86 } },',
+        '[5] = { .look = 0x86, .flags = CM_DRAW, .draw = pg_draw } },').replace(
+        'static const struct cm_ui pg_page',
+        'static int32_t pg_draw(void *bmp, int32_t x, int32_t y, int32_t v, int32_t flag)\n'
+        '{ (void)flag; fw_fillrect(bmp, x + 1, y, x + 1 + (v >> 11), y + 16, 1); return 1; }\n'
+        'static const struct cm_ui pg_page')
+    with tempfile.TemporaryDirectory() as tmp:
+        d = os.path.join(tmp, 'drawtest')
+        os.makedirs(d)
+        with open(os.path.join(d, 'drawtest.c'), 'w') as fh:
+            fh.write(src)
+        with open(os.path.join(d, 'mod.json'), 'w') as fh:
+            json.dump({'id': 'drawtest', 'version': '1.0', 'device': 'digitakt-mk1', 'os': '1.53',
+                       'sources': ['drawtest.c'],
+                       'machines': [{'id': 30, 'descriptor': 'pg_machine'}],
+                       'subscribe': [{'event': 'ev_render_voices', 'fn': 'pg_render', 'order': 30}],
+                       'requires': ['core', 'machine-pages'], 'resources': {'core': '3.0'}}, fh)
+        path, m = build.build(d, stock(), tmp)
+        assert set(m.imports) == {'cm_ui_v31', 'fw_active_track', 'fw_fillrect', 'fw_voice_params'}
+        mp = machine_pages(stock(), tmp)
+        with open(mp) as fh:
+            assert json.load(fh)['version'] == '1.1'
+        rc, r = lint_json(path, '--stock', stock(), '--with', built_core(), '--with', mp)
+        assert rc == 0, r['problems']
 
 
 def test_the_sine_machine_example_builds_for_each_os_unchanged():

@@ -18,8 +18,10 @@
 #define PAGES       32                         /* added machines with a page; more get the stock page */
 #define LAY_LONGS   11
 
-/* The marker a page's abi names: a machine whose page reads this layout links only beside this mod. */
+/* The markers a page's abi names: a machine whose page reads this layout links only beside this mod. 3.1
+ * is 3 with knobs that draw their own graphic (CM_DRAW), which machine-pages 1.0 does not read. */
 const char cm_ui_v3[] = "machine-pages 3";
+const char cm_ui_v31[] = "machine-pages 3.1";
 
 struct page {
     int32_t id;
@@ -46,7 +48,7 @@ static void find(void)
     for (i = 0; core_machines[i] && npages < PAGES; i++) {
         const struct cm_machine *d = core_machines[i];
         const struct cm_ui *ui = (const struct cm_ui *)core_machine_ui(d->id);
-        if (!ui || ui->abi != cm_ui_v3 || ui->page_from > 3 || d->id <= 3)
+        if (!ui || (ui->abi != cm_ui_v3 && ui->abi != cm_ui_v31) || ui->page_from > 3 || d->id <= 3)
             continue;                          /* no page, or not one this mod reads */
         pages[npages].id = d->id;
         pages[npages].ui = ui;
@@ -134,16 +136,21 @@ uint32_t mp_pop_text(uint32_t id, int32_t value)
     return (uint32_t)pop;
 }
 
-/* The knob's graphic: [id, value] as given; the borrowed look's id, and the graphic's value. */
-void mp_knob(int32_t *a)
+/* The knob's graphic: a = its arguments from the id on, [id, value, flag, -, bmp, x, y]. -> nonzero when
+ * the machine drew it (CM_DRAW); else a holds the borrowed look's id and the graphic's value. */
+int32_t mp_knob(int32_t *a)
 {
     const struct cm_knob *k = page_knob((uint32_t)a[0]);
     if (!k)
-        return;
-    if (k->gfx)
+        return 0;
+    if ((k->flags & CM_DRAW) && page_now->ui->abi == cm_ui_v31) {
+        if (k->draw && k->draw((void *)a[4], a[5], a[6], a[1], a[2]))
+            return 1;
+    } else if (k->gfx)
         a[1] = k->gfx(a[1]);
     if (k->look)
         a[0] = k->look;
+    return 0;
 }
 
 uint32_t mp_look(uint32_t id)

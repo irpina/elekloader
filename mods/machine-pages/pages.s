@@ -93,17 +93,21 @@ mp_val_text_s:
         movem.l %d2-%d4/%a2-%a3, (%sp)
         jmp     VAL_TEXT_ON
 
-| 0x4000f2bc(obj, id, value, ...): a knob's graphic (was: lea -20(sp),sp ;
-| movem.l d2-d6,(sp)), by jmp. pages.c may give it another parameter's
-| graphic, and another value, in its arguments.
+| 0x4000f2bc(obj, id, value, flag, -, bmp, x, y): a knob's graphic (was:
+| lea -20(sp),sp ; movem.l d2-d6,(sp)), by jmp. pages.c may draw it with the
+| machine's own drawer (CM_DRAW), or give it another parameter's graphic, and
+| another value, in its arguments.
         .globl  mp_knob_gfx_s
 mp_knob_gfx_s:
-        pea     8(%sp)                  | -> [id, value]
-        jsr     mp_knob
+        pea     8(%sp)                  | -> [id, value, flag, -, bmp, x, y]
+        jsr     mp_knob                 | -> nonzero when the machine drew it
         addq.l  #4, %sp
+        tst.l   %d0
+        bne.s   9f
         lea     -20(%sp), %sp
         movem.l %d2-%d6, (%sp)
         jmp     KNOB_GFX_ON
+9:      rts
 
 | 0x40065794(id): a parameter's UI record, 84 bytes (how a turn moves it,
 | its text and graphic drawers) (was: move.l 4(sp),d1 ; cmpi.l #164,d1), by
