@@ -107,10 +107,11 @@ event (lower first; the shipped mods use 10-90).
 | `ev_hold` | Digitone mk1 only (core-dn1 2.2): a track key held on its own, UI task | `int f(void *brain, void *event, int track)` | return nonzero to take it; when none does, core opens the Mod Menu ("The Mod Menu" below) |
 | `ev_personalize` | Digitakt II only (core-dt2): SETTINGS > PERSONALIZE is built | `void f(void *menu)` | add a row with `core_additem(menu, row)`, after TRK SELECT; a row redraws the menu with `View::invalidate(menu + 0x38)`, as from SETTINGS; a checkbox is drawn as mods/core-dt2/README.md describes |
 | `ev_voice_on` | Digitone mk1 only (core-dn1 2.1): a voice starts a note, in the render | `void f(int voice, int track, void *event)` | interrupt level. The voice's pitch word (`0x41391f80` + 4 x voice, the note << 16) is already written and may be changed: the render reads it every block. The voice's sound and the step's locks load after this, so read the voice's parameters from `ev_render_out` |
+| `ev_midi_cc` | Digitone mk1 only (core-dn1 3.2): each MIDI CC the unit receives on a track's channel or the auto channel, before the stock applies it; the MIDI task | `int f(int track, int cc, int value, int flags)` | `track` 0-8 (with MIDI CONFIG's default channels, channels 1-9); a CC on the auto channel comes as the active track, with `flags` bit 0 (`CORE_MIDI_CC_AUTO`) set. Return nonzero to take it: the stock does not apply it. Only what MIDI CONFIG lets in arrives (PORT CONFIG > INPUT FROM). A mod that patches the CC router's entry, 0x400ed94e (Tone+FX), sees a CC before core |
 
 The events, their prototypes and their conventions are the same on every
-device; only the sites differ, and `ev_voice_on` exists on the Digitone
-only. The Digitakt II's core (mods/core-dt2 1.0) has `ev_tick`, `ev_draw`,
+device; only the sites differ, and `ev_voice_on` and `ev_midi_cc` exist on the
+Digitone only. The Digitakt II's core (mods/core-dt2 1.0) has `ev_tick`, `ev_draw`,
 `ev_key`, `ev_enc`, `ev_settings` and its own `ev_personalize`, and no
 render events: its audio
 renders on the DSP. It copies `.fast` code into SRAM itself, on the first
@@ -120,10 +121,10 @@ the tick site runs first). The sites core owns (do not patch them):
 - Digitakt mk1 1.53 and 1.54: 0x40000538, 0x4000a770, 0x4000a7d6,
   0x4000b770, 0x4000b7ba, 0x40058800, 0x40077428, 0x400784c8;
 - Digitone mk1 1.43: 0x40000538, 0x4001900c, 0x40019072, 0x40019d9c,
-  0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c, and from core-dn1 2.1
-  0x4009e928;
+  0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c, from core-dn1 2.1
+  0x4009e928 and from 3.2 0x400ed96e;
 - Digitone mk1 1.44: the same, but 0x40072a54, 0x4009d128 and 0x4009e53c
-  for the last three of the eight, and 0x4009e948;
+  for the last three of the eight, 0x4009e948 and 0x400edbe2;
 - Digitakt II 1.17: 0x40000538, 0x40032ad4, 0x40032b3a, 0x40033d94,
   0x40033dde, 0x400a5eac, 0x4009e2a2.
 

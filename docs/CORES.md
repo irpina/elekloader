@@ -67,7 +67,8 @@ ticked: there, untick the built-in one when you add a newer core.
   place of FM ([ADAPTING.md](ADAPTING.md), "Machines on the Digitone").
   From 3.2 a mod may take the whole output, with the synths silent, and
   keep large buffers in the profile's `bulk` area ([ADAPTING.md](ADAPTING.md),
-  "Exclusive audio").
+  "Exclusive audio"), and take MIDI CCs before the stock applies them
+  (`ev_midi_cc`).
 - **Digitakt II** ([mods/core-dt2](../mods/core-dt2)): the hook bus's tick,
   draw, key and encoder events, and rows in SETTINGS > PERSONALIZE.
 - **Octatrack** ([mods/core-ot](../mods/core-ot)): a source of its own. It

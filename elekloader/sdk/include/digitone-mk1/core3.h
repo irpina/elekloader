@@ -162,5 +162,12 @@ extern int32_t core_page_shown(void *brain, void *page);
 /* Core-dn1's own events, beside the hook bus's (docs/ADAPTING.md, "The hook bus"). */
 typedef void (*ev_voice_on_fn)(int32_t voice, int32_t track, void *event);  /* in the render */
 typedef int32_t (*ev_hold_fn)(void *brain, void *event, int32_t track);     /* nonzero: taken */
+/* 3.2: each MIDI CC the unit receives on a track's channel or the auto channel, before the stock applies
+ * it. track 0-8 (with MIDI CONFIG's default channels, channels 1-9); a CC on the auto channel comes as
+ * the active track, with CORE_MIDI_CC_AUTO in flags. cc and value 0-127. Nonzero takes it: the stock
+ * does not apply it. The MIDI task, not interrupt level. A mod that patches the router's entry
+ * (Tone+FX) sees a CC first. */
+#define CORE_MIDI_CC_AUTO  1u
+typedef int32_t (*ev_midi_cc_fn)(int32_t track, int32_t cc, int32_t value, int32_t flags);
 
 #endif

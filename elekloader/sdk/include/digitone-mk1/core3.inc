@@ -4,7 +4,7 @@
 | Assembly names the locations directly: fw_voice_pitch, fw_kit, fw_fillrect,
 | ... A mod that uses them needs core-dn1 3.0: "resources": {"core": "3.0"};
 | one that uses a 3.1 name (fw_voices, core_sound_set, ...) needs 3.1, and a
-| 3.2 one (fw_tempo, core_audio) 3.2.
+| 3.2 one (fw_tempo, core_audio, ev_midi_cc) 3.2.
 | The SDK puts this folder on the include path:
 |
 |       .include "digitone-mk1/core3.inc"
@@ -28,3 +28,4 @@
         .equ    CORE_AUDIO_RENDER, 4             | render(out, in), each block
         .equ    CORE_AUDIO_FLAGS,  8
         .equ    CORE_AUDIO_MUTE_VOICES, 1        | skip the voices' filters too
+        .equ    CORE_MIDI_CC_AUTO, 1             | ev_midi_cc's flags: on the auto channel
