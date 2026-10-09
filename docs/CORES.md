@@ -29,7 +29,8 @@ There is one core file per device and OS:
 | Digitone mk1, Digitone Keys | 1.43 | `core-dn1-3.2.elemod` | the [core-dn1-v3.2](https://github.com/irpina/elekloader/releases/tag/core-dn1-v3.2) pre-release, for mods that need the 3.x line |
 | Digitone mk1, Digitone Keys | 1.44 | `core-dn1-3.2-os1.44.elemod` | the same pre-release |
 | Digitakt II | 1.17 | `core-dt2-1.0.elemod` | not released yet: build it ([below](#building-a-core)) |
-| Octatrack MKI, MKII | 1.40C | `core-ot-0.1.elemod` | the latest release (v0.4.0); 0.3 is in this repository |
+| Octatrack MKI, MKII | 1.40C | `core-ot-0.1.elemod` | the latest release (v0.4.0) |
+| Octatrack MKI, MKII | 1.40C | `core-ot-0.3.elemod` | on main, not released yet (0.2, with the hook bus, is too) |
 
 From 3.0 the Digitakt mk1's core and the Digitone mk1's each have two
 lines, 2.x and 3.x, and a build takes the 3.x line only for a mod that
@@ -75,7 +76,8 @@ ticked: there, untick the built-in one when you add a newer core.
   draw, key and encoder events, and rows in SETTINGS > PERSONALIZE.
 - **Octatrack** ([mods/core-ot](../mods/core-ot)): a source of its own. It
   reserves RAM for mods, copies their code there, and from 0.2 has a hook
-  bus with the Octatrack's events. Beside it,
+  bus with the Octatrack's events; from 0.3 it reserves only the RAM the mods
+  use, at most 10 MB. Beside it,
   [mods/dspbus-ot](../mods/dspbus-ot) is an optional bus for mods' DSP code.
 
 ### The Digitone's Mod Menu

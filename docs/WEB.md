@@ -234,7 +234,9 @@ a secure context (https, or localhost).
 
 ## How long it takes
 
-Measured on one Windows 11 desktop PC, in Chromium, from a local server.
+Measured on one Windows 11 desktop PC, in Chromium, from a local server. The
+builds in the table are the cores of that time (core 2.1, core-dn1 2.0a, core
+0.1), not measured again since; a current build may differ.
 A build is `patch.build` plus `patch.save`; each figure is the median of
 three runs. CPython 3.14 is shown for comparison:
 
