@@ -52,11 +52,35 @@
       "sha256": "fb2af06001576c1ac1cf2c10e86be863866b612259344e79646b48e3ad8a08d5"
     },
     {
+      "repo": "irpina/elekloader", "tag": "core-dn1-v3.2", "file": "core-dn1-3.2.elemod", "kind": "core",
+      "device": "digitone-mk1",
+      "sha256": "999834c7fd2c62c65a05acfde3c815530cc7447898297e145540c84e545acfd3"
+    },
+    {
+      "repo": "irpina/elekloader", "tag": "core-dn1-v3.2", "file": "core-dn1-3.2-os1.44.elemod", "kind": "core",
+      "device": "digitone-mk1",
+      "sha256": "f2c6a28c3ff8c65d961afc78e87961b9378988d2d9b8b482f7033bc4362d08f6"
+    },
+    {
       "repo": "irpina/digitables", "tag": "v1.3", "file": "digitables-1.3.elemod",
       "device": "digitone-mk1", "needs_core": "2.2",
       "sha256": "a9a2335d0f0c80c17103062bb731a3560af5aca3b05b1b4650713dd273ca5511",
       "summary": "Pitch tables for every note: arpeggios, trills and riffs from one trig, and ADD steps that strum chords.",
       "on_unit": "Tested on a Digitone mk1 (3-4 Oct 2026): the TBL page, the table editor, the fast speeds, the Mod Menu and ADD steps. Not yet checked: the tables restored at power-up, and the arpeggiator with tables."
+    },
+    {
+      "repo": "irpina/digicosm", "tag": "v0.1", "file": "digicosm-0.1.elemod",
+      "device": "digitone-mk1", "needs_core": "3.2",
+      "sha256": "bac1184caf36f939e66891faae42d9187ac86efa1e5f72ce7f72fd4199fbb04e",
+      "summary": "A Microcosm-style effects engine for the audio inputs: eleven engines with four variations, a 60-second looper, Hold, Reverse and the Microcosm's MIDI CCs, on a page like the Digitone's own. The synths are silent while it is open.",
+      "on_unit": "Tested on a Digitone mk1 (Oct 2026): it runs and works. Also checked in digikit's emulator on OS 1.43 and 1.44. Not yet run on a Digitone Keys."
+    },
+    {
+      "repo": "irpina/digicosm", "tag": "v0.1", "file": "digicosm-0.1-os1.44.elemod",
+      "device": "digitone-mk1", "needs_core": "3.2",
+      "sha256": "012028c0b35447a45aaf7615a9cedb9e18f374a53ffa363b678ab4f1bf039d8b",
+      "summary": "A Microcosm-style effects engine for the audio inputs: eleven engines with four variations, a 60-second looper, Hold, Reverse and the Microcosm's MIDI CCs, on a page like the Digitone's own. The synths are silent while it is open.",
+      "on_unit": "Tested on a Digitone mk1 (Oct 2026): it runs and works. Also checked in digikit's emulator on OS 1.43 and 1.44. Not yet run on a Digitone Keys."
     },
     {
       "repo": "irpina/digineighbor", "tag": "v0.6", "file": "digineighbor-0.6.elemod",

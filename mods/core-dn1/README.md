@@ -129,8 +129,9 @@ python -m elekloader.lint mods/core-dn1/out/core-3.2-os1.44.elemod --stock Digit
 ```
 
 A release names them `core-dn1-3.2.elemod` and `core-dn1-3.2-os1.44.elemod`
-(3.0, 3.1 and 3.2 are not released yet);
-2.3's are on the [core-dn1-v2.3](https://github.com/irpina/elekloader/releases/tag/core-dn1-v2.3) pre-release.
+3.2's are on the [core-dn1-v3.2](https://github.com/irpina/elekloader/releases/tag/core-dn1-v3.2) pre-release
+(3.0 and 3.1 were not released), and
+2.3's on the [core-dn1-v2.3](https://github.com/irpina/elekloader/releases/tag/core-dn1-v2.3) pre-release.
 
 Checked by cold-booting it in digikit's emulator against stock (docs/DEVICES.md):
 - every stage passes, and every screen is identical;
