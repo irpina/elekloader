@@ -98,19 +98,38 @@ the Digitone needs it. On its own it changes nothing the unit does.
   3.1 keeps everything 2.3 and 3.0 have: their sites, tables, code paths
   and exports, so every 2.x and 3.0 mod links with it (`tests/test_sdk.py`
   checks it against the released 2.3). It adds two sites and two tables.
+- **From 3.2, exclusive audio** ([audio.s](audio.s); docs/ADAPTING.md,
+  "Exclusive audio"): a mod may take the whole output while it wants to.
+  Each block core takes the first record in the table `core_audio` whose
+  `on` is set. While there is one, the render's master stage (the inputs'
+  mix, chorus, delay, reverb and drive, called at 0x4009e146) does not run,
+  and the owner's `render(out, in)` gets the input and writes the output.
+  With `CORE_AUDIO_MUTE_VOICES` the voices' filter loop (0x4009e07e) is
+  skipped too, so the synths are silent. Also `fw_tempo`,
+  the tempo x 120, and the stock pages' fonts, `fw_font_label` and
+  `fw_font_title`, for a mod that draws a page of its own in their style. The profile's `bulk` area (0x44000000-0x47BE0000) holds
+  such mods' large buffers, as regions they claim.
+  [examples/dn-thru](../../examples/dn-thru) is the smallest such mod.
+- **From 3.2, `ev_midi_cc`** ([midi.s](midi.s)): each MIDI CC the unit
+  receives on a track's channel (1-9 by default) or the auto channel, as
+  `f(track, cc, value, flags)`, before the stock applies it; a handler
+  that returns nonzero takes it. The site is the CC router's track check
+  at 0x400ed96e (0x400edbe2 in 1.44), 32 bytes past the router's entry,
+  which Tone+FX patches: the two link together, and a CC Tone+FX lets
+  through comes to core next.
 - **OS 1.44:** every site has its port (`ports` in mod.json): the same
   code, moved, and RAM 0x1000 further on.
 
 Build it with the SDK (it needs m68k binutils):
 
 ```bash
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-3.1.elemod
-python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-3.1-os1.44.elemod
-python -m elekloader.lint mods/core-dn1/out/core-3.1-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/core-3.2.elemod
+python -m elekloader.sdk.build mods/core-dn1 --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/core-3.2-os1.44.elemod
+python -m elekloader.lint mods/core-dn1/out/core-3.2-os1.44.elemod --stock Digitone_and_Digitone_Keys_OS1.44.syx
 ```
 
-A release names them `core-dn1-3.1.elemod` and `core-dn1-3.1-os1.44.elemod`
-(3.0 and 3.1 are not released yet);
+A release names them `core-dn1-3.2.elemod` and `core-dn1-3.2-os1.44.elemod`
+(3.0, 3.1 and 3.2 are not released yet);
 2.3's are on the [core-dn1-v2.3](https://github.com/irpina/elekloader/releases/tag/core-dn1-v2.3) pre-release.
 
 Checked by cold-booting it in digikit's emulator against stock (docs/DEVICES.md):
@@ -132,3 +151,21 @@ while the other tracks stay FM ([../machines-dn1](../machines-dn1)). Its two
 new sites are the same code in 1.44 (the voices' site calls the routine
 it calls at its new address), and the setter's last step, `SOUND_LIVE`, was
 found again by its own code.
+
+3.2 was checked the same way on 1.43 and 1.44: every stage passes, every
+screen is identical, and the audio is identical up to PLAY. With THRU
+([../../examples/dn-thru](../../examples/dn-thru)) open while the factory
+pattern plays, the inputs reach the output at their own level and the FM
+does not; after NO the FM is back. Its two new sites are the same code
+in 1.44, 0x20 bytes later, as are the routines they call.
+
+`ev_midi_cc` was checked with CCs sent into the emulator's MIDI input on
+1.43 and 1.44, with a mod's handler that takes the CCs it maps: a CC it
+takes stops at core's site, and one it lets go, or any CC while it has
+nothing to take, goes on into the stock router. With the default
+channels, channels 1-9 came as tracks 0-8 (all nine on 1.43, 1 and 4 on
+1.44), the auto channel as the active track with `CORE_MIDI_CC_AUTO`,
+and channel 12, which no track uses, never reached the site. The site's
+six bytes and the router's exit are the same code in 1.44, 0x274 bytes
+later. Core 3.2 links beside Tone+FX 3.0a, which patches the router's
+entry.

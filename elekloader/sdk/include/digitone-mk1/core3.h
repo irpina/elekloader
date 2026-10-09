@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-/* core-dn1 3.0 and 3.1 for the Digitone mk1, in C: the firmware locations core exports, and core-dn1's
+/* core-dn1 3.0 to 3.2 for the Digitone mk1, in C: the firmware locations core exports, and core-dn1's
  * own tables and calls (docs/ADAPTING.md, "Firmware locations", "Parameter slots", "Mod pages", "Project
  * data", "The Mod Menu" and "Machines and stock parameters"). The SDK puts this folder on the include
  * path:
@@ -8,8 +8,8 @@
  *
  * Every fw_ name here is resolved by the linker against the core in the build, so a mod that uses only
  * these rebuilds for another OS version without a change (its port in mod.json is empty). Declaring one
- * makes the mod need core-dn1 3.0, or 3.1 for the names marked 3.1: say so with "resources": {"core":
- * "3.0"} (or "3.1"). digitone-mk1/core3.inc has the same for assembly. Functions that return a pointer
+ * makes the mod need core-dn1 3.0, or 3.1 or 3.2 for the names marked so: say so with "resources":
+ * {"core": "3.0"} (or "3.1", "3.2"). digitone-mk1/core3.inc has the same for assembly. Functions that return a pointer
  * are declared to return uint32_t: the firmware returns it in d0, where gcc for m68k looks in a0. */
 #ifndef ELEKLOADER_DIGITONE_MK1_CORE3_H
 #define ELEKLOADER_DIGITONE_MK1_CORE3_H
@@ -54,6 +54,8 @@ extern void fw_fillrect(void *bmp, int32_t x0, int32_t y0, int32_t x1, int32_t y
 extern void fw_framerect(void *bmp, int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t colour);
 extern int32_t fw_textf(void *bmp, const void *font, int32_t x, int32_t y, int32_t maxlen, const char *fmt, ...);
 extern const char fw_font5[];
+extern const char fw_font_label[];             /* 3.2: the stock pages' labels (FREQ, RESO), capitals 4 x 5 */
+extern const char fw_font_title[];             /* 3.2: their title bar (Amplitude (1/2)), 6 pixels */
 extern void fw_blit(void *dst, const void *src, int32_t x, int32_t y, int32_t centre);
 extern uint32_t fw_op_new(uint32_t size);       /* the firmware's heap; 0 when it is full */
 extern volatile int32_t fw_active_track;        /* 3.1: the active track, 0-3 the synth tracks */
@@ -69,6 +71,28 @@ extern volatile uint32_t fw_gate_on;            /* bit v: voice v started in the
  * write any voice's 32 samples, which are then that voice's sound through its filter and the mix. The
  * DSP applies the amp envelope before its output: what is written here has none. Interrupt level. */
 typedef void (*ev_render_voices_fn)(int32_t *voices);
+
+/* ---- 3.2: exclusive audio (core_audio) ------------------------------------------------------------ */
+extern volatile int32_t fw_tempo;               /* 3.2: the tempo x 120 (87.0 BPM: 10440), as the sequencer
+                                                   runs it; the timeline moves twice this every block */
+#define CORE_AUDIO_MUTE_VOICES  1u
+/* A mod that wants the whole output contributes a pointer to one of these to the table core_audio and
+ * may have its buffers in the profile's bulk area (a region it claims). A build may hold several such
+ * mods: each block, before the voices' filters, core takes the first record whose on is set (the table's
+ * order), and while there is one, the render's master stage (the inputs' mix, chorus, delay, reverb and
+ * drive) does not run. render(out, in) gets the block's input, 32 frames
+ * L,R in Q1.31 (the codec's 24 bits, left first on a Keys too), and writes all 64 words of out, 32 frames
+ * L,R in Q1.31: core sends them to the codec and to USB's main pair. With CORE_AUDIO_MUTE_VOICES the
+ * voices' filters are skipped too, so the synths are silent and are not filtered (the second CPU still
+ * renders them, and the voice mix still runs: skipping it would leave a note that started meanwhile
+ * silent after the owner lets go, until its next note). Interrupt level, inside the render: keep it
+ * short, and keep MACSR as it was if the EMAC is used. Set and clear on from the UI task; it takes effect
+ * at the next block. */
+struct core_audio_owner {
+    volatile int32_t on;            /* +0 nonzero: this mod has the output */
+    void (*render)(int32_t *out, const int32_t *in);    /* +4 each block it has it */
+    uint32_t flags;                 /* +8 CORE_AUDIO_MUTE_VOICES */
+} __attribute__((aligned(4)));
 
 /* ---- core-dn1's tables (core 2.1-2.3): what a mod contributes points to one of these ------------ */
 struct core_param {                 /* core_params: parameter slots 182-184 */
@@ -140,5 +164,12 @@ extern int32_t core_page_shown(void *brain, void *page);
 /* Core-dn1's own events, beside the hook bus's (docs/ADAPTING.md, "The hook bus"). */
 typedef void (*ev_voice_on_fn)(int32_t voice, int32_t track, void *event);  /* in the render */
 typedef int32_t (*ev_hold_fn)(void *brain, void *event, int32_t track);     /* nonzero: taken */
+/* 3.2: each MIDI CC the unit receives on a track's channel or the auto channel, before the stock applies
+ * it. track 0-8 (with MIDI CONFIG's default channels, channels 1-9); a CC on the auto channel comes as
+ * the active track, with CORE_MIDI_CC_AUTO in flags. cc and value 0-127. Nonzero takes it: the stock
+ * does not apply it. The MIDI task, not interrupt level. A mod that patches the router's entry
+ * (Tone+FX) sees a CC first. */
+#define CORE_MIDI_CC_AUTO  1u
+typedef int32_t (*ev_midi_cc_fn)(int32_t track, int32_t cc, int32_t value, int32_t flags);
 
 #endif

@@ -92,7 +92,7 @@ export const DIGITONE_MK1: Device = {
       'fce648a97c6c5d93b961732e8f8db6b02e0820c6d344c7e2131fa05a4b3168e4', 2736304),
   ],
   stage: 0x40200000, flashAt: 0x80000, flashLimit: 0x380000,
-  areas: { ddr: [0x47be0000, 0x47c00000] },
+  areas: { ddr: [0x47be0000, 0x47c00000], bulk: [0x44000000, 0x47be0000] },
   ddr: [0x47be0000, 0x47c00000],
   recovery: 'hold FUNC while powering on for the startup menu, press TRIG 4 (OS UPGRADE), then send the stock .syx',
 }

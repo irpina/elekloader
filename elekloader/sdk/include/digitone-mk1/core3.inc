@@ -1,9 +1,10 @@
 | SPDX-License-Identifier: GPL-2.0-or-later
-| core-dn1 3.0 and 3.1 for the Digitone mk1, in assembly: the layouts that go
+| core-dn1 3.0 to 3.2 for the Digitone mk1, in assembly: the layouts that go
 | with the firmware locations core exports (core3.h has the same in C).
 | Assembly names the locations directly: fw_voice_pitch, fw_kit, fw_fillrect,
 | ... A mod that uses them needs core-dn1 3.0: "resources": {"core": "3.0"};
-| one that uses a 3.1 name (fw_voices, core_sound_set, ...) needs 3.1.
+| one that uses a 3.1 name (fw_voices, core_sound_set, ...) needs 3.1, and a
+| 3.2 one (fw_tempo, core_audio, ev_midi_cc) 3.2.
 | The SDK puts this folder on the include path:
 |
 |       .include "digitone-mk1/core3.inc"
@@ -22,3 +23,9 @@
         .equ    FW_PARAM_REC,     60            | fw_params + 60 id: a parameter record
         .equ    FW_UI_REC,        84            | fw_uirecs + 84 id: its UI record
         .equ    CORE_LOOK_NONE,   -1            | core_param_ui_make's look: id 0's ('none')
+| 3.2: a core_audio record (core3.h, struct core_audio_owner)
+        .equ    CORE_AUDIO_ON,     0             | nonzero: this mod has the output
+        .equ    CORE_AUDIO_RENDER, 4             | render(out, in), each block
+        .equ    CORE_AUDIO_FLAGS,  8
+        .equ    CORE_AUDIO_MUTE_VOICES, 1        | skip the voices' filters too
+        .equ    CORE_MIDI_CC_AUTO, 1             | ev_midi_cc's flags: on the auto channel

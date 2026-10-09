@@ -1,0 +1,22 @@
+{
+ "id": "dnthru", "version": "1.0",
+ "license": "GPL-2.0-or-later",
+ "title": "THRU (Digitone exclusive audio)", "category": "Sound", "author": "irpina",
+ "description": "THRU, the smallest exclusive-audio mod for the Digitone mk1: THRU in core-dn1's Mod Menu (hold a track key) gives it the output, and the audio inputs go straight there at knob A's level while the synths are silent; NO gives the output back. A template for a mod that wants the whole audio engine: it names no firmware address, so its OS 1.44 port is empty (docs/ADAPTING.md, \"Exclusive audio\"). Needs core-dn1 3.2.",
+ "device": "digitone-mk1", "os": "1.43",
+ "ports": {"1.44": {}},
+ "sources": ["thru.c"],
+ "subscribe": [
+  {"event": "ev_key", "fn": "thru_key", "order": 50},
+  {"event": "ev_enc", "fn": "thru_enc", "order": 50},
+  {"event": "ev_draw", "fn": "thru_draw", "order": 50}
+ ],
+ "contribute": [
+  {"to": "core_menu", "order": 50, "data": "00000000",
+   "relocs": [[0, "abs32", "sym:thru_menu", 0]]},
+  {"to": "core_audio", "order": 50, "data": "00000000",
+   "relocs": [[0, "abs32", "sym:thru_owner", 0]]}
+ ],
+ "resources": {"core": "3.2"},
+ "requires": ["core"]
+}

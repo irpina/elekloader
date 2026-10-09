@@ -49,6 +49,11 @@
 |   fw_active_track  0x41367ce0  the active track (a long), 0-3 the synth tracks
 |   fw_params        0x4018d104  the parameter records, 60 bytes an id
 |   fw_uirecs        0x4136b9fc  their UI records, 84 bytes an id
+| From 3.2:
+|   fw_tempo         0x40241c94  the tempo x 120 (87.0 BPM: 10440), a long: the
+|                                timeline moves twice this every block
+|   fw_font_label    0x4022eb58  the stock pages' labels' font: capitals 4 x 5
+|   fw_font_title    0x4022dc88  their title bar's: 6 pixels, upper and lower case
 
         .macro  FW name, value
         .globl  \name
@@ -84,3 +89,6 @@
         FW      fw_active_track, FW_ACTIVE_TRACK
         FW      fw_params, PARAMS
         FW      fw_uirecs, UIRECS
+        FW      fw_tempo, FW_TEMPO
+        FW      fw_font_label, FONT_LABEL
+        FW      fw_font_title, FONT_TITLE

@@ -34,6 +34,14 @@ the DDR area, so what follows holds for both:
   mapped.
 - No .fast area: the free SRAM (0x800058F0-0x80008000, zero in the same
   run) is not claimed yet.
+- A second area for mods' large buffers, 'bulk': 0x44000000-0x47BE0000
+  (about 60 MB), between the highest DDR the code names (0x43EA72C8) and
+  the mods' own area. Nothing places code or data there: a mod claims a
+  piece as a region (resources.regions, fixed addresses the linker keeps
+  apart) and uses it at run time. The OS never clears it, so its contents
+  at power-on are whatever the DDR holds: a mod clears what it reads before
+  it has written it. Checked in digikit on 1.43 and 1.44 with a mod's 26 MB
+  of buffers there (a looper and an input history, recording and playing).
 """
 from . import Device, Release
 
@@ -62,6 +70,7 @@ DEVICE = Device(
     isa='coldfire',
     areas={
         'ddr': (0x47BE0000, 0x47C00000),          # below the stack's page, above anything the OS uses
+        'bulk': (0x44000000, 0x47BE0000),         # large buffers, claimed as regions (above)
     },
     ddr=(0x47BE0000, 0x47C00000),
     recovery=('hold FUNC while powering on for the startup menu, press TRIG 4 (OS UPGRADE), '

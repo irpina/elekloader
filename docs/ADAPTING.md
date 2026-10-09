@@ -107,10 +107,11 @@ event (lower first; the shipped mods use 10-90).
 | `ev_hold` | Digitone mk1 only (core-dn1 2.2): a track key held on its own, UI task | `int f(void *brain, void *event, int track)` | return nonzero to take it; when none does, core opens the Mod Menu ("The Mod Menu" below) |
 | `ev_personalize` | Digitakt II only (core-dt2): SETTINGS > PERSONALIZE is built | `void f(void *menu)` | add a row with `core_additem(menu, row)`, after TRK SELECT; a row redraws the menu with `View::invalidate(menu + 0x38)`, as from SETTINGS; a checkbox is drawn as mods/core-dt2/README.md describes |
 | `ev_voice_on` | Digitone mk1 only (core-dn1 2.1): a voice starts a note, in the render | `void f(int voice, int track, void *event)` | interrupt level. The voice's pitch word (`0x41391f80` + 4 x voice, the note << 16) is already written and may be changed: the render reads it every block. The voice's sound and the step's locks load after this, so read the voice's parameters from `ev_render_out` |
+| `ev_midi_cc` | Digitone mk1 only (core-dn1 3.2): each MIDI CC the unit receives on a track's channel or the auto channel, before the stock applies it; the MIDI task | `int f(int track, int cc, int value, int flags)` | `track` 0-8 (with MIDI CONFIG's default channels, channels 1-9); a CC on the auto channel comes as the active track, with `flags` bit 0 (`CORE_MIDI_CC_AUTO`) set. Return nonzero to take it: the stock does not apply it. Only what MIDI CONFIG lets in arrives (PORT CONFIG > INPUT FROM). A mod that patches the CC router's entry, 0x400ed94e (Tone+FX), sees a CC before core |
 
 The events, their prototypes and their conventions are the same on every
-device; only the sites differ, and `ev_voice_on` exists on the Digitone
-only. The Digitakt II's core (mods/core-dt2 1.0) has `ev_tick`, `ev_draw`,
+device; only the sites differ, and `ev_voice_on` and `ev_midi_cc` exist on the
+Digitone only. The Digitakt II's core (mods/core-dt2 1.0) has `ev_tick`, `ev_draw`,
 `ev_key`, `ev_enc`, `ev_settings` and its own `ev_personalize`, and no
 render events: its audio
 renders on the DSP. It copies `.fast` code into SRAM itself, on the first
@@ -120,10 +121,10 @@ the tick site runs first). The sites core owns (do not patch them):
 - Digitakt mk1 1.53 and 1.54: 0x40000538, 0x4000a770, 0x4000a7d6,
   0x4000b770, 0x4000b7ba, 0x40058800, 0x40077428, 0x400784c8;
 - Digitone mk1 1.43: 0x40000538, 0x4001900c, 0x40019072, 0x40019d9c,
-  0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c, and from core-dn1 2.1
-  0x4009e928;
+  0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c, from core-dn1 2.1
+  0x4009e928 and from 3.2 0x400ed96e;
 - Digitone mk1 1.44: the same, but 0x40072a54, 0x4009d128 and 0x4009e53c
-  for the last three of the eight, and 0x4009e948;
+  for the last three of the eight, 0x4009e948 and 0x400edbe2;
 - Digitakt II 1.17: 0x40000538, 0x40032ad4, 0x40032b3a, 0x40033d94,
   0x40033dde, 0x400a5eac, 0x4009e2a2.
 
@@ -297,8 +298,11 @@ line stays on 2.3.
 | `fw_gate_on` (3.1) | 0x80001f70 | the same | bit v: voice v started in the last block |
 | `fw_active_track` (3.1) | 0x41367ce0 | 0x41368ce0 | the active track, 0-3 the synth tracks |
 | `fw_params`, `fw_uirecs` (3.1) | 0x4018d104, 0x4136b9fc | 0x4018d454, 0x4136c9fc | the parameter records (60 bytes an id) and their UI records (84 bytes an id) |
+| `fw_tempo` (3.2) | 0x40241c94 | 0x40242094 | the tempo the sequencer runs at, x 120 (87.0 BPM: 10440); the timeline moves twice this every block |
+| `fw_font_label`, `fw_font_title` (3.2) | 0x4022eb58, 0x4022dc88 | 0x4022ef58, 0x4022e088 | the stock parameter pages' fonts, for `fw_textf`: their labels (FREQ, RESO; capitals 4 x 5) and their title bar (6 pixels, upper and lower case); `fw_font5` is the 3 x 5 one their value boxes use |
 
-A name marked 3.1 needs core-dn1 3.1 (`"resources": {"core": "3.1"}`).
+A name marked 3.1 or 3.2 needs that core-dn1 (`"resources": {"core": "3.1"}`,
+or `"3.2"`).
 
 Each 1.44 value was found by the code that uses it, which is the same in
 both versions but for the addresses in it. A routine was found by its own
@@ -669,6 +673,72 @@ down. It names no firmware address, so its 1.44 port is empty:
 
 The machines mod claims sound slot 0 as the resource `soundslot:0`; what it
 does not do yet is in its README.
+
+### Exclusive audio (core-dn1 3.2, Digitone mk1)
+
+A mod can take the whole output: the audio inputs in, and everything the
+Digitone plays out, with the synths silent. After the voices' filters and
+their mix, the render (vector 191) calls its master stage (0x40096e14),
+which mixes the voices and the inputs, runs chorus, delay, reverb and the
+master drive, and writes the output and the USB block. In digikit's
+emulator that stage takes a third of every block (31.9% of the 166,667
+core cycles of a 667 us block at 250 MHz), and the voices' filters another
+7.9%.
+
+A mod contributes to the table `core_audio` a pointer to a record (`struct
+core_audio_owner` in `digitone-mk1/core3.h`):
+
+| offset | field | |
+|---|---|---|
+| +0 | on | nonzero: the mod has the output from the next block on; set and cleared from the UI task |
+| +4 | render | `void render(int32_t *out, const int32_t *in)`: `in` is the block's input, 32 frames L,R in Q1.31 (the codec's 24 bits, left first on a Keys too); `render` writes all of `out`, 32 frames L,R in Q1.31 |
+| +8 | flags | `CORE_AUDIO_MUTE_VOICES` (1): skip the voices' filters as well |
+
+Each block, before the voices' filters, core takes the first record whose
+`on` is set, in the table's order. While there is one, the master stage
+does not run: core hands the owner the input, and sends what it returns to
+the codec and to the USB block's main pair (the four effect buses silent,
+the inputs where the master stage puts them). On a Keys it also clears the
+Keys' second buffer at 0x80001000. With `CORE_AUDIO_MUTE_VOICES` the
+voices' filter loop is skipped too: the second CPU still renders FM, but
+nothing hears it and the main CPU does not filter it. The voice mix keeps
+running (2.3% of a block): skipping it would leave a note that started
+meanwhile silent after the owner lets go, until its next note. With no
+record on, every block is stock. `render` runs at interrupt level inside
+the render, which uses the EMAC: a mod that uses it leaves MACSR as it
+found it. In the emulator, with the factory pattern playing, the stock
+render takes 56.6% of a block and the render with THRU (below) owning the
+output 17.9%, so an owner has about 64,000 core cycles a block at stock's
+load. The emulator's tables assume zero-wait memory, so expect a unit to
+run slower.
+
+A build may hold several such mods, and their buffers can be large. The
+Digitone profile has an area for them, `bulk` (0x44000000-0x47BE0000,
+about 60 MB), which the OS never touches and never clears. A mod claims
+its piece as a region, so the linker keeps two mods' buffers apart:
+
+```json
+"resources": {"core": "3.2",
+              "regions": [{"name": "my buffers", "lo": "0x44000000", "hi": "0x44400000"}]}
+```
+
+It clears what it reads before it has written it. `fw_tempo` (3.2) is the
+tempo the sequencer runs at, x 120: a mod in time with the Digitone takes
+its grid from it and from `fw_timeline`.
+
+`examples/dn-thru` is the smallest such mod. THRU in the Mod Menu takes
+the output, and the inputs go straight to it at knob A's level; NO gives
+it back. It names no firmware address, so its 1.44 port is empty:
+
+```json
+"contribute": [{"to": "core_audio", "order": 50, "data": "00000000",
+                "relocs": [[0, "abs32", "sym:thru_owner", 0]]}],
+"resources": {"core": "3.2"}
+```
+
+Core-dn1 3.2 owns two more sites: 0x4009e07e (`core_voices_gate`, by jmp
+over the 14 bytes before the voices' filter loop) and 0x4009e146
+(`core_render_master`, by jsr); in 1.44 they are 0x4009e09e and 0x4009e166.
 
 The addresses in these sections are OS 1.43's. In 1.44 the same
 routines are there, unchanged but moved, and RAM is 0x1000 further on:
