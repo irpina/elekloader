@@ -49,7 +49,7 @@ both).
 
 | CC | | CC | |
 |---|---|---|---|
-| 5 | Subdivision (Time) | 17, 18 | Loop Speed (FUNC + F) |
+| 5 | Subdivision (Time), in steps: 0-5 | 18 | Loop Speed in steps: 0-5 |
 | 6 | Activity (A) | 19 | Mod Depth (FUNC + B) |
 | 7 | Shape (C) | 20 | Space type (FUNC + G) |
 | 8 | Filter (D) | 21 | Loop Fade (FUNC + H) |
@@ -61,11 +61,19 @@ both).
 | 14 | Mod Rate (FUNC + C) | 31 | Stop |
 | 15 | Resonance (FUNC + D) | 34, 35 | Erase, undo |
 | 16 | Effect Volume (FUNC + E) | 48 | Hold: on from 64 |
-| | | 102 | Bypass below 64, on from 64 |
+| 17 | Loop Speed (FUNC + F) | 102 | Bypass below 64, on from 64 |
 
-The looper's CCs act on a value of 64 or more. Program changes (the
-Microcosm's preset recall) are not mapped: core-dn1 passes DigiCosm the
-CCs only.
+CC 5 and CC 18 take the Microcosm's steps, 0 to 5: 1/4, 1/2, TAP, 2x, 4x
+and 8x (anything above 5 as 8x). The six subdivisions are DigiCosm's six
+Time steps, a bar down to 1/32; the loop speeds are its five, 1/4X to 4X,
+with 8x as 4X. The looper's CCs act on a value of 64 or more.
+
+CC 22 (looper on/off), 45 and 46 (copy and save preset) and 93 (tap tempo)
+have nothing to do here: the looper is always on, presets are saved from
+SETUP and the tempo is the Digitone's. DigiCosm takes them anyway while it
+is open, so they don't change the active track's sound. Program changes (the
+Microcosm's preset recall) are not mapped: core-dn1 passes DigiCosm the CCs
+only.
 
 ## Engines
 
@@ -153,9 +161,10 @@ unit yet.
   project beside digitables' tables.
 - **MIDI.** CCs sent into the emulator's MIDI input on 1.43 and 1.44: while
   the page is open, the mapped ones on the auto channel set DigiCosm (the
-  knobs, FUNC's knobs, Reverse, Hold, Bypass, SETUP's rows, and the looper
+  knobs, CC 5 and 18 in the Microcosm's steps, FUNC's knobs, Reverse, Hold,
+  Bypass, SETUP's rows, and the looper
   through record, play, overdub, stop and erase) and do not reach the
-  Digitone's own CC handling; an unmapped CC, a CC on a track's channel (with
+  Digitone's own CC handling, nor do CC 22, 45, 46 and 93; an unmapped CC, a CC on a track's channel (with
   AUTO CH) and every CC while the page is closed go on to it. With ANY CH a
   track's channel works too.
 - **The Digitone Keys.** With the Keys bit set in the emulator, core-dn1 3.2

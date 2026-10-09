@@ -301,10 +301,15 @@ int dcosm_enc(void *brain, void *ev)
 /* ---- MIDI: the Microcosm's CC map (core-dn1 3.2's ev_midi_cc, the MIDI task) -------------------------------
  * While the page is open, the CCs below are DigiCosm's when they come on the auto channel (SETUP's MIDI CC:
  * ANY CH, on a track's channel too): the Digitone does not apply them. Every other CC, and every CC while
- * the page is closed, goes on to the Digitone. A switch is on from 64; a looper CC acts from 64. */
+ * the page is closed, goes on to the Digitone. A switch is on from 64; a looper CC acts from 64. CC 5 and
+ * CC 18 take the Microcosm's steps, 0-5: 1/4, 1/2, TAP, 2x, 4x, 8x (and anything above as 8x). Its six
+ * subdivisions are DigiCosm's six TIME steps, a bar down to 1/32; its loop speeds are DigiCosm's five, 8x
+ * as 4x. */
 static const u8 cc_knob[8] = { K_ACT, K_SHP, K_FLT, K_MIX, K_TIME, K_REP, K_SPC, K_LOOP };          /* CC 6-13 */
 static const u8 cc_shift[8] = { S_MRATE, S_RESO, S_FXVOL, S_LSPEED, S_LSPEED, S_MDEP, S_VERB, S_FADE }; /* 14-21 */
 static const u8 cc_cfg[4] = { G_PRE, G_ONLY, G_BURST, G_QUANT };                                    /* 24-27 */
+static const u8 cc_time[6] = { 10, 32, 53, 74, 96, 117 };       /* CC 5: the middle of each TIME step */
+static const u8 cc_lspeed[6] = { 12, 38, 64, 89, 115, 115 };    /* CC 18: of each LSPD step */
 
 int dcosm_cc(int track, int cc, int value, int flags)
 {
@@ -314,11 +319,13 @@ int dcosm_cc(int track, int cc, int value, int flags)
         return 0;
     if (value < 0 || value > 127)
         return 0;
-    if (cc == 5) {                              /* Subdivision */
-        dcosm.knob[K_TIME] = (u8)value;
+    if (cc == 5) {                              /* Subdivision, stepped */
+        dcosm.knob[K_TIME] = cc_time[value < 5 ? value : 5];
+    } else if (cc == 18) {                      /* Loop Speed, stepped */
+        dcosm.shift[S_LSPEED] = cc_lspeed[value < 5 ? value : 5];
     } else if (cc >= 6 && cc <= 13) {
         dcosm.knob[cc_knob[cc - 6]] = (u8)value;
-    } else if (cc >= 14 && cc <= 21) {          /* 17 Loop Speed, 18 its stepped twin: the same steps here */
+    } else if (cc >= 14 && cc <= 21) {          /* 17 is Loop Speed, 0-127 */
         dcosm.shift[cc_shift[cc - 14]] = (u8)value;
     } else if (cc == 23 || cc == 47) {          /* Reverse */
         dcosm.reverse = (u8)on;
@@ -343,6 +350,10 @@ int dcosm_cc(int track, int cc, int value, int flags)
         dcosm.hold = (u8)on;
     } else if (cc == 102) {                     /* Bypass: below 64 bypassed */
         dcosm.bypass = (u8)!on;
+    } else if (cc == 22 || cc == 45 || cc == 46 || cc == 93) {
+        /* the Microcosm's looper on/off, copy preset, save preset and tap tempo: nothing to do here (the
+         * looper is always on, presets are saved from SETUP, the tempo is the Digitone's), but taken, so
+         * the Digitone does not apply them to the active track meanwhile */
     } else {
         return 0;
     }
