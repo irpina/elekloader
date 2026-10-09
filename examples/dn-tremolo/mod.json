@@ -1,0 +1,17 @@
+{
+ "id": "dntrem", "version": "1.0",
+ "license": "GPL-2.0-or-later",
+ "title": "TREMOLO (Digitone insert audio)", "category": "Effect", "author": "irpina",
+ "description": "TREMOLO, the smallest insert-audio mod for the Digitone mk1: TREMOLO in core-dn1's Mod Menu (hold a track key) turns a 4 Hz tremolo on everything the Digitone plays on, and picking it again turns it off; every key, knob and screen stays the Digitone's. A template for an effect on the Digitone's output: it names no firmware address, so its OS 1.44 port is empty (docs/ADAPTING.md, \"Insert audio\"). Needs core-dn1 3.3.",
+ "device": "digitone-mk1", "os": "1.43",
+ "ports": {"1.44": {}},
+ "sources": ["trem.c"],
+ "contribute": [
+  {"to": "core_menu", "order": 50, "data": "00000000",
+   "relocs": [[0, "abs32", "sym:trem_menu", 0]]},
+  {"to": "core_audio", "order": 70, "data": "00000000",
+   "relocs": [[0, "abs32", "sym:trem_owner", 0]]}
+ ],
+ "resources": {"core": "3.3"},
+ "requires": ["core"]
+}
