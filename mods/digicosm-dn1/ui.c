@@ -2,11 +2,13 @@
 /* DigiCosm's UI: its Mod Menu entry, its screen, its keys and knobs, its project data. While it is open it
  * owns the output (dcosm_owner.on) and the screen; NO gives both back.
  *
- *   knobs A-H        ACT REP SHP FLT / MIX TIME SPC LOOP;  FUNC + a knob: GAIN MDEP MRAT RESO / FXVL LSPD
- *                    VERB FADE;  pushing a knob: its default
+ *   three pages, as the Digitone's own (LEFT, RIGHT or PAGE moves between them):
+ *     1 EFFECT  ACT REP SHP FLT / MIX TIME SPC LOOP        pushing a knob: its default
+ *     2 SHIFT   GAIN MDEP MRAT RESO / FXVL LSPD VERB FADE  (also FUNC + a knob on page 1)
+ *     3 LOOPER  HOLD REV BYP - / LOOP STOP UNDO CLR        turn A-C for off/on, push to toggle or act
  *   trig keys 1-11   the engines; 12 HOLD; 13-16 the variation, A-D
- *   T1 the looper: record, play, overdub (held: undo);  T2 stop (held: erase);  T3 reverse;  T4 bypass
- *   YES SETUP, NO back (from the main page: close);  PLAY, STOP, RECORD, TEMPO and LEVEL/DATA stay stock
+ *   T1 the looper: record, play, overdub (held: undo);  T2 stop (held: erase), as the Microcosm's footswitches
+ *   YES SETUP, NO back (from a page: close);  PLAY, STOP, RECORD, TEMPO and LEVEL/DATA stay stock
  *   presets: in SETUP a trig key saves the page as that preset (1-16); FUNC + a trig key recalls one
  *   MIDI: the Microcosm's CCs, on the auto channel (or any, in SETUP), while the page is open */
 #pragma GCC optimize ("no-tree-loop-distribute-patterns")
@@ -23,6 +25,7 @@
 #define KEY_DOWN    16
 #define KEY_LEFT    17
 #define KEY_RIGHT   18
+#define KEY_PAGE    19
 #define KEY_STEP1   26
 #define KEY_T1      42
 #define KEY_PUSH_A  46
@@ -36,7 +39,9 @@ typedef void (*text_fn)(void *bmp, const void *font, int x, int y, int maxlen, c
 #define FILLRECT  ((rect_fn)fw_fillrect)
 #define FRAMERECT ((rect_fn)fw_framerect)
 #define TEXTF     ((text_fn)fw_textf)
-#define FONT5     ((const void *)fw_font5)
+#define FONT5     ((const void *)fw_font5)          /* 3 x 5: the stock value boxes' */
+#define FONT_LBL  ((const void *)fw_font_label)     /* the stock labels' */
+#define FONT_TTL  ((const void *)fw_font_title)     /* the stock title bar's */
 
 static const u8 knob_def[8] = { 64, 64, 0, 127, 64, 48, 32, 100 };
 static const u8 shift_def[8] = { 64, 0, 40, 0, 100, 64, 0, 30 };
@@ -46,13 +51,17 @@ static const char *const shapes[4] = { "FLAT", "SWEL", "PERC", "ARCH" };
 static const char *const times[6] = { "BAR", "1/2", "1/4", "1/8", "1/16", "1/32" };
 static const char *const speeds[5] = { "1/4X", "1/2X", "1X", "2X", "4X" };
 static const char *const rooms[4] = { "ROOM", "DARK", "HALL", "AMBI" };
+static const char *const eng_title[E_COUNT] = { "Mosaic", "Seq", "Glide", "Haze", "Tunnel", "Strum",
+                                                "Blocks", "Interrupt", "Arp", "Pattern", "Warp" };
 static const char *const cfg_lbl[G_COUNT] = { "INPUT", "LOOP ROUTE", "LOOPER ONLY", "QUANTIZE", "BURST",
                                               "HOLD", "LOOP ORDER", "MIDI CC" };
 static const char *const cfg_val[G_COUNT][2] = { { "STEREO", "MONO" }, { "POST-FX", "PRE-FX" }, { "OFF", "ON" },
                                                  { "OFF", "ON" }, { "OFF", "ON" }, { "LATCH", "MOMENT" },
                                                  { "REC-PLAY", "REC-DUB" }, { "AUTO CH", "ANY CH" } };
 
-static u8 ui_open, ui_page, ui_func, ui_ready, ui_inited, ui_row;
+static u8 ui_open, ui_setup, ui_pg, ui_func, ui_ready, ui_inited, ui_row;
+static u8 ui_flash_ticks, ui_flash_pg, ui_flash_i;   /* a knob's value in the title bar after a turn */
+#define NPAGE 3
 static u8 ui_msg_ticks, ui_msg_preset, ui_msg_kind;   /* a message for a second: 1 saved, 2 recalled, 3 empty */
 static u32 clear_at;                        /* the next address to clear, 0 when nothing is */
 static u32 bclear_at;                       /* the overdub layer's clearing, in frames */
@@ -172,7 +181,8 @@ static void dcosm_open(void *brain, void *ev, int track)
 {
     (void)brain, (void)ev, (void)track;
     ui_open = 1;
-    ui_page = 0;
+    ui_setup = 0;
+    ui_pg = 0;
     ui_func = 0;
     if (!ui_ready && !clear_at)
         clear_at = DC_BULK;                 /* the first time: clear what the render reads */
@@ -203,10 +213,55 @@ static void set_knob(int i, int func, s32 v)
         dcosm.knob[i] = (u8)v;
 }
 
+static void flash(int pg, int i)              /* the knob's value in the title bar, a second */
+{
+    ui_flash_pg = (u8)pg;
+    ui_flash_i = (u8)i;
+    ui_flash_ticks = 30;
+}
+
+static void hold_key(void)
+{
+    dcosm.hold = dcosm.cfg[G_HOLDMOM] ? 1 : !dcosm.hold;
+}
+
+static void loop_key(void)                   /* T1, and LOOP on page 3: record, play, overdub */
+{
+    dcosm.lcmd = dcosm.cfg[G_BURST] ? C_BURST_DOWN : C_T1;
+}
+
+static int page_now(void)                    /* FUNC held shows page 2 */
+{
+    return ui_func ? 1 : ui_pg;
+}
+
+static void push(int i)                      /* an encoder pushed */
+{
+    int pg = page_now();
+    if (pg < 2) {
+        set_knob(i, pg, pg ? shift_def[i] : knob_def[i]);
+        flash(pg, i);
+    } else if (i == 0) {
+        hold_key();
+    } else if (i == 1) {
+        dcosm.reverse = !dcosm.reverse;
+    } else if (i == 2) {
+        dcosm.bypass = !dcosm.bypass;
+    } else if (i == 4) {
+        loop_key();
+    } else if (i == 5) {
+        dcosm.lcmd = C_STOP;
+    } else if (i == 6 && !dcosm.cfg[G_BURST]) {
+        dcosm.lcmd = C_UNDO;
+    } else if (i == 7) {
+        dcosm.lcmd = C_ERASE;
+    }
+}
+
 int dcosm_key(void *brain, void *ev)
 {
     u32 key = EV_KEY(ev), fl = EV_FLAGS(ev);
-    int press = (fl & 1) && !(fl & 8), released = (fl & 0x10) != 0;
+    int press = (fl & 1) && !(fl & 8), released = (fl & 0x10) != 0, looper = !ui_setup && page_now() == 2;
     (void)brain;
     if (!ui_open)
         return 0;
@@ -220,17 +275,17 @@ int dcosm_key(void *brain, void *ev)
     if (key == KEY_PLAY || key == KEY_STOP || key == KEY_TEMPO || key == KEY_RECORD)
         return 0;                           /* the sequencer and its tempo stay the Digitone's */
     if (released) {
-        if (key == KEY_STEP1 + 11 && dcosm.cfg[G_HOLDMOM])
+        if ((key == KEY_STEP1 + 11 || (looper && key == KEY_PUSH_A)) && dcosm.cfg[G_HOLDMOM])
             dcosm.hold = 0;
-        if (key == KEY_T1 && dcosm.cfg[G_BURST])
+        if ((key == KEY_T1 || (looper && key == KEY_PUSH_A + 4)) && dcosm.cfg[G_BURST])
             dcosm.lcmd = C_BURST_UP;
         return 1;
     }
     if (!press)
         return 1;                           /* repeats; ev_hold sees the track keys held */
-    if (key >= KEY_STEP1 && key < KEY_STEP1 + NPRESET && (ui_page || ui_func)) {
+    if (key >= KEY_STEP1 && key < KEY_STEP1 + NPRESET && (ui_setup || ui_func)) {
         int n = (int)(key - KEY_STEP1);
-        if (ui_page) {                      /* SETUP: save the page as preset n */
+        if (ui_setup) {                     /* SETUP: save the page as preset n */
             preset_save(n);
             message(1, n);
         } else {                            /* FUNC: recall it */
@@ -239,33 +294,31 @@ int dcosm_key(void *brain, void *ev)
     } else if (key >= KEY_STEP1 && key < KEY_STEP1 + E_COUNT) {
         dcosm.engine = (u8)(key - KEY_STEP1);
     } else if (key == KEY_STEP1 + 11) {
-        dcosm.hold = dcosm.cfg[G_HOLDMOM] ? 1 : !dcosm.hold;
+        hold_key();
     } else if (key >= KEY_STEP1 + 12 && key <= KEY_STEP1 + 15) {
         dcosm.var = (u8)(key - KEY_STEP1 - 12);
     } else if (key == KEY_T1) {
-        dcosm.lcmd = dcosm.cfg[G_BURST] ? C_BURST_DOWN : C_T1;
+        loop_key();
     } else if (key == KEY_T1 + 1) {
         dcosm.lcmd = C_STOP;
-    } else if (key == KEY_T1 + 2) {
-        dcosm.reverse = !dcosm.reverse;
-    } else if (key == KEY_T1 + 3) {
-        dcosm.bypass = !dcosm.bypass;
     } else if (key == KEY_YES) {
-        ui_page = !ui_page;
+        ui_setup = !ui_setup;
     } else if (key == KEY_NO) {
-        if (ui_page)
-            ui_page = 0;
+        if (ui_setup)
+            ui_setup = 0;
         else
             dcosm_close();
-    } else if (ui_page && (key == KEY_UP || key == KEY_DOWN)) {
+    } else if (ui_setup && (key == KEY_UP || key == KEY_DOWN)) {
         ui_row = (u8)((ui_row + (key == KEY_UP ? G_COUNT - 1 : 1)) % G_COUNT);
-    } else if (ui_page && (key == KEY_LEFT || key == KEY_RIGHT)) {
+    } else if (ui_setup && (key == KEY_LEFT || key == KEY_RIGHT)) {
         dcosm.cfg[ui_row] = !dcosm.cfg[ui_row];
         if (ui_row == G_HOLDMOM)
             dcosm.hold = 0;
-    } else if (key >= KEY_PUSH_A && key < KEY_PUSH_A + 8) {
-        int i = (int)(key - KEY_PUSH_A);
-        set_knob(i, ui_func, ui_func ? shift_def[i] : knob_def[i]);
+    } else if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_PAGE) {
+        ui_pg = (u8)((ui_pg + (key == KEY_LEFT ? NPAGE - 1 : 1)) % NPAGE);
+        ui_flash_ticks = 0;
+    } else if (key >= KEY_PUSH_A && key < KEY_PUSH_A + 8 && !ui_setup) {
+        push((int)(key - KEY_PUSH_A));
     }
     return 1;
 }
@@ -287,14 +340,29 @@ int dcosm_enc(void *brain, void *ev)
 {
     u32 e = EV_KEY(ev);
     s32 d;
+    int i, pg;
     (void)brain;
     if (!ui_open || e < 1 || e > 8)
         return 0;                           /* LEVEL/DATA stays the Digitone's */
-    enc_acc[e - 1] += EV_DELTA(ev);
-    d = enc_acc[e - 1] / COUNTS;
-    enc_acc[e - 1] -= d * COUNTS;
-    if (d)
-        set_knob((int)e - 1, ui_func, (ui_func ? dcosm.shift[e - 1] : dcosm.knob[e - 1]) + d);
+    if (ui_setup)
+        return 1;
+    i = (int)e - 1;
+    enc_acc[i] += EV_DELTA(ev);
+    d = enc_acc[i] / COUNTS;
+    enc_acc[i] -= d * COUNTS;
+    if (!d)
+        return 1;
+    pg = page_now();
+    if (pg < 2) {
+        set_knob(i, pg, (pg ? dcosm.shift[i] : dcosm.knob[i]) + d);
+        flash(pg, i);
+    } else if (i == 0 && !dcosm.cfg[G_HOLDMOM]) {  /* page 3: right on, left off */
+        dcosm.hold = (u8)(d > 0);
+    } else if (i == 1) {
+        dcosm.reverse = (u8)(d > 0);
+    } else if (i == 2) {
+        dcosm.bypass = (u8)(d > 0);
+    }
     return 1;
 }
 
@@ -399,49 +467,297 @@ void dcosm_tick(void *ctrl)
     keep_save();
     if (ui_msg_ticks)
         ui_msg_ticks--;
+    if (ui_flash_ticks)
+        ui_flash_ticks--;
     if (ui_open)
         *((unsigned char *)ctrl + 0x20) = 1;
 }
 
 /* ---- the screen: 128 x 64, y = 0 the bottom row ------------------------------------------------------ */
-static void value_text(void *bmp, int x, int y, int i, int func)
+static void value_text(void *bmp, const void *font, int x, int y, int i, int func)
 {
     int v = func ? dcosm.shift[i] : dcosm.knob[i];
     if (!func) {
         if (i == K_SHP)
-            TEXTF(bmp, FONT5, x, y, -1, "%s", shapes[v >> 5]);
+            TEXTF(bmp, font, x, y, -1, "%s", shapes[v >> 5]);
         else if (i == K_FLT && v == 127)
-            TEXTF(bmp, FONT5, x, y, -1, "OPEN");
+            TEXTF(bmp, font, x, y, -1, "OPEN");
         else if (i == K_TIME)
-            TEXTF(bmp, FONT5, x, y, -1, "%s", times[(v * 6) >> 7]);
+            TEXTF(bmp, font, x, y, -1, "%s", times[(v * 6) >> 7]);
         else
-            TEXTF(bmp, FONT5, x, y, -1, "%d", v);
+            TEXTF(bmp, font, x, y, -1, "%d", v);
         return;
     }
     if (i == S_LSPEED) {
-        TEXTF(bmp, FONT5, x, y, -1, "%s", speeds[(v * 5) >> 7]);
+        TEXTF(bmp, font, x, y, -1, "%s", speeds[(v * 5) >> 7]);
     } else if (i == S_VERB) {
-        TEXTF(bmp, FONT5, x, y, -1, "%s", rooms[(v * 4) >> 7]);
+        TEXTF(bmp, font, x, y, -1, "%s", rooms[(v * 4) >> 7]);
     } else if (i == S_GAIN) {
         int t = (v - 64) * 3;                   /* tenths of a dB */
         if (!v)
-            TEXTF(bmp, FONT5, x, y, -1, "MUTE");
+            TEXTF(bmp, font, x, y, -1, "MUTE");
         else
-            TEXTF(bmp, FONT5, x, y, -1, "%c%d.%d", t < 0 ? '-' : '+', (t < 0 ? -t : t) / 10, (t < 0 ? -t : t) % 10);
+            TEXTF(bmp, font, x, y, -1, "%c%d.%d", t < 0 ? '-' : '+', (t < 0 ? -t : t) / 10, (t < 0 ? -t : t) % 10);
     } else if (i == S_FADE) {
-        TEXTF(bmp, FONT5, x, y, -1, "%d.%dS", v / 16, (v % 16) * 10 / 16);
+        TEXTF(bmp, font, x, y, -1, "%d.%dS", v / 16, (v % 16) * 10 / 16);
     } else {
-        TEXTF(bmp, FONT5, x, y, -1, "%d", v);
+        TEXTF(bmp, font, x, y, -1, "%d", v);
     }
+}
+
+/* As the Digitone's own parameter pages (traced from its FLTR, AMP and LFO pages): an inverted box (here the
+ * tempo) and title bar on top, a column on the left (the looper's state, the input's meter, as SYN and LEV)
+ * and two rows of four controls, each 17 pixels square over its label: knobs, value boxes and switches. */
+static const u8 col_x[4] = { 33, 59, 86, 112 };
+#define ROW_Y(r)    ((r) ? 15 : 42)         /* a control's centre, rows 1 and 2 */
+#define LBL_Y(r)    ((r) ? 0 : 27)          /* its label's bottom row */
+static const signed char ring[12][2] = { {0, 8}, {1, 8}, {2, 8}, {3, 7}, {4, 7}, {5, 6}, {6, 5}, {7, 4}, {7, 3}, {8, 2},
+                                {8, 1}, {8, 0} };             /* a knob's circle, one quadrant */
+static const signed char needle[29][2] = {             /* its pointer: 270 degrees from 7:30 to 4:30, radius 6 */
+    {-4, -4}, {-5, -3}, {-5, -3}, {-6, -2}, {-6, -1}, {-6, 0}, {-6, 1}, {-6, 2}, {-5, 3}, {-4, 4}, {-4, 5},
+    {-3, 5}, {-2, 6}, {-1, 6}, {0, 6}, {1, 6}, {2, 6}, {3, 5}, {4, 5}, {4, 4}, {5, 3}, {6, 2}, {6, 1}, {6, 0},
+    {6, -1}, {6, -2}, {5, -3}, {5, -3}, {4, -4} };
+static const char *const sw_lbl[8] = { "HOLD", "REV", "BYP", "", "LOOP", "STOP", "UNDO", "CLR" };
+
+static void px(void *bmp, int x, int y, int c)
+{
+    FILLRECT(bmp, x, y, x, y, c);
+}
+
+static void corners(void *bmp, int x0, int y0, int x1, int y1, int c)
+{
+    px(bmp, x0, y0, c);
+    px(bmp, x1, y0, c);
+    px(bmp, x0, y1, c);
+    px(bmp, x1, y1, c);
+}
+
+static void rframe(void *bmp, int x0, int y0, int x1, int y1)    /* a frame with the corners off */
+{
+    FRAMERECT(bmp, x0, y0, x1, y1, 1);
+    corners(bmp, x0, y0, x1, y1, 0);
+}
+
+static void line(void *bmp, int x0, int y0, int x1, int y1)
+{
+    int dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
+    int dy = y1 > y0 ? y0 - y1 : y1 - y0, sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy, e2;
+    for (;;) {
+        px(bmp, x0, y0, 1);
+        if (x0 == x1 && y0 == y1)
+            break;
+        e2 = 2 * err;
+        if (e2 >= dy) {
+            err += dy;
+            x0 += sx;
+        }
+        if (e2 <= dx) {
+            err += dx;
+            y0 += sy;
+        }
+    }
+}
+
+static int text_w(const char *s)            /* FONT5's capitals, near enough */
+{
+    int n = 0;
+    while (s[n])
+        n++;
+    return n ? 5 * n - 1 : 0;
+}
+
+static void small_text(void *bmp, int cx, int cy, const char *s)    /* font5, centred on cx, cy */
+{
+    int n = 0;
+    while (s[n])
+        n++;
+    TEXTF(bmp, FONT5, cx - (4 * n - 1) / 2, cy - 2, -1, "%s", s);
+}
+
+static void label(void *bmp, int cx, int y, const char *s)
+{
+    if (*s)
+        TEXTF(bmp, FONT_LBL, cx - text_w(s) / 2, y, -1, "%s", s);
+}
+
+static void knob(void *bmp, int cx, int cy, int v, int bipolar)
+{
+    int i, k = (v * 28 + 63) / 127;
+    for (i = 0; i < 12; i++) {
+        int dx = ring[i][0], dy = ring[i][1];
+        px(bmp, cx + dx, cy + dy, 1);
+        px(bmp, cx - dx, cy + dy, 1);
+        px(bmp, cx + dx, cy - dy, 1);
+        px(bmp, cx - dx, cy - dy, 1);
+    }
+    line(bmp, cx, cy, cx + needle[k][0], cy + needle[k][1]);
+    if (bipolar) {                          /* the stock - and + below */
+        FILLRECT(bmp, cx - 10, cy - 7, cx - 8, cy - 7, 1);
+        FILLRECT(bmp, cx + 8, cy - 7, cx + 10, cy - 7, 1);
+        FILLRECT(bmp, cx + 9, cy - 8, cx + 9, cy - 6, 1);
+    }
+}
+
+static void box(void *bmp, int cx, int cy, const char *s, int on)    /* a value box; on: inverted */
+{
+    rframe(bmp, cx - 8, cy - 8, cx + 8, cy + 8);
+    if (s)
+        small_text(bmp, cx, cy, s);
+    if (on)
+        FILLRECT(bmp, cx - 7, cy - 7, cx + 7, cy + 7, -1);
+}
+
+static void shape_icon(void *bmp, int cx, int cy, int sh)   /* Shape's contour, over a dotted floor */
+{
+    int x, lo = cy - 4, hi = cy + 3;
+    for (x = cx - 6; x <= cx + 6; x += 2)
+        px(bmp, x, lo, 1);
+    if (sh == 0) {                          /* FLAT */
+        line(bmp, cx - 6, lo, cx - 6, hi);
+        line(bmp, cx - 6, hi, cx + 6, hi);
+        line(bmp, cx + 6, hi, cx + 6, lo);
+    } else if (sh == 1) {                   /* SWELL */
+        line(bmp, cx - 6, lo, cx + 6, hi);
+        line(bmp, cx + 6, hi, cx + 6, lo);
+    } else if (sh == 2) {                   /* PERC */
+        line(bmp, cx - 6, lo, cx - 6, hi);
+        line(bmp, cx - 6, hi, cx + 6, lo);
+    } else {                                /* ARCH */
+        line(bmp, cx - 6, lo, cx, hi);
+        line(bmp, cx, hi, cx + 6, lo);
+    }
+}
+
+static void loop_icon(void *bmp, int cx, int cy, int s)     /* the looper's state, 7 pixels */
+{
+    int k;
+    if (s == L_REC || s == L_DUB) {         /* a dot; with a play arrow beside it, overdub */
+        int x = s == L_DUB ? cx - 3 : cx;
+        FILLRECT(bmp, x - 1, cy - 3, x + 1, cy + 3, 1);
+        FILLRECT(bmp, x - 2, cy - 2, x + 2, cy + 2, 1);
+        FILLRECT(bmp, x - 3, cy - 1, x + 3, cy + 1, 1);
+        if (s == L_DUB)
+            for (k = -3; k <= 3; k++)
+                FILLRECT(bmp, cx + 2, cy + k, cx + 2 + (3 - (k < 0 ? -k : k)) / 1, cy + k, 1);
+    } else if (s == L_PLAY) {               /* a play arrow */
+        for (k = -3; k <= 3; k++)
+            FILLRECT(bmp, cx - 2, cy + k, cx - 2 + 3 - (k < 0 ? -k : k), cy + k, 1);
+    } else if (s == L_STOP) {               /* a square */
+        FILLRECT(bmp, cx - 3, cy - 3, cx + 3, cy + 3, 1);
+    } else {                                /* nothing recorded */
+        FILLRECT(bmp, cx - 4, cy, cx - 2, cy, 1);
+        FILLRECT(bmp, cx + 2, cy, cx + 4, cy, 1);
+    }
+}
+
+static void title_bar(void *bmp, int pg)
+{
+    int t = fw_tempo / 120;
+    TEXTF(bmp, FONT_TTL, t >= 100 ? 1 : 3, 56, -1, "%d", t);   /* the box: the tempo, as the stock's A01 */
+    FILLRECT(bmp, 0, 54, 14, 63, -1);
+    corners(bmp, 0, 54, 14, 63, 0);
+    if (ui_msg_ticks) {
+        TEXTF(bmp, FONT_TTL, 19, 56, -1, "%s P%d", ui_msg_kind == 1 ? "Saved" : ui_msg_kind == 2 ? "Loaded" : "Empty",
+              ui_msg_preset);
+    } else if (ui_flash_ticks && !ui_setup) {
+        const char *l = ui_flash_pg ? shift_lbl[ui_flash_i] : knob_lbl[ui_flash_i];
+        TEXTF(bmp, FONT_TTL, 19, 56, -1, "%s", l);
+        value_text(bmp, FONT_TTL, 19 + text_w(l) + 6, 56, ui_flash_i, ui_flash_pg);
+    } else if (ui_setup) {
+        TEXTF(bmp, FONT_TTL, 19, 56, -1, "Setup (trig: save)");
+    } else {
+        TEXTF(bmp, FONT_TTL, 19, 56, -1, "%s %c (%d/%d)", eng_title[dcosm.engine], 'A' + dcosm.var, pg + 1, NPAGE);
+    }
+    TEXTF(bmp, FONT_TTL, 110, 56, -1, "C%d", dcosm.cpu / 10);
+    FILLRECT(bmp, 17, 54, 127, 63, -1);
+    corners(bmp, 17, 54, 127, 63, 0);
+}
+
+static void left_column(void *bmp)
+{
+    int s = dcosm.lstate, k, l, r, secs;
+    rframe(bmp, 0, 27, 14, 50);             /* the looper, as the stock's SYN box */
+    loop_icon(bmp, 7, 44, s);
+    if (s != L_EMPTY) {
+        secs = (int)((s == L_REC ? dcosm.lrec : dcosm.llen) / 48000);
+        TEXTF(bmp, FONT5, secs >= 10 ? 3 : 5, 35, -1, "%d", secs);
+    }
+    if (dcosm.hold)
+        small_text(bmp, 3, 31, "H");
+    if (dcosm.reverse)
+        small_text(bmp, 7, 31, "R");
+    if (dcosm.bypass)
+        small_text(bmp, 11, 31, "B");
+    for (k = 0; k < 5; k++) {               /* the input's meter, as LEV: L and R */
+        FILLRECT(bmp, 0, 7 + 4 * k, 1, 7 + 4 * k, 1);
+        FILLRECT(bmp, 13, 7 + 4 * k, 14, 7 + 4 * k, 1);
+    }
+    rframe(bmp, 4, 7, 10, 23);
+    l = (dcosm.meter[0] * 13) / 32767;
+    r = (dcosm.meter[1] * 13) / 32767;
+    if (l)
+        FILLRECT(bmp, 6, 9, 6, 8 + l, 1);
+    if (r)
+        FILLRECT(bmp, 8, 9, 8, 8 + r, 1);
+    label(bmp, 7, -1, "IN");
+}
+
+static void control(void *bmp, int pg, int i)
+{
+    int cx = col_x[i & 3], r = i >> 2, cy = ROW_Y(r), v;
+    const char *lbl;
+    if (pg == 0) {
+        v = dcosm.knob[i];
+        lbl = knob_lbl[i];
+        if (i == K_SHP) {
+            box(bmp, cx, cy, 0, 0);
+            shape_icon(bmp, cx, cy, v >> 5);
+        } else if (i == K_TIME) {
+            box(bmp, cx, cy, times[(v * 6) >> 7], 0);
+        } else {
+            knob(bmp, cx, cy, v, 0);
+        }
+    } else if (pg == 1) {
+        v = dcosm.shift[i];
+        lbl = shift_lbl[i];
+        if (i == S_LSPEED)
+            box(bmp, cx, cy, speeds[(v * 5) >> 7], 0);
+        else if (i == S_VERB)
+            box(bmp, cx, cy, rooms[(v * 4) >> 7], 0);
+        else
+            knob(bmp, cx, cy, v, i == S_GAIN);
+    } else {
+        lbl = sw_lbl[i];
+        if (i < 3) {
+            v = i == 0 ? dcosm.hold : i == 1 ? dcosm.reverse : dcosm.bypass;
+            box(bmp, cx, cy, v ? "ON" : "OFF", v);
+        } else if (i == 4) {
+            box(bmp, cx, cy, 0, 0);
+            loop_icon(bmp, cx, cy, dcosm.lstate);
+        } else if (i == 5) {
+            box(bmp, cx, cy, 0, 0);
+            FILLRECT(bmp, cx - 3, cy - 3, cx + 3, cy + 3, 1);
+        } else if (i == 6) {                /* an arrow back */
+            box(bmp, cx, cy, 0, 0);
+            line(bmp, cx - 3, cy, cx + 3, cy);
+            line(bmp, cx - 3, cy, cx - 1, cy + 2);
+            line(bmp, cx - 3, cy, cx - 1, cy - 2);
+            line(bmp, cx + 3, cy, cx + 3, cy - 3);
+        } else if (i == 7) {                /* a cross */
+            box(bmp, cx, cy, 0, 0);
+            line(bmp, cx - 3, cy - 3, cx + 3, cy + 3);
+            line(bmp, cx - 3, cy + 3, cx + 3, cy - 3);
+        }
+    }
+    label(bmp, cx, LBL_Y(r), lbl);
 }
 
 static void draw_setup(void *bmp)
 {
     int i;
-    TEXTF(bmp, FONT5, 1, 57, -1, "SETUP   TRIG: SAVE");
-    FILLRECT(bmp, 0, 54, 127, 54, 1);
     for (i = 0; i < G_COUNT; i++) {
-        int y = 47 - 6 * i;
+        int y = 46 - 6 * i;
         TEXTF(bmp, FONT5, 3, y, -1, "%s", cfg_lbl[i]);
         TEXTF(bmp, FONT5, 76, y, -1, "%s", cfg_val[i][dcosm.cfg[i] & 1]);
         if (i == ui_row)
@@ -451,7 +767,7 @@ static void draw_setup(void *bmp)
 
 void dcosm_draw(void *bmp, void *ctrl)
 {
-    int i, t = fw_tempo, s = dcosm.lstate;
+    int i, pg = page_now();
     (void)ctrl;
     if (!ui_open)
         return;
@@ -460,40 +776,12 @@ void dcosm_draw(void *bmp, void *ctrl)
         TEXTF(bmp, FONT5, 30, 30, -1, "DIGICOSM...");
         return;
     }
-    if (ui_page) {
+    title_bar(bmp, pg);
+    if (ui_setup) {
         draw_setup(bmp);
         return;
     }
-    TEXTF(bmp, FONT5, 2, 57, -1, "%s %c", dcosm_engine_names[dcosm.engine], 'A' + dcosm.var);
-    FILLRECT(bmp, 0, 56, 56, 63, -1);
-    TEXTF(bmp, FONT5, 60, 57, -1, "%d.%d", t / 120, (t % 120) / 12);
-    if (ui_msg_ticks)
-        TEXTF(bmp, FONT5, 88, 57, -1, "%s P%d", ui_msg_kind == 1 ? "SAVED" : ui_msg_kind == 2 ? "LOAD" : "EMPTY",
-              ui_msg_preset);
-    else if (s == L_REC)
-        TEXTF(bmp, FONT5, 88, 57, -1, "REC %d.%d", dcosm.lrec / 48000, (dcosm.lrec % 48000) / 4800);
-    else if (s == L_EMPTY)
-        TEXTF(bmp, FONT5, 88, 57, -1, "LOOP --");
-    else
-        TEXTF(bmp, FONT5, 88, 57, -1, "%s %d.%d", s == L_PLAY ? "PLAY" : s == L_DUB ? "DUB" : "STOP",
-              dcosm.llen / 48000, (dcosm.llen % 48000) / 4800);
-    FILLRECT(bmp, 0, 54, 127, 54, 1);
-    for (i = 0; i < 8; i++) {
-        int x = 32 * (i & 3) + 2, yl = (i < 4) ? 46 : 26, v = ui_func ? dcosm.shift[i] : dcosm.knob[i];
-        TEXTF(bmp, FONT5, x, yl, -1, "%s", ui_func ? shift_lbl[i] : knob_lbl[i]);
-        value_text(bmp, x, yl - 8, i, ui_func);
-        FILLRECT(bmp, x, yl - 11, x + 26, yl - 11, 1);
-        FILLRECT(bmp, x, yl - 12, x + (v * 26) / 127, yl - 10, 1);
-    }
-    FILLRECT(bmp, 0, 9, 127, 9, 1);
-    TEXTF(bmp, FONT5, 1, 1, -1, "IN");
-    FILLRECT(bmp, 12, 5, 12 + (dcosm.meter[0] * 30) / 32767, 6, 1);
-    FILLRECT(bmp, 12, 2, 12 + (dcosm.meter[1] * 30) / 32767, 3, 1);
-    if (dcosm.hold)
-        TEXTF(bmp, FONT5, 48, 1, -1, "HOLD");
-    if (dcosm.reverse)
-        TEXTF(bmp, FONT5, 70, 1, -1, "REV");
-    if (dcosm.bypass)
-        TEXTF(bmp, FONT5, 87, 1, -1, "BYP");
-    TEXTF(bmp, FONT5, 104, 1, -1, "C%d", dcosm.cpu / 10);
+    left_column(bmp);
+    for (i = 0; i < 8; i++)
+        control(bmp, pg, i);
 }

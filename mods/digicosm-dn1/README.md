@@ -15,27 +15,36 @@ you hear is the inputs through DigiCosm. NO gives the audio and the screen
 back. The sequencer keeps running, so DigiCosm follows its tempo and PLAY,
 STOP and TEMPO still work.
 
-## Controls
+## The page
+
+DigiCosm's page is drawn like the Digitone's own parameter pages, in their
+fonts: the tempo in the box at the top left, the engine and variation in the
+title bar with the page number (1/3), the looper's state (and the H, R and B
+of Hold, Reverse and Bypass when they are on) and the input's meter on the
+left, and eight controls, one per knob: a knob, a value box or a switch.
+While you turn a knob, the title bar shows its value. LEFT and RIGHT, or
+PAGE, move between the three pages; holding FUNC shows page 2.
+
+| Page | Knobs A-D | Knobs E-H |
+|---|---|---|
+| 1 Effect | ACT, REP, SHP (its contour), FLT | MIX, TIME, SPC, LOOP |
+| 2 Shift (the Microcosm's Shift + a knob) | GAIN (input, 64 is 0 dB; the - and + knob), MDEP, MRAT (pitch modulation), RESO | FXVL (effect volume), LSPD (loop speed), VERB (room), FADE (loop fade) |
+| 3 Looper | HOLD, REV, BYP: turn right for on, left for off, or push | LOOP (record, play, overdub), STOP, UNDO, CLR: push |
+
+Pushing a knob on pages 1 and 2 sets it back to its default. Time picks a
+bar, 1/2, 1/4, 1/8, 1/16 or 1/32 of the Digitone's tempo, and when the
+sequencer plays the engines' grid is its timeline.
 
 | Microcosm | DigiCosm |
 |---|---|
-| Activity, Repeats, Shape, Filter | knobs A, B, C, D |
-| Mix, Time, Space, Loop Level | knobs E, F, G, H |
-| Shift + a knob | FUNC + the same knob: GAIN (input, 64 is 0 dB), MDEP and MRAT (pitch modulation), RESO, FXVL (effect volume), LSPD (loop speed), VERB (room), FADE (loop fade) |
 | The preset selector | trig keys 1-11 pick the engine, 13-16 the variation (A-D) |
-| Hold | trig key 12 (latching, or momentary in SETUP) |
-| Looper: Rec / Play / Dub, hold for undo | T1; hold T1 to undo the overdub |
-| Looper: Stop, hold to erase | T2; hold T2 to erase |
-| Reverse | T3 |
-| Bypass (with trails) | T4 |
+| Hold | HOLD on page 3, or trig key 12 (latching, or momentary in SETUP) |
+| Looper footswitches: Rec / Play / Dub, hold for undo; Stop, hold to erase | page 3, or T1 and T2 as the two footswitches (hold T1 to undo, T2 to erase) |
+| Reverse, Bypass (with trails) | REV and BYP on page 3 |
 | 16 user presets | FUNC + trig key 1-16 recalls one; in SETUP a trig key saves the page as that preset (the engine, the variation and knobs A-H). They are saved with the project |
 | Global configuration | YES opens SETUP (input mono/stereo, loop route, looper only, quantize, burst, hold mode, loop order, MIDI channel); UP and DOWN pick a row, LEFT or RIGHT changes it |
 | MIDI CCs | the same CC numbers, on the Digitone's auto channel (see MIDI below) |
 | Tap tempo | the Digitone's own tempo (TEMPO) |
-
-Pushing a knob sets it back to its default. Time picks a bar, 1/2, 1/4,
-1/8, 1/16 or 1/32 of the Digitone's tempo, and when the sequencer plays the
-engines' grid is its timeline.
 
 ## MIDI
 
@@ -129,7 +138,8 @@ python -m elekloader.sdk.build mods/digicosm-dn1 --stock Digitone_and_Digitone_K
 ```
 
 It names no firmware address, so its 1.44 port is empty. It needs core-dn1
-3.2 (`"resources": {"core": "3.2"}`) and an elekloader with the profile's
+3.2 (`"resources": {"core": "3.2"}`; its page uses 3.2's `fw_font_label` and
+`fw_font_title`) and an elekloader with the profile's
 `bulk` area. `gentables.py` makes `tables.h`.
 
 ## Checked
@@ -141,9 +151,12 @@ unit yet.
   while DigiCosm is open and back at once after NO, also when PLAY was
   pressed while DigiCosm was open. After DigiCosm has used its buffers, the
   FM plays as before.
-- **The page.** Knob turns, FUNC's page, the engine and variation keys,
-  SETUP (UP, DOWN, LEFT, RIGHT) and NO, as screenshots and as the state
-  DigiCosm keeps.
+- **The page.** Its three pages, laid out pixel for pixel as the stock
+  FLTR, AMP and LFO pages (their labels on the same rows, in the same
+  font); a knob turn and its value in the title bar; FUNC's view; page 3's
+  switches, turned and pushed, and its looper boxes (record, play, stop,
+  clear); the engine and variation keys; SETUP and NO; as screenshots and as
+  the state DigiCosm keeps. T3 and T4 do nothing now.
 - **The engines.** Every engine at every variation, with plucked notes on
   the inputs, on the emulator's cycle clock (MCF5441x tables at 250 MHz):
   each makes sound, at the octaves its variation names (MOSAIC C an octave

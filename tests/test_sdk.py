@@ -644,7 +644,8 @@ def test_digicosm_builds_and_links():
         mpath, _m = build.build(os.path.join(ROOT, 'mods', 'machines-dn1'), DN_STOCK, tmp)
         assert os.path.basename(dpath) == 'digicosm-0.1.elemod'
         assert d.needs_core == '3.2' and not d.sites
-        assert set(d.imports) == {'fw_fillrect', 'fw_font5', 'fw_tempo', 'fw_textf', 'fw_timeline'}, d.imports
+        assert set(d.imports) == {'fw_fillrect', 'fw_font5', 'fw_font_label', 'fw_font_title', 'fw_framerect',
+                                  'fw_tempo', 'fw_textf', 'fw_timeline'}, d.imports
         assert [(g['area'], g['lo'], g['hi']) for g in d.regions] == [('bulk', 0x44000000, 0x45B00000)]
         rc, r = lint_json(dpath, '--stock', DN_STOCK, '--with', core3, '--with', tpath, '--with', mpath)
         assert rc == 0, r['problems']
