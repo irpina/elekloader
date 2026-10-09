@@ -30,8 +30,9 @@ where the stock files are, and only the cores are uploaded.
 
    The other mods (machine-pages, machines-dn1, dspbus-ot, digicosm-dn1) are not
    cores. The apps and the page take only `core-*.elemod` from a release; a mod
-   reaches the shop from its own release (DigiCosm does, [WEB.md](WEB.md)).
-   machine-pages, machines-dn1 and dspbus-ot are not in the shop yet.
+   reaches the shop from its own release (DigiCosm does, [WEB.md](WEB.md));
+   machine-pages from its pre-release here, `machine-pages-v1.1`.
+   machines-dn1 and dspbus-ot are not in the shop yet.
 3. **The release.** Create it on that commit with the core files attached:
    `gh release create vX.Y.Z core-*.elemod --target <commit>`.
 4. **The apps.** Run **windows-build** and **macos-build** by hand (Actions >

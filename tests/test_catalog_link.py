@@ -5,7 +5,8 @@ catalog's core 2.1 and against mods/core built from this tree. Core 3.0 is
 core 2.1 and more, so every selection must link or be refused as it is
 with 2.1, with the same messages; and the core a builder takes for each
 selection (elemod.pick_core) must stay 2.1, so today's builds keep their
-bytes.
+bytes. A selection with a mod that needs core 3.0 (machine-pages, say) is
+the exception: 2.1 refuses it for that, and the builder takes 3.0.
 
 Needs files named by environment variables; without them it skips:
   ELEKLOADER_CATALOG_DIR  a folder with the catalog's .elemod files, cores
@@ -91,16 +92,26 @@ def check_os(os_version):
     with tempfile.TemporaryDirectory() as tmp:
         rows, old, new, _image = matrix(os_version, tmp)
         assert new.version == '3.0' and rows
-        diff = [(sel, a, b) for sel, a, b, _ in rows if a != b]
-        assert not diff, diff[:3]
-        # the core a builder takes for each selection: 2.1, as before 3.0 was listed
-        for _sel, _a, _b, ms in rows:
+        same, on3 = [], []
+        for sel, a, b, ms in rows:
             needs = [m.needs_core for m in ms if m.needs_core]
             need = max(needs, key=elemod.version_key) if needs else None
-            assert elemod.pick_core([old.version, new.version], need) == 0
-        linked = sum(a == 'links' for _s, a, _b, _m in rows)
-        print('  %s: %d selections, %d link and %d are refused, the same with core 3.0'
-              % (os_version, len(rows), linked, len(rows) - linked))
+            took = elemod.pick_core([old.version, new.version], need)
+            if need and elemod.version_key(need) > elemod.version_key(old.version):
+                # a mod that needs 3.0: refused with 2.1 for that, and a builder takes 3.0
+                assert took == 1 and 'needs core %s or newer' % need in a, (sel, a)
+                on3.append((sel, b))
+            else:
+                # the core a builder takes: 2.1, as before 3.0 was listed, with the same outcome
+                assert took == 0 and a == b, (sel, a, b)
+                same.append(a)
+        linked = sum(a == 'links' for a in same)
+        print('  %s: %d selections take 2.1, %d link and %d are refused, the same with core 3.0'
+              % (os_version, len(same), linked, len(same) - linked))
+        if on3:
+            print('  %s: %d need core 3.0 and take it: %d link, %d are refused'
+                  % (os_version, len(on3), sum(b == 'links' for _s, b in on3),
+                     sum(b != 'links' for _s, b in on3)))
 
 
 def test_the_catalog_links_with_core_3_as_with_core_2_1():
