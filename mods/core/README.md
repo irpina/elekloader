@@ -49,6 +49,10 @@ python -m elekloader.sdk.build mods/core --stock Digitakt_OS1.54.syx      # out/
 python -m elekloader.lint mods/core/out/core-3.0-os1.54.elemod --stock Digitakt_OS1.54.syx
 ```
 
+Core 3.0's files are on the
+[core-v3.0](https://github.com/irpina/elekloader/releases/tag/core-v3.0)
+pre-release and in the mod shop; 2.1's are in the latest release (v0.4.0).
+
 The 1.54 port is the same core: the same code, sites and sections, built
 with 1.54's addresses. Of its 39 sites, 38 are where 1.53 has them, and
 0x400a1706 is 0x400a1862. Of the routines and data it names, DRAWALL,
