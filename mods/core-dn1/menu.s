@@ -27,16 +27,20 @@
 | goes on to its page; PLAY, STOP, FUNC and the track keys still work.
 |
 | The hold is the stock key event's flags 0x9: down (1) and held (8),
-| about 0.4 s in. Another key pressed meanwhile stops it, but one pressed
-| before does not (MIDI held, then a track key, selects a MIDI track), and
-| neither does a knob: so a hold counts only when the track key went down
-| with no other key down and no knob turned since. The stock OS does
-| nothing with 0x9 on a track key held alone.
+| about 0.4 s in. Another chord key pressed meanwhile stops it, but one
+| pressed before does not (MIDI held, then a track key, selects a MIDI
+| track), and neither does a knob: so a hold counts only when the track key
+| went down with no chord key down and no knob turned since. Only FUNC, MIDI
+| and the track keys count as chord keys: other keys' releases can be eaten
+| by a modal (the bank popup eats the trig keys'), which left stale bits
+| that wedged every later hold. The stock OS does nothing with 0x9 on a
+| track key held alone.
 |
 | core-dn1's tick, draw, key and encoder sites go to core_dn_tick ...
 | core_dn_enc below, which do this and go on to core.s's core_tick ...
 | core_enc: core.s stays the Digitakt's.
         .equ    KEY_FUNC,  1
+        .equ    KEY_MIDI,  2               | MIDI: held, then a track key, selects a MIDI track
         .equ    KEY_PLAY,  11
         .equ    KEY_STOP,  12
         .equ    KEY_YES,   13
@@ -173,15 +177,28 @@ note_key:
         and.l   %d0, (%a1)
         rts
 
-| others_down: d2 = a track key (32-63) -> d0 nonzero if another key is down.
+| others_down: d2 = a track key (42-45) -> d0 nonzero if a chord key besides
+| itself is down: FUNC, MIDI or another track key. Any other key does not
+| count: a modal can eat its release (the bank popup eats the trig keys'),
+| and counting it wedged every later hold on a stale bit. Keeps d1 and d2.
 others_down:
-        move.l  %d2, %d1
+        lea     -8(%sp), %sp
+        move.l  %d1, (%sp)
+        move.l  %d2, 4(%sp)
+        move.l  #0x00000006, %d0          | FUNC(1), MIDI(2) in the first word
+        and.l   keys_down, %d0
+        move.l  keys_down + 4, %d1
+        andi.l  #0x00003C00, %d1          | T1-T4: bits 10-13 of the second word
+        or.l    %d1, %d0
+        move.l  4(%sp), %d1               | the track key itself
         subi.l  #32, %d1
-        moveq   #1, %d0
-        lsl.l   %d1, %d0
-        not.l   %d0
-        and.l   keys_down + 4, %d0
-        or.l    keys_down, %d0
+        moveq   #1, %d2
+        lsl.l   %d1, %d2                  | its own bit (a double press still arms)
+        not.l   %d2
+        and.l   %d2, %d0
+        move.l  (%sp), %d1
+        move.l  4(%sp), %d2
+        lea     8(%sp), %sp
         rts
 
 | menu_root: the menu shows core_menu again, at the entry it had (after a
