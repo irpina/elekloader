@@ -732,7 +732,9 @@ its grid from it and from `fw_timeline`.
 
 `mods/digicosm-dn1` (DigiCosm) is a whole one: an effects engine for the
 inputs, with eleven engines, a looper and its own page, buffers in the
-bulk area, and the Microcosm's MIDI CCs through `ev_midi_cc`. `examples/dn-thru` is the smallest such mod. THRU in the Mod Menu takes
+bulk area, and the Microcosm's MIDI CCs through `ev_midi_cc`; `mods/digichroma-dn1`
+(DigiChroma) is another, a Chroma Console-style pedal with four modules of
+effects. `examples/dn-thru` is the smallest such mod. THRU in the Mod Menu takes
 the output, and the inputs go straight to it at knob A's level; NO gives
 it back. It names no firmware address, so its 1.44 port is empty:
 

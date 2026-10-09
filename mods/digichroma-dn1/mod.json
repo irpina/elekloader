@@ -1,0 +1,34 @@
+{
+ "id": "digichroma", "version": "0.1",
+ "license": "GPL-2.0-or-later",
+ "title": "DigiChroma", "category": "Effect", "author": "irpina",
+ "description": "A Chroma Console-style effects pedal for the Digitone mk1's audio inputs: four modules, Character (DRIVE, SWEETEN, FUZZ, HOWL, SWELL), Movement (DOUBLER, VIBRATO, PHASER, TREMOLO, PITCH), Diffusion (CASCADE, REELS, SPACE, COLLAGE, REVERSE) and Texture (FILTER, SQUASH, CASSETTE, BROKEN, INTERFERENCE), in any order, with TILT, RATE, TIME, MIX and four AMOUNTs on the encoders, their secondary controls, GESTURE (knob recordings), CAPTURE (a 30-second looper and sustainer), eight presets and the Chroma Console's MIDI CCs. DIGICHROMA in core-dn1's Mod Menu (hold a track key) opens its page; while it is open it owns the audio engine (the synths are muted) and processes the inputs, and NO gives both back. With SETUP's SOURCE on DIGITONE and core-dn1 3.3 it processes everything the Digitone plays instead, and stays on after NO. Needs core-dn1 3.2.",
+ "device": "digitone-mk1", "os": "1.43",
+ "ports": {"1.44": {}},
+ "sources": ["dsp.c", "ui.c"],
+ "weak": ["core_audio_caps"],
+ "subscribe": [
+  {"event": "ev_key", "fn": "dchroma_key", "order": 6},
+  {"event": "ev_enc", "fn": "dchroma_enc", "order": 6},
+  {"event": "ev_hold", "fn": "dchroma_hold", "order": 6},
+  {"event": "ev_midi_cc", "fn": "dchroma_cc", "order": 55},
+  {"event": "ev_render_in", "fn": "dchroma_rin", "order": 50},
+  {"event": "ev_render_out", "fn": "dchroma_rout", "order": 50},
+  {"event": "ev_tick", "fn": "dchroma_tick", "order": 61},
+  {"event": "ev_draw", "fn": "dchroma_draw", "order": 91}
+ ],
+ "contribute": [
+  {"to": "core_menu", "order": 31, "data": "00000000",
+   "relocs": [[0, "abs32", "sym:dchroma_menu", 0]]},
+  {"to": "core_audio", "order": 60, "data": "00000000",
+   "relocs": [[0, "abs32", "sym:dchroma_owner", 0]]},
+  {"to": "core_projdata", "order": 70, "data": "00000000",
+   "relocs": [[0, "abs32", "sym:dchroma_projdata", 0]]}
+ ],
+ "resources": {
+  "core": "3.2",
+  "names": ["projdata:DCHR"],
+  "regions": [{"name": "digichroma buffers", "lo": "0x45B00000", "hi": "0x46200000"}]
+ },
+ "requires": ["core"]
+}

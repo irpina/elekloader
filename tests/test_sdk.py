@@ -665,6 +665,48 @@ def test_digicosm_builds_and_links():
             assert images[0] == images[1] and d.relocs == d4.relocs
 
 
+def test_digichroma_builds_and_links():
+    """mods/digichroma-dn1 (DigiChroma) on core-dn1 3.2's core_audio: it
+    patches no site, needs 3.2, carries the same code for 1.43 and 1.44 (an
+    empty port), keeps its buffers in a region of the bulk area beside
+    DigiCosm's, links with 3.2 beside DigiCosm, THRU and the machines mod
+    (three owners of the output in one build), and is refused beside 2.3."""
+    if not DN_STOCK or not os.path.exists(DN_STOCK):
+        raise Skip('missing ELEKLOADER_DN_SYX')
+    tc = [x for x in devices.devices() if x.key == 'digitone-mk1'][0].toolchain
+    if not shutil.which(os.environ.get('ELEKLOADER_CROSS', tc['prefix']) + 'gcc'):
+        raise Skip('no m68k cross compiler')
+    with tempfile.TemporaryDirectory() as tmp:
+        core3 = dn_core(tmp)
+        hpath, h = build.build(os.path.join(ROOT, 'mods', 'digichroma-dn1'), DN_STOCK, tmp)
+        dpath, _d = build.build(os.path.join(ROOT, 'mods', 'digicosm-dn1'), DN_STOCK, tmp)
+        tpath, _t = build.build(os.path.join(ROOT, 'examples', 'dn-thru'), DN_STOCK, tmp)
+        mpath, _m = build.build(os.path.join(ROOT, 'mods', 'machines-dn1'), DN_STOCK, tmp)
+        assert os.path.basename(hpath) == 'digichroma-0.1.elemod'
+        assert h.needs_core == '3.2' and not h.sites
+        assert set(h.imports) == {'fw_fillrect', 'fw_font5', 'fw_font_label', 'fw_font_title', 'fw_framerect',
+                                  'fw_tempo', 'fw_textf', 'core_audio_caps'}, h.imports
+        assert set(h.weak) == {'core_audio_caps'}     # 3.3's: with 3.2 it reads 0, and the source is the inputs
+        assert [(g['area'], g['lo'], g['hi']) for g in h.regions] == [('bulk', 0x45B00000, 0x46200000)]
+        rc, r = lint_json(hpath, '--stock', DN_STOCK, '--with', core3, '--with', dpath, '--with', tpath,
+                          '--with', mpath)
+        assert rc == 0, r['problems']
+        assert r['link']['order'] == ['core 3.2', 'digichroma 0.1', 'digicosm 0.1', 'dnthru 1.0', 'machines 0.1']
+        if CORE_DN23 and os.path.exists(CORE_DN23):
+            rc, r = lint_json(hpath, '--stock', DN_STOCK, '--with', CORE_DN23)
+            assert rc == 1 and 'digichroma 0.1 needs core 3.2 or newer, and this build has core 2.3' \
+                in r['problems'], r['problems']
+        if DN_STOCK_144 and os.path.exists(DN_STOCK_144):
+            path4, h4 = build.build(os.path.join(ROOT, 'mods', 'digichroma-dn1'), DN_STOCK_144, tmp)
+            assert path4.endswith('digichroma-0.1-os1.44.elemod')
+            images = []
+            for st, x in ((DN_STOCK, h), (DN_STOCK_144, h4)):
+                s, dv, _rel = formats.load(st)
+                images.append(bytes(elemod.parts_bytes(x.sections['.run']['parts'],
+                                                       formats.main_image(s, dv), dv)))
+            assert images[0] == images[1] and h.relocs == h4.relocs
+
+
 def test_example_builds_and_links():
     tc = devices.devices()[0].toolchain
     if not shutil.which(os.environ.get('ELEKLOADER_CROSS', tc['prefix']) + 'gcc'):
