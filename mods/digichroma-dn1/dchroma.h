@@ -28,7 +28,7 @@ typedef uint8_t u8;
 #define DH_BULK_END     0x46200000u
 #define DH_DIFF_FR      (1u << 17)                      /* Diffusion's line: 2.7 s, stereo s16 */
 #define DH_DIFF         ((s16 *)DH_BULK)
-#define DH_REV          ((s16 *)(DH_BULK + 0x00080000u)) /* Space: 8 lines, then 4 allpasses */
+#define DH_REV          ((s16 *)(DH_BULK + 0x00080000u)) /* Space: 8 lines, then 8 allpasses */
 #define DH_REV_LINE     8192
 #define DH_MOVE_FR      8192                            /* Movement's line: 171 ms */
 #define DH_MOVE         ((s16 *)(DH_BULK + 0x000A8000u))

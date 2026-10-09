@@ -7,9 +7,10 @@
  *   -> OUTPUT LEVEL -> a soft clip -> out
  * Fixed point: samples are Q15 in an int32 (32768 is full scale), with 6 dB of headroom (+-65535) between
  * the modules; the delay lines hold s16 at half scale. Knobs are 0-127; the render smooths them in 8.8.
- * The Digitone's own render takes over half of every block, so this one is lean: the loops go a frame at a
- * time with their filters' state in locals, slow modulation is worked out a block at a time and ramped
- * across it, and Space's network runs at half the rate. */
+ * The loops go a frame at a time with their filters' state in locals, and slow modulation is worked out a
+ * block at a time and ramped across it. With INPUTS the Digitone's own render is small, so Space is full and
+ * the delays and REVERSE are stereo; as an insert, after a render that takes over half of every block, Space
+ * runs at half the rate and the delays and REVERSE repeat the sum of both sides. */
 #pragma GCC optimize ("no-tree-loop-distribute-patterns")
 #include "dchroma.h"
 #include "tables.h"
@@ -542,24 +543,39 @@ static void m_move(s32 *w)
 /* ---- DIFFUSION ------------------------------------------------------------------------------------ */
 static u32 dw;                                  /* Diffusion's line: the next frame written */
 static s32 dl_cur;                              /* the delay, frames Q12, slewed to its target */
-static s32 dl_l0, dl_h0, dl_drop = 32767, dl_m;
+static s32 dl_l0, dl_h0, dl_l1, dl_h1, dl_drop = 32767, dl_m, dl_mr;
 static u32 dl_ph, dl_ph2;
 static u32 cl_skip, cl_t, cl_len, cl_start, cl_cnt;     /* COLLAGE's double-speed loops */
-static u32 rv_age[2];                           /* REVERSE's heads: frames into their windows */
+static u32 rv_age[4];                           /* REVERSE's heads (two a side): frames into their windows */
 static int d_fx = -1;                           /* the effect the delay's time belongs to */
 
-/* Space: four allpasses, then a 4-line feedback delay network with damping, at half the rate (24 kHz,
- * from the average of each two frames, ramped back up); its size, feedback, damping and pre-delay
- * blended across five rooms by TIME (a chamber .. a cloud). */
+/* Space: allpasses, then a feedback delay network with damping; its size, feedback, damping and pre-delay
+ * blended across five rooms by TIME (a chamber .. a cloud). With the source INPUTS DigiChroma has the CPU
+ * to itself and Space is full: each side through four allpasses into four of eight lines, at 48 kHz, DRIFT
+ * moving four of them. As an insert it is lean: the sum through four allpasses into four lines at half the
+ * rate (24 kHz, from the average of each two frames, ramped back up). */
 #define NL 4
+#define NLF 8
 static const u16 rv_base[NL] = { 1777, 2129, 2551, 3011 };          /* at 48 kHz */
+static const u16 rv_base8[NLF] = { 1571, 1861, 2039, 2237, 2473, 2671, 2927, 3163 };     /* rv_base's mean */
 static const u16 sp_mult[5] = { 90, 154, 256, 410, 620 };          /* Q8 */
 static const s16 sp_fb[5] = { 22938, 26214, 28836, 30474, 31785 }; /* Q15 */
 static const s16 sp_lp[5] = { 31457, 27525, 22856, 18924, 14336 }; /* Q15: the damping's low-pass at 24 kHz */
+static const s16 sp_lp48[5] = { 26214, 19661, 14746, 11469, 8192 }; /* the same at 48 kHz */
 static const u16 sp_pre[5] = { 96, 480, 960, 1440, 2400 };         /* frames at 48 kHz */
 static const u16 ap_len[4] = { 71, 53, 189, 138 };                 /* at 24 kHz */
-static u32 rv_w, ap_w[4];
-static s32 rv_lp[NL], rv_yl, rv_yr;
+static const u16 ap_len48[8] = { 142, 107, 379, 277, 149, 101, 367, 283 };   /* L's four, R's four */
+static u32 rv_w, ap_w[8];
+static s32 rv_lp[NLF], rv_yl, rv_yr, rv_m[4];
+static int hq;                                  /* the source INPUTS: the full Space and stereo delays */
+
+/* A Space line: the sample d12 (frames, Q12) behind frame w */
+static inline s32 rdm(const s16 *L, u32 w, u32 d12)
+{
+    u32 p = (w << 12) - d12, a = (p >> 12) & (DH_REV_LINE - 1), b = (a + 1) & (DH_REV_LINE - 1);
+    s32 f = (s32)(p & 0xfff), x0 = L[a], x1 = L[b];
+    return x0 + (((x1 - x0) * f) >> 12);
+}
 
 static s32 blend5(const void *t, int is16, s32 kq)
 {
@@ -585,12 +601,13 @@ static void space(s32 *w, s32 time, s32 amt, s32 drift, s32 wetv)
         len[k] = ((u32)rv_base[k] * (u32)mult) >> 9;               /* half the frames at half the rate */
     for (i = 0; i < N; i += 2) {
         s32 x, y[NL], s = 0, yl, yr, m0 = 0, m1 = 0;
-        D[2 * dw] = (s16)sat16((w[2 * i] + w[2 * i + 1]) >> 2);    /* the pre-delay, mono at half scale */
-        D[2 * ((dw + 1) & msk)] = (s16)sat16((w[2 * i + 2] + w[2 * i + 3]) >> 2);
+        u32 d1 = (dw + 1) & msk;
+        D[2 * dw] = D[2 * dw + 1] = (s16)sat16((w[2 * i] + w[2 * i + 1]) >> 2);  /* the pre-delay, mono at half scale */
+        D[2 * d1] = D[2 * d1 + 1] = (s16)sat16((w[2 * i + 2] + w[2 * i + 3]) >> 2);
         x = (D[2 * ((dw - pre) & msk)] + D[2 * ((dw + 1 - pre) & msk)]) >> 1;
         dw = (dw + 2) & msk;
         for (k = 0; k < 4; k++) {               /* diffusion */
-            s16 *b = R + NL * DH_REV_LINE + 1024 * k;
+            s16 *b = R + NLF * DH_REV_LINE + 1024 * k;
             u32 p = ap_w[k];
             s32 v = b[p], u = x - (v >> 1);
             b[p] = (s16)sat16(u);
@@ -624,6 +641,71 @@ static void space(s32 *w, s32 time, s32 amt, s32 drift, s32 wetv)
     rv_w = rw, rv_yl = pl, rv_yr = pr;
 }
 
+static void space_full(s32 *w, s32 time, s32 amt, s32 drift, s32 wetv)
+{
+    s16 *R = DH_REV, *D = DH_DIFF, *A = DH_REV + NLF * DH_REV_LINE;
+    u32 len[NLF], pre = (u32)blend5(sp_pre, 0, time), msk = DH_DIFF_FR - 1, rw = rv_w;
+    s32 mult = blend5(sp_mult, 0, time), fb = blend5(sp_fb, 1, time), lpc = blend5(sp_lp48, 1, time);
+    s32 dry = kt(ch_mix_dry, amt), wet = (kt(ch_mix_wet, amt) * wetv) >> 12, md = (drift * 10) >> 15;
+    s32 mc[4], ms[4];
+    int i, k, mod = md || rv_m[0] || rv_m[1] || rv_m[2] || rv_m[3];
+    for (k = 0; k < NLF; k++)
+        len[k] = ((u32)rv_base8[k] * (u32)mult) >> 8;
+    if (md)
+        dl_ph += 4474 * (N / 2);
+    for (k = 0; k < 4; k++) {                   /* DRIFT: lines 0, 1, 4 and 5 wander, a quarter cycle apart */
+        s32 t = md ? (sinq(dl_ph + (u32)k * 0x40000000u) * md) >> 3 : 0;          /* Q12 frames */
+        mc[k] = rv_m[k];
+        ms[k] = (t - mc[k]) >> 5;
+        rv_m[k] = t;
+    }
+    for (i = 0; i < N; i++) {
+        s32 xl, xr, y[NLF], s = 0, yl, yr;
+        u32 p = (dw - pre) & msk;
+        D[2 * dw] = (s16)sat16(w[2 * i] >> 1);  /* the pre-delay, stereo at half scale */
+        D[2 * dw + 1] = (s16)sat16(w[2 * i + 1] >> 1);
+        xl = D[2 * p];
+        xr = D[2 * p + 1];
+        dw = (dw + 1) & msk;
+        for (k = 0; k < 4; k++) {               /* diffusion: four allpasses a side */
+            s16 *b = A + 1024 * k, *c = A + 1024 * (k + 4);
+            u32 q = ap_w[k], r = ap_w[k + 4];
+            s32 v = b[q], u = xl - (v >> 1);
+            b[q] = (s16)sat16(u);
+            xl = v + (u >> 1);
+            v = c[r];
+            u = xr - (v >> 1);
+            c[r] = (s16)sat16(u);
+            xr = v + (u >> 1);
+            ap_w[k] = q + 1 < ap_len48[k] ? q + 1 : 0;
+            ap_w[k + 4] = r + 1 < ap_len48[k + 4] ? r + 1 : 0;
+        }
+        for (k = 0; k < NLF; k++) {
+            const s16 *ln = R + DH_REV_LINE * k;
+            s32 v;
+            if (mod && !(k & 2))
+                v = rdm(ln, rw, (len[k] << 12) + (u32)mc[(k & 1) | ((k >> 1) & 2)]);
+            else
+                v = ln[(rw - len[k]) & (DH_REV_LINE - 1)];
+            rv_lp[k] += ((v - rv_lp[k]) * lpc) >> 15;
+            y[k] = rv_lp[k];
+            s += y[k];
+        }
+        if (mod)
+            for (k = 0; k < 4; k++)
+                mc[k] += ms[k];
+        s >>= 2;                                /* Householder: y - 2/8 sum y */
+        for (k = 0; k < NLF; k++)               /* L's input into the even lines, R's into the odd */
+            R[DH_REV_LINE * k + rw] = (s16)sat16(((((y[k] - s) >> 1) * fb) >> 14) + ((k & 1) ? xr : xl));
+        rw = (rw + 1) & (DH_REV_LINE - 1);
+        yl = lim(y[0] + y[2] + y[4] + y[6], TOP);
+        yr = lim(y[1] + y[3] + y[5] + y[7], TOP);
+        w[2 * i] = lim(((w[2 * i] * dry) >> 12) + ((yl * wet) >> 12), TOP);
+        w[2 * i + 1] = lim(((w[2 * i + 1] * dry) >> 12) + ((yr * wet) >> 12), TOP);
+    }
+    rv_w = rw, rv_yl = rv_yr = 0;
+}
+
 static void m_diff(s32 *w)
 {
     s16 *D = DH_DIFF;
@@ -632,7 +714,10 @@ static void m_diff(s32 *w)
     int i, fx = dchroma.fx[M_DIFF];
     if (fx == FX_SPACE) {
         d_fx = fx;
-        space(w, time, amt, drift, wetv);
+        if (hq)
+            space_full(w, time, amt, drift, wetv);
+        else
+            space(w, time, amt, drift, wetv);
         return;
     }
     if (fx == FX_REVERSE) {                     /* backwards windows of the last moment, at a speed */
@@ -648,26 +733,50 @@ static void m_diff(s32 *w)
             L = Lmax;
         if (!rv_age[0] && !rv_age[1])
             rv_age[1] = L / 2;
+        if (!rv_age[2] && !rv_age[3]) {         /* R's heads a quarter window from L's */
+            rv_age[2] = L / 4;
+            rv_age[3] = 3 * L / 4;
+        }
         a0 = rv_age[0], a1 = rv_age[1];
         inv = 0xffffffffu / L;
         step = (u32)(4096 + s12);
-        for (i = 0; i < N; i++) {               /* mono: the sum backwards, to both sides */
-            s32 g0 = tri(a0 * inv), g1 = tri(a1 * inv), v;          /* the heads' windows cross-fade */
-            u32 b0 = a0 * step + 4096, b1 = a1 * step + 4096;      /* frames back from dw, Q12 */
-            D[2 * dw] = (s16)sat16((w[2 * i] + w[2 * i + 1]) >> 2);
-            v = ((rdl(D, msk, dw, b0, 0) * g0) >> 15) + ((rdl(D, msk, dw, b1, 0) * g1) >> 15);
-            v = (v * wet) >> 12;
-            if (++a0 >= L) a0 = 0;
-            if (++a1 >= L) a1 = 0;
-            dw = (dw + 1) & msk;
-            w[2 * i] = lim(((w[2 * i] * dry) >> 12) + v, TOP);
-            w[2 * i + 1] = lim(((w[2 * i + 1] * dry) >> 12) + v, TOP);
+        if (hq) {                               /* stereo: each side backwards, in its own windows */
+            u32 a2 = rv_age[2], a3 = rv_age[3];
+            for (i = 0; i < N; i++) {
+                s32 g0 = tri(a0 * inv), g1 = tri(a1 * inv), g2 = tri(a2 * inv), g3 = tri(a3 * inv), v, u;
+                u32 b0 = a0 * step + 4096, b1 = a1 * step + 4096, b2 = a2 * step + 4096, b3 = a3 * step + 4096;
+                D[2 * dw] = (s16)sat16(w[2 * i] >> 1);
+                D[2 * dw + 1] = (s16)sat16(w[2 * i + 1] >> 1);
+                v = ((rdl(D, msk, dw, b0, 0) * g0) >> 15) + ((rdl(D, msk, dw, b1, 0) * g1) >> 15);
+                u = ((rdl(D, msk, dw, b2, 1) * g2) >> 15) + ((rdl(D, msk, dw, b3, 1) * g3) >> 15);
+                if (++a0 >= L) a0 = 0;
+                if (++a1 >= L) a1 = 0;
+                if (++a2 >= L) a2 = 0;
+                if (++a3 >= L) a3 = 0;
+                dw = (dw + 1) & msk;
+                w[2 * i] = lim(((w[2 * i] * dry) >> 12) + ((v * wet) >> 12), TOP);
+                w[2 * i + 1] = lim(((w[2 * i + 1] * dry) >> 12) + ((u * wet) >> 12), TOP);
+            }
+            rv_age[2] = a2, rv_age[3] = a3;
+        } else {
+            for (i = 0; i < N; i++) {           /* mono: the sum backwards, to both sides */
+                s32 g0 = tri(a0 * inv), g1 = tri(a1 * inv), v;      /* the heads' windows cross-fade */
+                u32 b0 = a0 * step + 4096, b1 = a1 * step + 4096;  /* frames back from dw, Q12 */
+                D[2 * dw] = D[2 * dw + 1] = (s16)sat16((w[2 * i] + w[2 * i + 1]) >> 2);
+                v = ((rdl(D, msk, dw, b0, 0) * g0) >> 15) + ((rdl(D, msk, dw, b1, 0) * g1) >> 15);
+                v = (v * wet) >> 12;
+                if (++a0 >= L) a0 = 0;
+                if (++a1 >= L) a1 = 0;
+                dw = (dw + 1) & msk;
+                w[2 * i] = lim(((w[2 * i] * dry) >> 12) + v, TOP);
+                w[2 * i + 1] = lim(((w[2 * i + 1] * dry) >> 12) + v, TOP);
+            }
         }
         rv_age[0] = a0, rv_age[1] = a1;
         return;
     }
     {                                           /* CASCADE, REELS, COLLAGE: a delay with feedback */
-        s32 T, fb, step, la, ha, mdep, wet = (wetv * 3482) >> 12, crush = 0, noise = 0, m1, ms;
+        s32 T, fb, step, la, ha, mdep, wet = (wetv * 3482) >> 12, crush = 0, noise = 0, m1, ms, r1, rs;
         s32 l0 = dl_l0, h0 = dl_h0, cur = dl_cur, drop = dl_drop;
         u32 inc1, inc2;
         const s16 *sat = sh_soft;
@@ -732,16 +841,71 @@ static void m_diff(s32 *w)
         if (drop < 32767)
             drop += 64;
         m1 = dl_m;                              /* the modulation: at the block's end, ramped to */
+        r1 = dl_mr;
         if (mdep) {
             dl_ph += inc1 * N;
             dl_ph2 += inc2 * N;
             dl_m = (sinq(dl_ph) * mdep) >> 3;   /* Q12 frames */
-            if (inc2)
+            dl_mr = (sinq(dl_ph + 0x40000000u) * mdep) >> 3;            /* R's, a quarter cycle on */
+            if (inc2) {
                 dl_m += (sinq(dl_ph2) * (mdep >> 2)) >> 3;
+                dl_mr += (sinq(dl_ph2 + 0x40000000u) * (mdep >> 2)) >> 3;
+            }
         } else {
-            dl_m = 0;
+            dl_m = dl_mr = 0;
         }
         ms = (dl_m - m1) >> 5;
+        rs = (dl_mr - r1) >> 5;
+        if (hq) {                               /* stereo: a line a side */
+            s32 l1 = dl_l1, h1 = dl_h1;
+            for (i = 0; i < N; i++) {
+                s32 d, e, v, u, wl, wr;
+                cur += lim((T << 12) - cur, step);
+                d = cur + m1;
+                e = cur + r1;
+                m1 += ms;
+                r1 += rs;
+                if (d < (2 << 12))
+                    d = 2 << 12;
+                if (e < (2 << 12))
+                    e = 2 << 12;
+                if (cl_skip) {
+                    u32 p = (cl_start + ((2 * cl_t) % cl_len)) & msk;
+                    v = D[2 * p] << 1;
+                    u = D[2 * p + 1] << 1;
+                    if (++cl_t >= cl_len)
+                        cl_skip = 0;
+                } else {
+                    v = rdl(D, msk, dw, (u32)d, 0);
+                    u = rdl(D, msk, dw, (u32)e, 1);
+                }
+                v = LP(l0, v, la);
+                v -= LP(h0, v, ha);
+                u = LP(l1, u, la);
+                u -= LP(h1, u, ha);
+                if (drop < 32767) {
+                    v = (v * drop) >> 15;
+                    u = (u * drop) >> 15;
+                }
+                wl = shape(sat, (drop_x ? 0 : w[2 * i]) + ((v * fb) >> 14));
+                wr = shape(sat, (drop_x ? 0 : w[2 * i + 1]) + ((u * fb) >> 14));
+                if (noise) {
+                    wl += (rnd_s() * noise) >> 14;
+                    wr += (rnd_s() * noise) >> 14;
+                }
+                if (crush) {
+                    wl = (wl >> (crush + 4)) << (crush + 4);
+                    wr = (wr >> (crush + 4)) << (crush + 4);
+                }
+                D[2 * dw] = (s16)sat16(wl >> 1);
+                D[2 * dw + 1] = (s16)sat16(wr >> 1);
+                w[2 * i] = lim(w[2 * i] + ((v * wet) >> 12), TOP);
+                w[2 * i + 1] = lim(w[2 * i + 1] + ((u * wet) >> 12), TOP);
+                dw = (dw + 1) & msk;
+            }
+            dl_l0 = l0, dl_h0 = h0, dl_l1 = l1, dl_h1 = h1, dl_cur = cur, dl_drop = drop;
+            return;
+        }
         for (i = 0; i < N; i++) {               /* mono: the sum into the line, the repeats to both sides */
             s32 d, v, in, wr;
             cur += lim((T << 12) - cur, step);
@@ -767,7 +931,7 @@ static void m_diff(s32 *w)
                 wr += (rnd_s() * noise) >> 14;
             if (crush)
                 wr = (wr >> (crush + 4)) << (crush + 4);
-            D[2 * dw] = (s16)sat16(wr >> 1);
+            D[2 * dw] = D[2 * dw + 1] = (s16)sat16(wr >> 1);
             v = (v * wet) >> 12;
             w[2 * i] = lim(w[2 * i] + v, TOP);
             w[2 * i + 1] = lim(w[2 * i + 1] + v, TOP);
@@ -1185,20 +1349,22 @@ void dchroma_dsp_reset(void)
     dl_cur = 0;
     d_fx = -1;
     rv_w = 0;
-    for (k = 0; k < 4; k++)
+    for (k = 0; k < 8; k++)
         ap_w[k] = 0;
-    for (k = 0; k < NL; k++)
+    for (k = 0; k < NLF; k++)
         rv_lp[k] = 0;
+    for (k = 0; k < 4; k++)
+        rv_m[k] = rv_age[k] = 0;
     rv_yl = rv_yr = 0;
+    dl_m = dl_mr = 0;
     for (k = 0; k < 12; k++)
         ap_x[k] = ap_y[k] = 0;
     c_t0 = c_t1 = c_p0 = c_p1 = c_h0 = c_h1 = c_d0 = c_d1 = c_l0 = c_l1 = c_i0 = c_i1 = 0;
     h_l0 = h_l1 = h_b0 = h_b1 = 0;
     d_cur[0] = d_cur[1] = 0;
     ap_last = ap_prev = 0;
-    dl_l0 = dl_h0 = 0;
+    dl_l0 = dl_h0 = dl_l1 = dl_h1 = 0;
     t_a0 = t_a1 = t_b0 = t_b1 = t_c0 = 0;
-    rv_age[0] = rv_age[1] = 0;
     for (k = 0; k < 8; k++) {
         ek[k] = sk[k] = dchroma.knob[k] << 8;
         ss[k] = dchroma.sec[k] << 8;
@@ -1216,6 +1382,7 @@ void dchroma_render(int32_t *out, const int32_t *in)
     int i, k, pre = dchroma.croute, byp = dchroma.bypass;
 
     dchroma.blocks++;
+    hq = !(dchroma_owner.flags & CORE_AUDIO_INSERT);
     qfr = tempo ? 345600000u / tempo : 0;
     gestures_block(tempo);
     knobs_block();

@@ -99,6 +99,14 @@ VIBRATO's, PHASER's and TREMOLO's RATE picks a cycle from two bars to 1/32,
 REVERSE's windows are a quarter note long, and gestures play at the tempo
 against the one they were recorded at. On FREE the knobs are continuous.
 
+With SOURCE INPUTS Diffusion is stereo. SPACE takes each side through its
+own allpasses into four of its eight lines, and the delays and REVERSE keep
+a line a side, so a stereo source keeps its sides in the repeats. On a mono
+source the two sides' modulation (the delays' wow, REVERSE's windows) runs
+apart, for width. As an insert (DIGITONE) Diffusion is lean: SPACE has four
+lines at half the rate, and the delays and REVERSE repeat the sum of both
+sides (see CPU below).
+
 ## GESTURE and CAPTURE
 
 - **GESTURE**: trig 13 starts recording. Each primary knob you then turn
@@ -154,21 +162,22 @@ and the delay lines hold them at half scale. The UI (`ui.c`) runs in the
 Digitone's UI task.
 
 - **Memory:** the buffers (7 MB: Diffusion's 2.7-second line, SPACE's
-  four lines, Movement's and Texture's short lines, the gestures and
+  eight lines, Movement's and Texture's short lines, the gestures and
   CAPTURE's 30 seconds) are a region in the Digitone profile's `bulk` area
   after DigiCosm's, cleared at the first ticks after power-up. The code and
   its state take 59 KB of the 128 KB mods share; with DigiCosm, digitables
   and digihealth too, 114 KB.
-- **CPU:** in digikit's emulator, with the factory pattern playing, one
-  module takes 3-8% of each block (SPACE the most), the default chain 14%,
-  and the heaviest chains tried (FUZZ, PHASER, SPACE, INTERFERENCE) 17%.
-  With the source INPUTS the Digitone's own render shrinks to about 18% (no
-  master stage, no voices' filters), so the whole render stays under 35%.
-  With DIGITONE DigiChroma runs on top of all of it, about 57%, and the
-  whole render stays under 80%. To keep that low, the delays and REVERSE
-  make their repeats from the sum of both sides, PHASER's wet chain and
-  SPACE run at half the rate, and slow modulation is worked out a block at
-  a time. The emulator's timing tables assume memory without wait states,
+- **CPU:** in digikit's emulator, with the factory pattern playing. With
+  the source INPUTS the Digitone's own render shrinks to about 18% (no
+  master stage, no voices' filters), and DigiChroma uses the time: the full
+  SPACE takes 17% of each block, the stereo delays and REVERSE 8%, the other
+  effects 3-7%; the default chain 24%, and the heaviest chain tried (FUZZ,
+  PHASER, SPACE, INTERFERENCE) 27%, so the whole render stays under 45%.
+  With DIGITONE DigiChroma runs on top of all of the Digitone's render,
+  about 57%, and is lean: one module takes 3-8% (SPACE the most), the
+  default chain 14%, the heaviest chain 17%, and the whole render stays
+  under 80%. In both PHASER's wet chain runs at half the rate and slow
+  modulation is worked out a block at a time. The emulator's timing tables assume memory without wait states,
   so a unit runs slower: a guard times the whole render on DMA timer 0
   every block, and if the unit stays over 93% for 0.2 s it bypasses the
   pedal at once (no trails) and says so in the title ("CPU full:
@@ -212,9 +221,10 @@ compiled for a computer and fed test signals:
   1.44, with every screen identical (and so did one with core-dn1 3.3).
 - **INPUTS.** With plucked notes on the inputs and the factory pattern
   playing: closed, the synths; open, the plucks through the pedal and the
-  synths silent (with the inputs silent too, an rms of 5 against the
-  synths' 1856), the whole render 30% of a block; after NO the synths
-  again, and the stock render. With core-dn1 3.2 SOURCE stays INPUTS.
+  synths silent (with the inputs silent too, an rms of 6 against the
+  synths' 1856), the whole render 40% of a block with the default chain and
+  its full SPACE; after NO the synths again, and the stock render. With
+  core-dn1 3.2 SOURCE stays INPUTS.
 - **DIGITONE** (core-dn1 3.3): SETUP's SOURCE turns to DIGITONE, the synths
   go through the pedal, and it stays on after NO.
 - **The page and the keys.** Its three pages, a knob turn and its value in
@@ -239,9 +249,12 @@ compiled for a computer and fed test signals:
   delay self-oscillates, FUZZ and HOWL near the top) and with no DC;
   PITCH's and REVERSE's octaves; the delays' first repeat at the knob's time
   (30-700 ms, COLLAGE 40 ms-2.5 s), and on the tempo when synced; their
-  feedback at the top bounded; SPACE's decay from 0.4 s (TIME left) to 11 s
-  (right); TREMOLO's rate, also synced; FILTER's three styles open where
-  the manual says; SQUASH's curve; CAPTURE's pad and loop; GESTURE's loop;
+  feedback at the top bounded; SPACE's decay from 0.3 s (TIME left) to 9.4 s
+  (right), the lean one's to 10.6 s; with INPUTS an input on L alone
+  reaching R through SPACE and staying on L through the delays, at the lean
+  versions' level within 1 dB; TREMOLO's rate, also synced; FILTER's three
+  styles open where the manual says; SQUASH's curve; CAPTURE's pad and loop;
+  GESTURE's loop;
   BYPASS's trails, and without them a clean cut; the CPU guard's trip
   (sustained 94% bypasses, 92% and a short burst do not).
 - **CPU** on the cycle clock: above.
