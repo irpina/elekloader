@@ -1,6 +1,6 @@
 {
   "name": "elekloader",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "elekloader's mod manager in TypeScript: Elektron OS files, .elemod checks, the linker and the build, byte for byte as elekloader's Python, and the kit that puts it on any website",
   "license": "GPL-3.0-or-later",
   "type": "module",
