@@ -38,6 +38,10 @@ docs match its code.
   [mods/core-dt2](../mods/core-dt2) (Digitakt II), and
   [mods/core-ot](../mods/core-ot) with [mods/dspbus-ot](../mods/dspbus-ot)
   (Octatrack).
+- **A whole mod on core-dn1 3.2's exclusive audio:**
+  [mods/digicosm-dn1](../mods/digicosm-dn1), DigiCosm, a Microcosm-style
+  effects engine for the Digitone mk1's audio inputs, with its own page in
+  the Mod Menu and the Microcosm's MIDI CCs (`ev_midi_cc`).
 - **Examples to start from** ([examples/](../examples)):
   - `hello-marker`, one C function on the draw event that puts a small square
     in the corner of every screen; `hello-marker-dt2` and `hello-marker-ot`
