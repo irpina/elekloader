@@ -225,7 +225,9 @@ ignore:
 ```
 
 The loader then refuses it beside an older core with *"needs core 3.0 or
-newer"*, and an older loader with the imports it cannot resolve.
+newer"*, and an older loader with the imports it cannot resolve. Core 3.0's
+files are on the [core-v3.0](https://github.com/irpina/elekloader/releases/tag/core-v3.0) pre-release and in the
+mod shop, so the web page and the kit take 3.0 for such a mod.
 
 **Which core a build takes.** A builder (the app, the web page, the kit)
 takes, of the cores it has for the stock OS, the newest of the oldest major
