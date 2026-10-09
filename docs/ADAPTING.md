@@ -299,6 +299,7 @@ line stays on 2.3.
 | `fw_active_track` (3.1) | 0x41367ce0 | 0x41368ce0 | the active track, 0-3 the synth tracks |
 | `fw_params`, `fw_uirecs` (3.1) | 0x4018d104, 0x4136b9fc | 0x4018d454, 0x4136c9fc | the parameter records (60 bytes an id) and their UI records (84 bytes an id) |
 | `fw_tempo` (3.2) | 0x40241c94 | 0x40242094 | the tempo the sequencer runs at, x 120 (87.0 BPM: 10440); the timeline moves twice this every block |
+| `fw_font_label`, `fw_font_title` (3.2) | 0x4022eb58, 0x4022dc88 | 0x4022ef58, 0x4022e088 | the stock parameter pages' fonts, for `fw_textf`: their labels (FREQ, RESO; capitals 4 x 5) and their title bar (6 pixels, upper and lower case); `fw_font5` is the 3 x 5 one their value boxes use |
 
 A name marked 3.1 or 3.2 needs that core-dn1 (`"resources": {"core": "3.1"}`,
 or `"3.2"`).
