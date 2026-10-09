@@ -162,11 +162,11 @@ unit yet.
 - **MIDI.** CCs sent into the emulator's MIDI input on 1.43 and 1.44: while
   the page is open, the mapped ones on the auto channel set DigiCosm (the
   knobs, CC 5 and 18 in the Microcosm's steps, FUNC's knobs, Reverse, Hold,
-  Bypass, SETUP's rows, and the looper
-  through record, play, overdub, stop and erase) and do not reach the
-  Digitone's own CC handling, nor do CC 22, 45, 46 and 93; an unmapped CC, a CC on a track's channel (with
-  AUTO CH) and every CC while the page is closed go on to it. With ANY CH a
-  track's channel works too.
+  Bypass, SETUP's rows, and the looper through record, play, overdub, stop
+  and erase) and do not reach the Digitone's own CC handling, nor do CC 22,
+  45, 46 and 93; an unmapped CC, a CC on a track's channel (with AUTO CH)
+  and every CC while the page is closed go on to it. With ANY CH a track's
+  channel works too.
 - **The Digitone Keys.** With the Keys bit set in the emulator, core-dn1 3.2
   hands the inputs left first as on a Keys and keeps the Keys' own output
   buffer silent. Nothing has run on a Keys.
