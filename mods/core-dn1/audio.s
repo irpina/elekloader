@@ -1,6 +1,7 @@
 | SPDX-License-Identifier: GPL-2.0-or-later
-| core-dn1 3.2: exclusive audio (Digitone mk1). ColdFire V4; assemble with
-| -mcpu=54455. Beside core.s; the Digitakt's core does not have it.
+| core-dn1 3.2: exclusive audio (Digitone mk1), and from 3.3 insert audio.
+| ColdFire V4; assemble with -mcpu=54455. Beside core.s; the Digitakt's
+| core does not have it.
 |
 |   VOICES_LOOP  the render's loop over the eight voices' filters
 |   VOICES_DONE  just past that loop
@@ -27,15 +28,23 @@
 |              well. The voice mix still runs: skipping it would leave a
 |              note that started meanwhile silent after the owner lets go,
 |              until its next note.
+|              bit 1, CORE_AUDIO_INSERT (3.3): the master stage runs, and the
+|              owner gets what it wrote: an effect on everything the
+|              Digitone plays. Bit 0 is ignored then: the stage mixes the
+|              voices' filters' output, so the filters always run.
 | Each block, before the voices' filters, core takes the first record whose
 | on is set. While there is one, the master stage does not run: core hands
 | the owner the input and writes what it returns to the output and to the
 | USB block's main pair (the effect buses silent, the inputs where the master
-| stage puts them), and on a Keys clears the Keys' buffer. With no owner
+| stage puts them), and on a Keys clears the Keys' buffer. An INSERT owner
+| gets the master stage's output in place of the input, and core writes what
+| it returns over that output and the USB block's main pair; the rest of the
+| USB block, and a Keys' buffer, stay as the stage wrote them. With no owner
 | every block is stock. render runs at interrupt level, inside the render,
 | whose EMAC settings it keeps if it uses the EMAC.
 
         .equ    MUTE_VOICES, 1
+        .equ    INSERT, 2
         .equ    KEYS_BIT, 0x00080000
 
         .section .run, "ax"
@@ -50,8 +59,12 @@ core_audio_pick:
         beq.s   1b
 2:      move.l  %d0, core_audio_cur
         beq.s   3f
-        moveq   #MUTE_VOICES, %d0
-        and.l   8(%a1), %d0
+        move.l  8(%a1), %d0             | flags
+        btst    #1, %d0                 | INSERT: the master stage mixes the
+        beq.s   4f                      | voices, so they always play
+        moveq   #0, %d0
+        bra.s   3f
+4:      andi.l  #MUTE_VOICES, %d0
 3:      move.l  %d0, core_audio_mute
         rts
 
@@ -73,7 +86,8 @@ core_voices_gate:
         jmp     VOICES_LOOP
 1:      jmp     VOICES_DONE
 
-| 0x4009e146, the master stage's call: the stock stage, or the owner's.
+| 0x4009e146, the master stage's call: the stock stage, the owner's, or the
+| stock stage and then an INSERT owner's.
 |   4(sp) the output's half (32 frames L,R, 24-bit), 8(sp) the Keys' buffer's
 |   half, 12(sp) the input's half (32 frames, 24-bit), 16(sp) the mixer.
         .globl  core_render_master
@@ -81,7 +95,11 @@ core_render_master:
         tst.l   core_audio_cur
         bne.s   1f
         jmp     MASTER
-1:      lea     -24(%sp), %sp
+1:      movea.l core_audio_cur, %a0
+        moveq   #INSERT, %d0
+        and.l   8(%a0), %d0
+        bne.w   core_render_insert
+        lea     -24(%sp), %sp
         movem.l %d2-%d4/%a2-%a4, (%sp)
         movea.l 36(%sp), %a0            | the input, as the codec wrote it
         lea     core_audio_in, %a1
@@ -143,6 +161,51 @@ core_render_master:
         bne.s   5b
 6:      movem.l (%sp), %d2-%d4/%a2-%a4
         lea     24(%sp), %sp
+        rts
+
+| An INSERT owner (3.3): the stock stage with the same four arguments, then
+| the owner on what the stage wrote to the output's half, and what it
+| returns over that half and USB's main pair.
+core_render_insert:
+        move.l  16(%sp), -(%sp)         | the mixer
+        move.l  16(%sp), -(%sp)         | the input's half
+        move.l  16(%sp), -(%sp)         | the Keys' buffer's half
+        move.l  16(%sp), -(%sp)         | the output's half
+        jsr     MASTER
+        lea     16(%sp), %sp
+        lea     -12(%sp), %sp
+        movem.l %d2/%a2-%a3, (%sp)
+        movea.l 16(%sp), %a2            | the output's half, as the stage wrote it
+        movea.l %a2, %a0
+        lea     core_audio_in, %a1
+        moveq   #64, %d2
+1:      move.l  (%a0)+, %d0
+        asl.l   #8, %d0
+        move.l  %d0, (%a1)+
+        subq.l  #1, %d2
+        bne.s   1b
+        movea.l core_audio_cur, %a0
+        pea     core_audio_in
+        pea     core_audio_out
+        movea.l 4(%a0), %a0
+        jsr     (%a0)
+        addq.l  #8, %sp
+        lea     core_audio_out, %a1
+        lea     USB_BLOCK, %a3
+        moveq   #32, %d2
+2:      move.l  (%a1)+, %d0
+        move.l  (%a1)+, %d1
+        move.l  %d0, (%a3)              | USB: the main pair
+        move.l  %d1, 4(%a3)
+        lea     48(%a3), %a3
+        asr.l   #8, %d0
+        asr.l   #8, %d1
+        move.l  %d0, (%a2)+
+        move.l  %d1, (%a2)+
+        subq.l  #1, %d2
+        bne.s   2b
+        movem.l (%sp), %d2/%a2-%a3
+        lea     12(%sp), %sp
         rts
 
         .balign 4

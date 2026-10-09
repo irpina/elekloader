@@ -746,6 +746,49 @@ Core-dn1 3.2 owns two more sites: 0x4009e07e (`core_voices_gate`, by jmp
 over the 14 bytes before the voices' filter loop) and 0x4009e146
 (`core_render_master`, by jsr); in 1.44 they are 0x4009e09e and 0x4009e166.
 
+### Insert audio (core-dn1 3.3, Digitone mk1)
+
+An owner may instead take what the master stage made: an effect on
+everything the Digitone plays. With `CORE_AUDIO_INSERT` (2) in its flags,
+core runs the stock master stage as it is, with its own four arguments, and
+then hands `render` what the stage wrote to the output: the voices, the
+inputs as the mixer has them, chorus, delay, reverb and the master drive,
+32 frames L,R in Q1.31. What `render` returns goes to the codec and to the
+USB block's main pair in its place; the rest of the USB block (the effect
+buses and the inputs) and a Keys' second buffer stay as the stage wrote
+them. The voices always play: `CORE_AUDIO_MUTE_VOICES` is ignored with
+`CORE_AUDIO_INSERT`, since the stage mixes what the voices' filters make.
+The stock render keeps its own share of the block, so an insert has what
+is left. In the emulator, with the factory pattern playing, the stock
+render takes about 57% of a block (its master stage 53,240 of the block's
+166,667 core cycles), and core's part of an insert, the conversion in and
+out, about 600 cycles: an insert has a little under 40% of the block, less
+what the UI task needs. TREMOLO's own render (below) takes 926 cycles.
+
+Nothing else changes for the Digitone's own pages, so an insert may stay on
+while they are on screen. `examples/dn-tremolo` is the smallest one: TREMOLO
+in the Mod Menu turns a 4 Hz tremolo on everything on, and picking it again
+turns it off. It takes no key and draws nothing, and like THRU it names no
+firmware address, so its 1.44 port is empty:
+
+```c
+struct core_audio_owner trem_owner = { 0, trem_render, CORE_AUDIO_INSERT };
+```
+
+```json
+"contribute": [{"to": "core_audio", "order": 70, "data": "00000000",
+                "relocs": [[0, "abs32", "sym:trem_owner", 0]]}],
+"resources": {"core": "3.3"}
+```
+
+The table's order still decides between owners: each block the first
+record whose `on` is set has the output, so an exclusive mod that opens over
+an insert that stays on contributes before it, with a lower `order`, and the
+insert carries on once the exclusive one lets go. A mod may change its flags
+from the UI task, as it may `on`: core reads them each block. 3.3 owns no
+new site: `core_render_master` (0x4009e146) runs the stage first for an
+insert.
+
 The addresses in these sections are OS 1.43's. In 1.44 the same
 routines are there, unchanged but moved, and RAM is 0x1000 further on:
 `mods/core-dn1/mod.json`'s `ports` has every one of core-dn1's sites for it.

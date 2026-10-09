@@ -30,6 +30,7 @@ There is one core file per device and OS:
 | Digitone mk1, Digitone Keys | 1.44 | `core-dn1-2.3-os1.44.elemod` | the same pre-release (v0.4.0 has 2.0a) |
 | Digitone mk1, Digitone Keys | 1.43 | `core-dn1-3.2.elemod` | the [core-dn1-v3.2](https://github.com/irpina/elekloader/releases/tag/core-dn1-v3.2) pre-release, for mods that need the 3.x line |
 | Digitone mk1, Digitone Keys | 1.44 | `core-dn1-3.2-os1.44.elemod` | the same pre-release |
+| Digitone mk1, Digitone Keys | 1.43, 1.44 | `core-dn1-3.3.elemod`, `core-dn1-3.3-os1.44.elemod` | on main, not released yet: build them ([below](#building-a-core)) |
 | Digitakt II | 1.17 | `core-dt2-1.0.elemod` | not released yet: build it ([below](#building-a-core)) |
 | Octatrack MKI, MKII | 1.40C | `core-ot-0.1.elemod` | the latest release (v0.4.0) |
 | Octatrack MKI, MKII | 1.40C | `core-ot-0.3.elemod` | on main, not released yet (0.2, with the hook bus, is too) |
@@ -46,7 +47,8 @@ A mod says which core it needs at least (`resources.core` in the file,
 oldest major line that is new enough ([ADAPTING.md](ADAPTING.md), "Core
 3.0"). So a Digitakt mk1 selection stays on 2.1 unless a mod needs 3.0, and
 a Digitone selection takes 2.3, the newest of the 2.x line, unless a mod
-needs core-dn1 3.0, 3.1 or 3.2, and then it takes 3.2. The web page,
+needs core-dn1 3.0, 3.1 or 3.2, and then it takes 3.2 (3.3 once it is
+released: a mod that needs 3.3, insert audio, waits for it). The web page,
 the kit and the window (from source, and the apps after 0.4.0) tick that
 core for you and keep one. The 0.4.0 apps refuse a build with two cores
 ticked: there, untick the built-in one when you add a newer core.
@@ -73,7 +75,9 @@ ticked: there, untick the built-in one when you add a newer core.
   From 3.2 a mod may take the whole output, with the synths silent, and
   keep large buffers in the profile's `bulk` area ([ADAPTING.md](ADAPTING.md),
   "Exclusive audio"), and take MIDI CCs before the stock applies them
-  (`ev_midi_cc`).
+  (`ev_midi_cc`). From 3.3 a mod may instead take what the master stage
+  made, an effect on everything the Digitone plays, with the synths on
+  ("Insert audio").
 - **Digitakt II** ([mods/core-dt2](../mods/core-dt2)): the hook bus's tick,
   draw, key and encoder events, and rows in SETTINGS > PERSONALIZE.
 - **Octatrack** ([mods/core-ot](../mods/core-ot)): a source of its own. It
