@@ -122,9 +122,11 @@ the tick site runs first). The sites core owns (do not patch them):
   0x4000b770, 0x4000b7ba, 0x40058800, 0x40077428, 0x400784c8;
 - Digitone mk1 1.43: 0x40000538, 0x4001900c, 0x40019072, 0x40019d9c,
   0x40019de4, 0x40072a34, 0x4009d108, 0x4009e51c, from core-dn1 2.1
-  0x4009e928 and from 3.2 0x400ed96e;
+  0x4009e928, from 3.1 0x4009e078 and 0x400207b8, and from 3.2
+  0x4009e07e, 0x4009e146 and 0x400ed96e;
 - Digitone mk1 1.44: the same, but 0x40072a54, 0x4009d128 and 0x4009e53c
-  for the last three of the eight, 0x4009e948 and 0x400edbe2;
+  for the last three of the eight, 0x4009e948, 0x4009e098, 0x400207b8,
+  0x4009e09e, 0x4009e166 and 0x400edbe2;
 - Digitakt II 1.17: 0x40000538, 0x40032ad4, 0x40032b3a, 0x40033d94,
   0x40033dde, 0x400a5eac, 0x4009e2a2.
 
@@ -177,7 +179,7 @@ longs:
 
 | offset | field | |
 |---|---|---|
-| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>`. Taken so far: 4 NEIGHBOR, 5 DIGISLICER, 6 Digi Poly's POLY, 7 SOPHIE, 8 STRING, 9 DT-FM, 20-29 Digi Mono's (20-26 in use); pick another, and say which in your mod's README |
+| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>`. Taken so far: 4 NEIGHBOR, 5 DIGISLICER, 6 Digi Poly's POLY, 7 SOPHIE (also DT-FM 1.1.0, in the shop), 8 STRING, 9 DT-FM 1.2.0, 20-29 Digi Mono's (20-26 in use); pick another, and say which in your mod's README |
 | +4 | name | its name in the machine menu and the SRC page's title (10 characters fit) |
 | +8 | short | its 4-character name (the SRC page's `NAME: sample` title) |
 | +12 | icon | an 11 x 7 Bitmap for the menu, in the stock icons' format, or 0 |
@@ -347,7 +349,7 @@ A knob (`struct cm_knob`); a 0 field is the stock one:
 | +20, +24, +28 | min, max, def | 8.8 |
 | +32 | fmt | `int f(char *buf, int value, int ctx, int machine)`: its value's text into buf, returning nonzero (0: the stock text). ctx 0 is the value under a turning knob, about 5 characters; 1 the pop-up, up to 15 |
 | +36 | gfx | `int f(int value)`: the value its graphic shows, from the one the firmware gives it (both 8.8) |
-| +36 | draw | with flag 16, in gfx's place: `int f(void *bmp, int x, int y, int value, int flag)` draws the knob's graphic into the page's Bitmap, in x + 1 to x + 17 and y to y + 16 (y = 0 is the bottom row), from its value (8.8), and returns nonzero; 0 draws the stock graphic. flag is the firmware's, for a stock drawer it calls |
+| +36 | draw | with flag 16 on a `cm_ui_v31` page, in gfx's place: `int f(void *bmp, int x, int y, int value, int flag)` draws the knob's graphic into the page's Bitmap, in x + 1 to x + 17 and y to y + 16 (y = 0 is the bottom row), from its value (8.8), and returns nonzero; 0 draws the stock graphic. flag is the firmware's, for a stock drawer it calls |
 
 In assembly `digitakt-mk1/core3.inc` has `CM_MACHINE`, `CM_UI` and
 `CM_KNOB`; digineighbor 0.7, digislicer 2.3 and SOPHIE's core 3.0 build use
@@ -746,7 +748,7 @@ The addresses in these sections are OS 1.43's. In 1.44 the same
 routines are there, unchanged but moved, and RAM is 0x1000 further on:
 `mods/core-dn1/mod.json`'s `ports` has every one of core-dn1's sites for it.
 
-Core 2.1 owns these sites too (`mods/core/mod.json` says what each is;
+The Digitakt mk1's core 2.1 owns these sites too (`mods/core/mod.json` says what each is;
 in 1.54 they are at the same addresses, but 0x400a1706 is 0x400a1862):
 0x40011322, 0x400225f0, 0x40022fe6, 0x40028f7e, 0x40029e9c, 0x4002a4e0,
 0x4002a76e, 0x4002a9e8, 0x4002aee0, 0x4002ba7e, 0x40039dac, 0x40039dcc,
@@ -1191,6 +1193,8 @@ Some differences from an octabam build, by design:
 | `... overlap (0x...-0x...)` | another mod patches or claims those bytes | subscribe to an event instead, or agree with that mod's author |
 | `X requires Y` / `core is not enabled` | a dependency is missing | add Y (with lint: `--with Y.elemod`) |
 | `X needs core 3.0 or newer, and this build has core 2.1` | the mod's `resources.core` asks for a newer core | build with that core (the app and the web page take it when you tick the mod); an older loader says `imports fw_..., which no given mod exports` instead |
+| `imports cm_ui_v31, which no given mod exports` | the page names `cm_ui_v31` (a knob that draws itself, `CM_DRAW`), and no mod given exports it: machine-pages before 1.1 does not | use machine-pages 1.1 or newer |
+| `CM_KNOB: draw= needs flags=CM_DRAW` or `CM_KNOB: with CM_DRAW, +36 is draw` (assembly, `core3.inc`) | a knob's `draw=` without `flags=CM_DRAW`, or its `gfx=` with it | give the knob `flags=CM_DRAW` with `draw=`, or `draw=` in place of `gfx=`; the page's `CM_UI` needs `abi=cm_ui_v31` |
 | `imports N, which no given mod exports` | a missing dependency, or a typo | add the mod that exports N, fix the name, or list N under `weak` |
 | `adds to table T, which no given mod declares` | the table's owner is missing, or the event name is wrong | add core (or the owner); check the event name |
 | `both export S` | two mods define the same global | prefix your globals with your mod id; make internals `static` |

@@ -27,6 +27,11 @@ where the stock files are, and only the cores are uploaded.
 
    A release may carry several versions of one device's core (the Digitakt
    mk1's 2.1 and 3.0 lines, say): a build picks one ([CORES.md](CORES.md#how-a-build-picks-one)).
+
+   The other mods (machine-pages, machines-dn1, dspbus-ot, digicosm-dn1) are not
+   cores. The apps and the page take only `core-*.elemod` from a release; a mod
+   reaches the shop from its own release (DigiCosm does, [WEB.md](WEB.md)).
+   machine-pages, machines-dn1 and dspbus-ot are not in the shop yet.
 3. **The release.** Create it on that commit with the core files attached:
    `gh release create vX.Y.Z core-*.elemod --target <commit>`.
 4. **The apps.** Run **windows-build** and **macos-build** by hand (Actions >
@@ -42,8 +47,9 @@ where the stock files are, and only the cores are uploaded.
    `packaging/build_kit.py` gives on your machine with the same Node. With
    **test** ticked it builds the branch it is run on and keeps the two files
    as the run's artifact instead.
-6. **The site.** Run **pages** by hand. It runs on every push to main, but
-   a new release's cores reach the site only on its next run.
+6. **The site.** The **pages** workflow runs on every push to main. A new
+   release's cores reach the site on its next run, so run **pages** by hand
+   after the release.
 
 ## Pre-releases
 

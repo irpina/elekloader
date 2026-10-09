@@ -180,7 +180,7 @@ below was found again in 1.17.
   repacked by elekloader, passes it against stock: the updater accepts the
   stream, and the screens and the audio are identical.
 - **Linkable mods.** Its core is `mods/core-dn1`: `core.s` with the
-  Digitone's addresses. Its eight sites and every routine it calls are the
+  Digitone's addresses. Its first eight sites and every routine they call are the
   Digitakt mk1's found again in 1.43. They are the same code instruction
   for instruction, bar the addresses in it. The render handler's frame is
   0xB8 bytes (0xA8 on the Digitakt), hence `RENDER_FRAME`. From 2.1
@@ -194,7 +194,10 @@ below was found again in 1.17.
   the menu is a grid of the entries' icons. From 3.0 (`fw.s`) it exports
   the firmware locations mods use, with each OS's values, so a mod that
   names only those has an empty port.
-  1.44 has all of them, at its own addresses (`ports`).
+  From 3.1 (`voices.s`, `params.s`, `menu.s`) it has what machines need: the
+  render's voices, the parameter overrides and the Mod Menu's submenus. From
+  3.2 (`audio.s`, `midi.s`) it has the exclusive audio and the MIDI CCs.
+  1.44 has all of these, at its own addresses (`ports`).
 - **The DDR area** is the Digitakt's, `0x47BE0000-0x47C00000`:
   - The OS clears `0x4028E000-0x43229E60` at start, and its stack runs down
     from `0x48000000`.
@@ -202,7 +205,8 @@ below was found again in 1.17.
     stack.
   - In a settled emulator run, no DDR page from `0x43400000` to
     `0x47C00000` is ever mapped.
-  - So the profile has a second area, `bulk` (`0x44000000-0x47BE0000`), for
+  - So the profile has a second area, `bulk` (`0x44000000-0x47BE0000`, from
+  core-dn1 3.2), for
     mods' large buffers: a mod claims a piece as a region and uses it at
     run time. Nothing is placed there, and the OS never clears it.
 - **Checked in the emulator:** with core alone, the build passes every
