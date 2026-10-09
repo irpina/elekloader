@@ -54,6 +54,8 @@ extern void fw_fillrect(void *bmp, int32_t x0, int32_t y0, int32_t x1, int32_t y
 extern void fw_framerect(void *bmp, int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t colour);
 extern int32_t fw_textf(void *bmp, const void *font, int32_t x, int32_t y, int32_t maxlen, const char *fmt, ...);
 extern const char fw_font5[];
+extern const char fw_font_label[];             /* 3.2: the stock pages' labels (FREQ, RESO), capitals 4 x 5 */
+extern const char fw_font_title[];             /* 3.2: their title bar (Amplitude (1/2)), 6 pixels */
 extern void fw_blit(void *dst, const void *src, int32_t x, int32_t y, int32_t centre);
 extern uint32_t fw_op_new(uint32_t size);       /* the firmware's heap; 0 when it is full */
 extern volatile int32_t fw_active_track;        /* 3.1: the active track, 0-3 the synth tracks */

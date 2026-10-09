@@ -106,7 +106,8 @@ the Digitone needs it. On its own it changes nothing the unit does.
   and the owner's `render(out, in)` gets the input and writes the output.
   With `CORE_AUDIO_MUTE_VOICES` the voices' filter loop (0x4009e07e) is
   skipped too, so the synths are silent. Also `fw_tempo`,
-  the tempo x 120. The profile's `bulk` area (0x44000000-0x47BE0000) holds
+  the tempo x 120, and the stock pages' fonts, `fw_font_label` and
+  `fw_font_title`, for a mod that draws a page of its own in their style. The profile's `bulk` area (0x44000000-0x47BE0000) holds
   such mods' large buffers, as regions they claim.
   [examples/dn-thru](../../examples/dn-thru) is the smallest such mod.
 - **From 3.2, `ev_midi_cc`** ([midi.s](midi.s)): each MIDI CC the unit

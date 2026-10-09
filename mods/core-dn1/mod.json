@@ -62,6 +62,8 @@
   "MODEL_FLAGS": "0x402292f0",
   "USB_BLOCK": "0x8000f270",
   "FW_TEMPO": "0x40241c94",
+  "FONT_LABEL": "0x4022eb58",
+  "FONT_TITLE": "0x4022dc88",
   "ROUTER_EXIT": "0x400eddb0"
  },
  "sites": [
@@ -209,6 +211,8 @@
     "MODEL_FLAGS": "0x402296f0",
     "USB_BLOCK": "0x8000f270",
     "FW_TEMPO": "0x40242094",
+    "FONT_LABEL": "0x4022ef58",
+    "FONT_TITLE": "0x4022e088",
     "ROUTER_EXIT": "0x400ee024"
    },
    "sites": [
