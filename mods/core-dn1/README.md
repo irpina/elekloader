@@ -123,7 +123,8 @@ the Digitone needs it. On its own it changes nothing the unit does.
   stock, and its output goes through the owner's `render` on its way to
   the codec and USB's main pair. An effect on everything the Digitone
   plays, which may stay on under the Digitone's own pages. No new site:
-  3.3 is 3.2 with that flag. [examples/dn-tremolo](../../examples/dn-tremolo)
+  3.3 is 3.2 with that flag, and `core_audio_caps`, an export that says
+  so to a mod that weak-imports it (0 with an older core). [examples/dn-tremolo](../../examples/dn-tremolo)
   is the smallest such mod.
 - **OS 1.44:** every site has its port (`ports` in mod.json): the same
   code, moved, and RAM 0x1000 further on.

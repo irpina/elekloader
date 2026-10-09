@@ -77,6 +77,9 @@ extern volatile int32_t fw_tempo;               /* 3.2: the tempo x 120 (87.0 BP
                                                    runs it; the timeline moves twice this every block */
 #define CORE_AUDIO_MUTE_VOICES  1u
 #define CORE_AUDIO_INSERT       2u      /* 3.3 */
+/* 3.3: the flags core_audio takes beyond CORE_AUDIO_MUTE_VOICES (CORE_AUDIO_INSERT). A mod that runs on 3.2 too
+ * lists it under "weak" in mod.json: with an older core it then reads 0, and the mod offers no insert. */
+extern const uint32_t core_audio_caps;
 /* A mod that wants the whole output contributes a pointer to one of these to the table core_audio and
  * may have its buffers in the profile's bulk area (a region it claims). A build may hold several such
  * mods: each block, before the voices' filters, core takes the first record whose on is set (the table's

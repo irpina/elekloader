@@ -785,8 +785,12 @@ The table's order still decides between owners: each block the first
 record whose `on` is set has the output, so an exclusive mod that opens over
 an insert that stays on contributes before it, with a lower `order`, and the
 insert carries on once the exclusive one lets go. A mod may change its flags
-from the UI task, as it may `on`: core reads them each block. 3.3 owns no
-new site: `core_render_master` (0x4009e146) runs the stage first for an
+from the UI task, as it may `on`: core reads them each block. A mod that
+also runs on core-dn1 3.2, as an exclusive owner there, can tell whether
+the core takes inserts: 3.3 exports `core_audio_caps`, a long with
+`CORE_AUDIO_INSERT` set, and a mod that lists it under `weak` in mod.json
+reads 0 with an older core (the linker's `core_zero`). 3.3 owns no new
+site: `core_render_master` (0x4009e146) runs the stage first for an
 insert.
 
 The addresses in these sections are OS 1.43's. In 1.44 the same

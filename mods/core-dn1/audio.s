@@ -208,7 +208,13 @@ core_render_insert:
         lea     12(%sp), %sp
         rts
 
+| core_audio_caps (3.3): the flags core_audio takes beyond MUTE_VOICES. A mod
+| that weak-imports it reads 0 with an older core (the linker's core_zero),
+| so it can offer an insert only where there is one.
         .balign 4
+        .globl  core_audio_caps
+core_audio_caps:
+        .long   INSERT
 core_audio_cur:
         .long   0
 core_audio_mute:

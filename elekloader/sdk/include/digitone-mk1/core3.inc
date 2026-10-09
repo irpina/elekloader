@@ -29,4 +29,5 @@
         .equ    CORE_AUDIO_FLAGS,  8
         .equ    CORE_AUDIO_MUTE_VOICES, 1        | skip the voices' filters too
         .equ    CORE_AUDIO_INSERT, 2             | 3.3: after the master stage, on its output
+| 3.3: core_audio_caps, a long, the flags core_audio takes (weak-import it: 0 before 3.3)
         .equ    CORE_MIDI_CC_AUTO, 1             | ev_midi_cc's flags: on the auto channel
