@@ -11,6 +11,9 @@ describes its page: SOPHIE, NEIGHBOR and DIGISLICER, built for it, combine.
 On its own, and for machines that describe no page (every core 2.1
 machine mod), it changes nothing the unit does.
 
+1.1's files are on the [machine-pages-v1.1](https://github.com/irpina/elekloader/releases/tag/machine-pages-v1.1) pre-release, and it is in
+the mod shop: tick it there and the page takes core 3.0 for it.
+
 | | |
 |---|---|
 | needs | core 3.0 (`resources.core`), and refuses beside digichain, which owns the same places |

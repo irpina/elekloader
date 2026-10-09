@@ -22,6 +22,20 @@
       "sha256": "5bdefabdca61d344756a3d0448f414c715006937ab417eb002032a976e9196e7"
     },
     {
+      "repo": "irpina/elekloader", "tag": "machine-pages-v1.1", "file": "machine-pages-1.1.elemod",
+      "device": "digitakt-mk1", "needs_core": "3.0",
+      "sha256": "56899d2a3cfee638bee6ba1e1d881853676dcd5c0db2922a9d898e151d88d17d",
+      "summary": "Lets machine mods built for it share one build: it draws each machine's SRC and LFO pages from what the machine describes. Needs core 3.0, which the shop takes for it; on its own it changes nothing. Not with the shop's machine mods that draw their own pages: DIGISLICER 2.2, NEIGHBOR 0.6, SOPHIE, DT-FM 1.1.0, and digichain (so not Digi Mono or Digi Poly).",
+      "on_unit": "Its first version (1.0) ran on a Digitakt mk1 on OS 1.54 with core 3.0 and six machine mods built for it, and everything worked. 1.1, which adds knobs that draw themselves, is checked in digikit's emulator on OS 1.53 and 1.54."
+    },
+    {
+      "repo": "irpina/elekloader", "tag": "machine-pages-v1.1", "file": "machine-pages-1.1-os1.54.elemod",
+      "device": "digitakt-mk1", "needs_core": "3.0",
+      "sha256": "e76b6223edf53de60d843ce92c023735506fa67fcd667ee75f4d25b228f610c2",
+      "summary": "Lets machine mods built for it share one build: it draws each machine's SRC and LFO pages from what the machine describes. Needs core 3.0, which the shop takes for it; on its own it changes nothing. Not with the shop's machine mods that draw their own pages: DIGISLICER 2.2, NEIGHBOR 0.6, SOPHIE, DT-FM 1.1.0, and digichain (so not Digi Mono or Digi Poly).",
+      "on_unit": "Its first version (1.0) ran on a Digitakt mk1 on OS 1.54 with core 3.0 and six machine mods built for it, and everything worked. 1.1, which adds knobs that draw themselves, is checked in digikit's emulator on OS 1.53 and 1.54."
+    },
+    {
       "repo": "irpina/digislicer", "tag": "v2.2", "file": "digislicer-2.2.elemod",
       "device": "digitakt-mk1", "needs_core": "2.1",
       "sha256": "20cfd79492c40289653c62667003e4a60eda7cc4ceed7abdb7fbde9e051a3527",
