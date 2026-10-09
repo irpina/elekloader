@@ -26,13 +26,15 @@ There is one core file per device and OS:
 | Digitakt mk1 | 1.54 | `core-2.1-os1.54.elemod` | the latest release (v0.4.0) |
 | Digitone mk1, Digitone Keys | 1.43 | `core-dn1-2.3.elemod` | the [core-dn1-v2.3](https://github.com/irpina/elekloader/releases/tag/core-dn1-v2.3) pre-release (v0.4.0 has 2.0a) |
 | Digitone mk1, Digitone Keys | 1.44 | `core-dn1-2.3-os1.44.elemod` | the same pre-release (v0.4.0 has 2.0a) |
+| Digitone mk1, Digitone Keys | 1.43 | `core-dn1-3.2.elemod` | the [core-dn1-v3.2](https://github.com/irpina/elekloader/releases/tag/core-dn1-v3.2) pre-release, for mods that need the 3.x line |
+| Digitone mk1, Digitone Keys | 1.44 | `core-dn1-3.2-os1.44.elemod` | the same pre-release |
 | Digitakt II | 1.17 | `core-dt2-1.0.elemod` | not released yet: build it ([below](#building-a-core)) |
 | Octatrack MKI, MKII | 1.40C | `core-ot-0.1.elemod` | the latest release (v0.4.0); 0.3 is in this repository |
 
 From 3.0 the Digitakt mk1's core and the Digitone mk1's each have two
 lines, 2.x and 3.x, and a build takes the 3.x line only for a mod that
-needs it. The Digitakt's 3.0 and the Digitone's 3.2 are in this repository
-and not released yet.
+needs it. The Digitone's 3.2 is on the core-dn1-v3.2 pre-release and in
+the shop; the Digitakt's 3.0 is in this repository and not released yet.
 
 ## How a build picks one
 

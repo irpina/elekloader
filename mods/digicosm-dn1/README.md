@@ -144,8 +144,8 @@ It names no firmware address, so its 1.44 port is empty. It needs core-dn1
 
 ## Checked
 
-In digikit's emulator, OS 1.43 and 1.44, with core-dn1 3.2. Not run on a
-unit yet.
+It runs on a Digitone mk1, with core-dn1 3.2. In digikit's emulator, OS
+1.43 and 1.44, in detail:
 
 - **Owning the audio.** With the factory pattern playing, its FM is silent
   while DigiCosm is open and back at once after NO, also when PLAY was
