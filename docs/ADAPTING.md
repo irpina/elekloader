@@ -179,7 +179,7 @@ longs:
 
 | offset | field | |
 |---|---|---|
-| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>`. Taken so far: 4 NEIGHBOR, 5 DIGISLICER, 6 Digi Poly's POLY, 7 SOPHIE (also DT-FM 1.1.0, in the shop), 8 STRING, 9 DT-FM 1.2.0, 20-29 Digi Mono's (20-26 in use); pick another, and say which in your mod's README |
+| +0 | id | its number, 4-127. Kits store it, so it is fixed for good: claim it as the resource `machine:<id>`. Taken so far: 4 NEIGHBOR, 5 DIGISLICER, 6 Digi Poly's POLY, 7 SOPHIE (also DT-FM 1.1.0 and older), 8 STRING, 9 DT-FM (from 1.2.0), 20-29 Digi Mono's (20-26 in use); pick another, and say which in your mod's README |
 | +4 | name | its name in the machine menu and the SRC page's title (10 characters fit) |
 | +8 | short | its 4-character name (the SRC page's `NAME: sample` title) |
 | +12 | icon | an 11 x 7 Bitmap for the menu, in the stock icons' format, or 0 |

@@ -111,8 +111,8 @@ them beside it; they still link with core 3.0 without it, as they did with
 2.1. Their builds for machine-pages (NEIGHBOR 0.7, DIGISLICER 2.3, and
 SOPHIE's, Digi Mono's and Digi Poly's, which are their authors' to publish)
 all link together: with digihealth, 100,012 of the 131,072 bytes of RAM.
-DT-FM 1.2.0, built for 1.1, links beside it with each shop mod that does,
-on OS 1.53 and 1.54.
+DT-FM 1.2.0, built for 1.1 and in the shop in place of 1.1.0, links beside it
+with each shop mod that does, on OS 1.53 and 1.54.
 
 | mod | sites with core 2.1 | built for machine-pages |
 |---|---|---|
