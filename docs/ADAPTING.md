@@ -158,6 +158,13 @@ arena writes listed in its `mod.json`, 0x40061e94, 0x40013cae, 0x40061dc8,
 0x400c46ea-0x400c4702. They keep clear of every byte that the converted
 octabam modules (4b) patch.
 
+Handlers of one event run in `order`, and one that takes the event stops
+the rest, so a mod can run on both sides of another without knowing it.
+`examples/cc-who-ot` subscribes to `ev_midi` at 10 and at 90, around CC
+MAP's 50 (octabam2elemod v1.1). It shows, for each CC, whether CC MAP took it
+or the Octatrack got it. Before the bus that took a bridge written for the
+pair.
+
 ### The DSP bus on the Octatrack (dspbus 0.1)
 
 `mods/dspbus-ot` is a second, optional bus, for code that runs on DSP core

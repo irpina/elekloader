@@ -10,8 +10,10 @@ is skipped, not passed:
 Building and checking also needs the cross binutils (m68k-linux-gnu-as, -ld,
 -objcopy).
 """
+import json
 import os
 import shutil
+import struct
 import sys
 import tempfile
 import textwrap
@@ -788,6 +790,50 @@ def test_real_bus_glue_is_checked():
         raise AssertionError('a stub entered past a replay it does not start with passed')
     finally:
         spec['skip'] = False
+
+
+def test_real_cc_who_around_cc_map():
+    """examples/cc-who-ot beside CC MAP on the bus: ev_midi calls cc-who's first handler,
+    CC MAP's glue, then cc-who's last, so cc-who sees what CC MAP decided. Its twin that
+    repoints the CC dispatch entry as CC MAP itself did before the bus is refused beside
+    CC MAP's patch."""
+    ob, img = real(), stock()
+    if not octabam.bare_metal(DEV):
+        raise Skip('the configured assembler is not bare metal (ELEKLOADER_CROSS=m68k-elf-)')
+    cc = DEV.toolchain['prefix']                # the example is C: the device's own gcc
+    if not shutil.which(cc + 'gcc'):
+        raise Skip('no %sgcc for the C example' % cc)
+    plan, mapbus, _l = convert_bus(['cc-map'])['cc-map']
+    out = tempfile.mkdtemp()
+    was = os.environ.get('ELEKLOADER_CROSS')
+    os.environ['ELEKLOADER_CROSS'] = cc
+    try:
+        who, _m = build.build(os.path.join(ROOT, 'examples', 'cc-who-ot'), SYX, out)
+    finally:
+        if was is None:
+            os.environ.pop('ELEKLOADER_CROSS', None)
+        else:
+            os.environ['ELEKLOADER_CROSS'] = was
+    core_mod = elemod.load_any(_c['core'])
+    ln = link.link([core_mod, mapbus, elemod.load_any(who)], img)
+    at, n, _w = ln.tables['ev_midi']
+    o = ln.layout['run_load'] + (at - DEV.ddr[0]) - DEV.main_load
+    assert struct.unpack('>4I', ln.image[o:o + 16]) == (
+        ln.map['ccwho_first'], ln.map['%s:%s' % (plan['id'], plan['bus'][0]['sym'])],
+        ln.map['ccwho_last'], 0)
+    d = os.path.join(out, 'twin')
+    os.makedirs(d)
+    with open(os.path.join(d, 'twin.s'), 'w') as fh:
+        fh.write('        .section .run, "ax"\n        .globl  twin_cc\ntwin_cc: jmp 0x4000e79c\n')
+    with open(os.path.join(d, 'mod.json'), 'w') as fh:
+        json.dump({'id': 'cc-who-patch', 'version': '1', 'device': 'octatrack', 'os': '1.40C',
+                   'sources': ['twin.s'], 'requires': ['core'],
+                   'sites': [{'addr': '0x400d64a0', 'stock': '4000e79c', 'op': 'ptr',
+                              'target': 'twin_cc'}]}, fh)
+    twin, _m = build.build(d, SYX, out)
+    patched = convert_all(['cc-map'])['cc-map']                 # without --bus: the repoint
+    probs = link.check([core_mod, patched, elemod.load_any(twin)], img)
+    assert any('0x400d64a0' in p and 'overlap' in p for p in probs), probs
 
 
 def test_real_overlapping_claims_do_not_combine():
