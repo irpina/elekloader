@@ -468,6 +468,48 @@ def test_parts_stay_in_the_image():
         raise AssertionError('accepted %r' % bad)
 
 
+
+def test_lint_notes_the_code_sites_a_mod_hooks_itself():
+    from elekloader.lint import core_candidates
+
+    def mod2(mod_id, sites):
+        m = link.Mod2.__new__(link.Mod2)
+        m.id, m.sites = mod_id, sites
+        return m
+    sites = [{'addr': 0x400ea1a8, 'len': 6, 'kind': 'code'},
+             {'addr': 0x401ab9b0, 'len': 4, 'kind': 'data'}]
+    assert core_candidates(mod2('my-mod', sites)) == [
+        {'mod': 'my-mod', 'site': '0x400ea1a8', 'len': 6}]
+    # the core owns its sites; data sites are not events
+    assert core_candidates(mod2('core', sites)) == []
+    assert core_candidates(mod2('my-mod', sites[1:])) == []
+
+
+def test_coresites_groups_the_sites_mods_share():
+    from elekloader.sdk.coresites import routine_test, shared_sites
+    sites = [('health', '1.0', 0x4007814a, 6), ('neighbor', '0.6', 0x40078142, 6),
+             ('slicer', '2.0', 0x40074df2, 6), ('slicer', '2.0', 0x40074e00, 6),
+             ('fm', '1.2', 0x40074df2, 6), ('fm', '1.2', 0x40090000, 6)]
+    g = shared_sites(sites)
+    assert [(x['kind'], x['overlap'], x['lo'], x['hi'], sorted(y['mod'] for y in x['sites']))
+            for x in g] == [
+        ('near', True, 0x40074df2, 0x40074e06, ['fm', 'slicer', 'slicer']),
+        ('near', False, 0x40078142, 0x40078150, ['health', 'neighbor'])]
+    assert shared_sites(sites[2:5:2])[0]['kind'] == 'same bytes'
+    # one mod's own sites close together are not shared
+    assert shared_sites([('a', '1', 0x100, 6), ('a', '1', 0x106, 6)]) == []
+    assert [(x['lo'], x['hi']) for x in shared_sites(sites, window=0)] == [(0x40074df2, 0x40074df8)]
+    # by routine: an rts between two sites parts them, however close
+    code = bytes.fromhex('4e714e714e714e714e754e714e714e71')       # nop x4, rts, nop x3
+    dev = type('Dev', (), {'main_load': 0x1000, 'decoder': lambda self: __import__(
+        'elekloader.isa.coldfire', fromlist=['x'])})()
+    same = routine_test(code, dev)
+    assert same((0x1000, 2), (0x1006, 2)) and not same((0x1000, 2), (0x100a, 2))
+    two = [('a', '1', 0x1000, 2), ('b', '1', 0x1006, 2), ('c', '1', 0x100c, 2)]
+    assert [sorted(y['mod'] for y in x['sites']) for x in shared_sites(two, same)] == [['a', 'b']]
+    assert shared_sites(two, same)[0]['kind'] == 'same routine'
+
+
 if __name__ == '__main__':
     import traceback
     ok = failed = 0

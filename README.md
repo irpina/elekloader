@@ -75,7 +75,7 @@ The [docs](docs/README.md) are elekloader's wiki:
 | for | pages |
 |---|---|
 | **Using it** | [Install](docs/INSTALL.md) · [Build, flash and recover](docs/BUILDING.md) · [Cores](docs/CORES.md) · [The web page](docs/WEB.md) |
-| **Writing mods** | [Adapting your mod](docs/ADAPTING.md) · [The file format](docs/FORMAT.md) · [Adding a device](docs/DEVICES.md) · coding agents: [AGENTS.md](AGENTS.md) |
+| **Writing mods** | [Adapting your mod](docs/ADAPTING.md) · [Growing the core](docs/CORE-CONTRIBUTING.md) · [The file format](docs/FORMAT.md) · [Adding a device](docs/DEVICES.md) · coding agents: [AGENTS.md](AGENTS.md) |
 | **On your own site** | [The kit](docs/INTEGRATING.md) · [The engine in TypeScript](js/README.md) |
 | **Maintaining it** | [Releasing](docs/RELEASING.md) · [The apps](docs/APPS.md) · [Tests](docs/TESTS.md) |
 

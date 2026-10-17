@@ -1048,9 +1048,12 @@ small square in the top-right corner of every screen. For the Digitakt II,
 their addresses, as `hello.c` does. There is no C library. Keep interrupt-level
 handlers (`ev_render_*`) short and free of firmware calls that might block.
 
-**3.4 Hook a site nobody owns (only if no event fits).** Add a `sites`
-entry. `stock` is the hex of the whole stock instruction(s) at `addr`;
-`op` says what replaces them:
+**3.4 Hook a site nobody owns (only if no event fits).** First ask whether
+another mod could want the same site. If one could, build it in the core's
+shape, so that it can become a core event:
+[CORE-CONTRIBUTING.md](CORE-CONTRIBUTING.md). Then add a `sites` entry.
+`stock` is the hex of the whole stock instruction(s) at `addr`; `op` says
+what replaces them:
 
 | op | new bytes |
 |---|---|
@@ -1440,7 +1443,7 @@ Some differences from an octabam build, by design:
 | `is made for <device> 1.53; the stock file is <device> 1.54` / `mod.json is for ... 1.53; the stock file is ... 1.54` | the mod is for another OS version | build it for that OS: a port (3.10) |
 | `the stock bytes are ..., not ...` (SDK) / `not the ones it expects` | the address is wrong, or the OS version differs | re-read the stock bytes at that address |
 | `ends mid-instruction`, `sweeps land on the start`, `does not decode` | the site does not cover whole instructions | move or widen the site to instruction boundaries (disassemble the stock main OS) |
-| `... overlap (0x...-0x...)` | another mod patches or claims those bytes | subscribe to an event instead, or agree with that mod's author |
+| `... overlap (0x...-0x...)` | another mod patches or claims those bytes | subscribe to an event instead, agree with that mod's author, or propose the site as a core event ([CORE-CONTRIBUTING.md](CORE-CONTRIBUTING.md)) |
 | `X requires Y` / `core is not enabled` | a dependency is missing | add Y (with lint: `--with Y.elemod`) |
 | `X needs core 3.0 or newer, and this build has core 2.1` | the mod's `resources.core` asks for a newer core | build with that core (the app and the web page take it when you tick the mod); an older loader says `imports fw_..., which no given mod exports` instead |
 | `imports cm_ui_v31, which no given mod exports` | the page names `cm_ui_v31` (a knob that draws itself, `CM_DRAW`), and no mod given exports it: machine-pages before 1.1 does not | use machine-pages 1.1 or newer |

@@ -23,6 +23,9 @@ docs match its code.
 - **[Adapting your mod](ADAPTING.md)**: the path to take, the rules, every
   command with the output it should print, every refusal with its fix, and a
   definition of done. Coding agents: start with [AGENTS.md](../AGENTS.md).
+- **[Growing the core](CORE-CONTRIBUTING.md)**: when what your mod needs
+  belongs in the core, how to build it so it can move there, and how to
+  propose it.
 - **[The file format](FORMAT.md)**: `.elemod`, whole builds (format 1) and
   linkable mods (format 2).
 - **[Adding a device](DEVICES.md)**: a device profile, and what was found

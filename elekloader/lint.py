@@ -15,6 +15,11 @@ then linked, so every import resolves and the budgets are checked.
 
 It prints one "OK" or "PROBLEM:" line per finding, or JSON with --json.
 Exit status 0 means every check passed.
+
+It also lists, as "NOTE:" lines (`core_candidates` in the JSON), each code
+site a linkable mod hooks itself: a site another mod may want too belongs
+in the core as an event (docs/CORE-CONTRIBUTING.md). Notes never fail the
+check.
 """
 import argparse
 import json
@@ -41,6 +46,14 @@ def describe(m):
     return d
 
 
+def core_candidates(m):
+    """The code sites a linkable mod other than the core hooks itself."""
+    if not isinstance(m, link.Mod2) or m.id == 'core':
+        return []
+    return [{'mod': m.id, 'site': '0x%08x' % s['addr'], 'len': s['len']}
+            for s in m.sites if s['kind'] == 'code']
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='elekloader.lint', description=__doc__.split('\n')[0])
     ap.add_argument('mods', nargs='+', help='the .elemod files to check')
@@ -49,7 +62,7 @@ def main(argv=None):
                     help='another mod to check together with (repeatable), e.g. core')
     ap.add_argument('--json', action='store_true', help='machine-readable output')
     a = ap.parse_args(argv)
-    report = {'ok': True, 'mods': [], 'problems': []}
+    report = {'ok': True, 'mods': [], 'problems': [], 'core_candidates': []}
 
     def problem(text):
         report['ok'] = False
@@ -65,6 +78,7 @@ def main(argv=None):
         loaded.append(m)
         if p in a.mods:
             report['mods'].append(describe(m))
+            report['core_candidates'] += core_candidates(m)
     if a.stock and loaded and report['ok']:
         try:
             st, dev, rel = formats.load(a.stock)
@@ -111,6 +125,12 @@ def main(argv=None):
             print('OK: links as %s; RAM %d of %d bytes, fast SRAM %d of %d'
                   % (' > '.join(L['order']), L['ram_used'], L['ram_size'], L['fast_used'],
                      L['fast_size']))
+        for d in report['mods']:
+            at = [c['site'] for c in report['core_candidates'] if c['mod'] == d['id']]
+            if at:
+                print('NOTE: %s hooks %d code site%s itself (%s); a site another mod could want '
+                      'belongs in the core as an event (docs/CORE-CONTRIBUTING.md)'
+                      % (d['id'], len(at), '' if len(at) == 1 else 's', ', '.join(at)))
         for x in report['problems']:
             print('PROBLEM: %s' % x)
         if report['ok'] and not a.stock:

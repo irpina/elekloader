@@ -6,6 +6,15 @@ the rest of the docs start at docs/README.md.
 
 ## If you are adapting or writing a mod
 
+**Core first.** Before you add a code site to a mod, check whether the
+core already has an event, a table or a firmware export for it, and if
+not, whether another mod could want the same thing. If one could, build
+that part in the core's shape, in a file of its own, so that it can move
+into the core, and tell the user it is a candidate for a core pull request
+([docs/CORE-CONTRIBUTING.md](docs/CORE-CONTRIBUTING.md)). `lint` lists each
+code site a mod hooks itself under `core_candidates`, and
+`python -m elekloader.sdk.coresites` lists the sites several mods hook.
+
 Follow [docs/ADAPTING.md](docs/ADAPTING.md). It has:
 - the rules;
 - the build, lint and patch commands, with the output each should print;
