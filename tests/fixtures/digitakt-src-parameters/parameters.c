@@ -6,7 +6,7 @@
 
 static const struct cm_src_page pages[] = {
     { "PARAM 1/2", {0, 1, 2, 3, 4, 5, 6, 7} },
-    { "PARAM 2/2", {8, 9, 10, 11, 12, 13, 14, CM_SRC_BLANK} },
+    { "PARAM 2/2", {8, 9, 10, 11, 12, 13, 14, 51}, CM_SRC_STOCK(7) },   /* H: the amp's VOL */
 };
 
 static const struct cm_ui32 ui = {

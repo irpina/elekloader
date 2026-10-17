@@ -1,7 +1,8 @@
 # Silent two-page SRC test
 
-PARAM exposes P1–P8 and P9–P15 on two SRC pages (page 2's eighth knob is
-blank: sound slot 0 is kept for a machine's id). All controls range from
+PARAM exposes P1–P8 and P9–P15 on two SRC pages. Page 2's eighth knob is
+the amp's VOL, a stock knob (`CM_SRC_STOCK`): sound slot 0, the only other
+free one, is kept for a machine's id. P1–P15 range from
 0 to 127 and default to zero. It has no audio-render callback, oscillator,
 tick handler or custom graphics; only the shared parameter paths run.
 

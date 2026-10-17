@@ -121,9 +121,12 @@ def probe_storage(stock_path, Machine, call, pc_register):
     for machine in (120, 121):
         assert native(linked.map['mp_src_for'], [machine]) != 0
     assert native(linked.map['mp_src_for'], [122]) == 0
-    for machine in (119, 123, 124, 125, 126, 127):
+    for machine in (117, 118, 119, 123, 124, 125, 126, 127):  # 117/118: a trig's or a bank's id as a stock knob
         assert native(linked.map['mp_src_for'], [machine]) == 0
         assert native(linked.map['mp_layout'], [machine]) == 0
+    # Only the sound's own stock parameters may be a page's knob: filter, amp, both LFOs.
+    stock_ok = [i for i in range(172) if native(linked.map['mp_stock_sound_parameter'], [i])]
+    assert stock_ok == list(range(30, 70)), stock_ok
 
     # These are the native sound reference and parameter objects used by a
     # view; call its encoder scaler/setter, rather than writing sound words.
@@ -298,6 +301,7 @@ def probe_storage(stock_path, Machine, call, pc_register):
         assert native(0x4003AAE4, [view, 5]) == 169
         title = native(linked.map['mp_src_title'], [view])
         assert bytes(m.uc.mem_read(title, 10)) == b'PARAM 2/2\0'
+        assert native(0x4003AAE4, [view, 7]) == 51  # knob H: the amp's VOL, a stock knob
         put_long(track_state + 8, 7)
         assert native(0x4003AAE4, [view, 4]) == 136
         put_long(track_state + 8, 0)
@@ -367,6 +371,8 @@ def probe_storage(stock_path, Machine, call, pc_register):
         put_long(view + 144, 1)
         click()
         assert native(0x4003AAE4, [view, 0]) == 164
+        assert native(0x4003AAE4, [view, 2]) == 30   # the filter's FREQ
+        assert native(0x4003AAE4, [view, 3]) == 0    # blank
         for machine in (122, 3):
             initialize(machine)
             key(20, 1)
@@ -403,13 +409,15 @@ def probe_storage(stock_path, Machine, call, pc_register):
                 m.uc.mem_write(sound + 20 + 2 * slot, struct.pack('>h', 1000 + logical))
             machine_id = struct.pack('>H', 0x5A5B)  # slot 0: a hashed machine id, never an SRC value
             m.uc.mem_write(sound + 20, machine_id)
+            vol = sound + 20 + 2 * 45                # page 2's knob H, the amp's VOL (slot 45)
+            m.uc.mem_write(vol, struct.pack('>h', 0x1234))
             native(action_stub, [clipboard, parameter, 4])
             assert collected(clipboard, 8) == list(range(132, 140))
             click()
             native(action_stub, [clipboard, parameter, 5])
-            page_ids = list(EXTRA_IDS)
-            def page_two(ids):  # the eighth knob is blank
-                return [i for i in ids if i] == page_ids and set(ids) <= {0, *page_ids}
+            page_ids = list(EXTRA_IDS) + [51]  # the eighth knob is the amp's VOL
+            def page_two(ids):
+                return ids == page_ids
             got = collected(clipboard, 8)
             assert page_two(got), got
             native(action_stub + 32, [id_list, 4])
@@ -424,20 +432,25 @@ def probe_storage(stock_path, Machine, call, pc_register):
             native(0x4000F0E4, [parameter, id_list])
             assert bytes(m.uc.mem_read(sound + 112, 14)) == bytes(14)
             assert bytes(m.uc.mem_read(sound + 20, 2)) == machine_id
+            got = bytes(m.uc.mem_read(vol, 2))  # the page's clear resets the stock knob to its default
+            assert got == struct.pack('>h', 0x6E00), got.hex()
             click()
             native(0x40011BD8, [parameter, clipboard, 0, 0])
             assert bytes(m.uc.mem_read(sound + 112, 4)) == struct.pack('>2h', 1008, 1009)
             assert bytes(m.uc.mem_read(sound + 54, 2)) == struct.pack('>h', 1000)
             assert bytes(m.uc.mem_read(sound + 112, 14)) == struct.pack('>7h', *range(1008, 1015))
             assert bytes(m.uc.mem_read(sound + 20, 2)) == machine_id
-            for parameter_id in (132, 164, 165):
+            assert bytes(m.uc.mem_read(vol, 2)) == struct.pack('>h', 0x1234)  # and paste brings it back
+            for parameter_id in (132, 164, 165, 51):
                 assert native(0x400107D2, [parameter, parameter_id, 2000, step]) & 0xFF == 1
+            assert native(0x4001076E, [parameter, 51, step]) == 2000  # a lock on the stock knob
             for parameter_id in collected(id_list, 4):
                 if parameter_id:
                     native(0x4001083E, [parameter, parameter_id, step])
             assert native(0x4001076E, [parameter, 132, step]) == 2000
             assert native(0x4001076E, [parameter, 164, step]) == 0xFFFFFFFF
             assert native(0x4001076E, [parameter, 165, step]) == 0xFFFFFFFF
+            assert native(0x4001076E, [parameter, 51, step]) == 0xFFFFFFFF
             initialize(122)
             native(action_stub, [clipboard, parameter, 4])
             assert collected(clipboard, 8) == list(range(108, 116))
@@ -752,6 +765,8 @@ def probe_storage(stock_path, Machine, call, pc_register):
         'individual_and_all_parameter_resets_use_metadata_defaults': True,
         'native_held_step_edit_and_removal_leave_base_values_unchanged': True,
         'stock_lfo_destination_chooser_reaches_slots_46_52_and_none': True,
+        'a_page_knob_may_be_a_stock_sound_parameter_that_edits_locks_clears_and_pastes': True,
+        'only_filter_amp_and_lfo_parameters_may_be_stock_knobs': True,
         'processed_accessor_keeps_seven_extra_identities_and_tracks': True,
         'native_src_view_knobs_follow_per_track_page_selection': True,
         'native_src_release_cycles_while_held_copy_clear_paste_keep_the_page': True,

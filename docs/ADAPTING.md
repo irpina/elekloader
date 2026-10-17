@@ -412,8 +412,14 @@ playback has written every track's block and before the overdrive
 `cm_ui_v32` is a `struct cm_ui32` (624 bytes): the `struct cm_ui` above, then
 `extra[7]` (+336, knobs as above; each needs flags 2 and 4, min 0, max
 0x7F00 and a `look` below 164), `page_count` (+616, 1 or 2) and `pages`
-(+620, `struct cm_src_page[page_count]`: a title and eight bytes, each a
-value 0-14, 8-14 being `extra[0-6]`, or 255 for a blank knob). SRC flips
+(+620, `struct cm_src_page[page_count]`, 16 bytes each: a title, eight
+bytes, each a value 0-14, 8-14 being `extra[0-6]`, or 255 for a blank knob,
+then `stock`, a byte whose bit k (`CM_SRC_STOCK(k)`) makes byte k a stock
+parameter's id instead, and three zero bytes). A stock knob is one of the
+sound's own parameters, the filter's (ids 30-43), the amp's (44-51) or the
+LFOs' (52-69), shown on this page too: the firmware's own knob, with its
+label, range, locks, LFO and saving; the page's copy, clear and paste take
+it with the rest. Any other id refuses the machine's page. SRC flips
 the track's page. Only a machine whose params machine is 3 (SLICE's bank)
 can have them. They are the sound's slots 46-52, the seven the firmware
 leaves unregistered, as parameter ids 164-170: they lock, the LFOs reach

@@ -124,8 +124,11 @@ uint32_t mp_layout_track(int32_t m, uint32_t track)
             for (i = 0; i < LAY_LONGS; i++)
                 p->lay[page][i] = s[i];
             for (i = 0; i < KNOBS; i++) {
-                int k = p->extended ? p->extended->pages[page].parameter[i] : i;
-                if (k == CM_SRC_BLANK || (knob(p, k)->flags & CM_HIDDEN))
+                const struct cm_src_page *pg = p->extended ? &p->extended->pages[page] : 0;
+                int k = pg ? pg->parameter[i] : i;
+                if (pg && (pg->stock & CM_SRC_STOCK(i)))
+                    p->lay[page][2 + i] = k;   /* a stock sound parameter: the firmware's own knob */
+                else if (k == CM_SRC_BLANK || (knob(p, k)->flags & CM_HIDDEN))
                     p->lay[page][2 + i] = 0;
                 else if (p->extended)
                     p->lay[page][2 + i] = k < 8 ? ID_BASE(p->params) + k : MP_EXTRA_ID + k - 8;
