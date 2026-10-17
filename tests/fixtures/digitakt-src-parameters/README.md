@@ -1,6 +1,7 @@
 # Silent two-page SRC test
 
-PARAM exposes P1–P8 and P9–P16 on two SRC pages. All controls range from
+PARAM exposes P1–P8 and P9–P15 on two SRC pages (page 2's eighth knob is
+blank: sound slot 0 is kept for a machine's id). All controls range from
 0 to 127 and default to zero. It has no audio-render callback, oscillator,
 tick handler or custom graphics; only the shared parameter paths run.
 
@@ -15,9 +16,9 @@ mise exec python@3.12.13 -- python -m elekloader.sdk.build mods/machine-pages --
 mise exec python@3.12.13 -- python -m elekloader.sdk.build tests/fixtures/digitakt-src-parameters --out build/src-poc
 mise exec python@3.12.13 -- python -m elekloader.lint build/src-poc/src-parameters-test-0.1.elemod \
   --stock "$ELEKLOADER_STOCK" --with build/src-poc/core-4.0.elemod \
-  --with build/src-poc/machine-pages-1.1.elemod --json
+  --with build/src-poc/machine-pages-1.2.elemod --json
 mise exec python@3.12.13 -- python -m elekloader.patch --stock "$ELEKLOADER_STOCK" \
-  --mod build/src-poc/core-4.0.elemod --mod build/src-poc/machine-pages-1.1.elemod \
+  --mod build/src-poc/core-4.0.elemod --mod build/src-poc/machine-pages-1.2.elemod \
   --mod build/src-poc/src-parameters-test-0.1.elemod --out build/src-poc/test.syx --version PRAM
 ```
 

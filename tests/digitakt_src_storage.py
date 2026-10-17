@@ -79,6 +79,9 @@ def probe_storage(stock_path, Machine, call, pc_register):
         guarded(loaded, 162)
         return result, bytes(m.uc.mem_read(loaded, 162))
 
+    EXTRAS = 7                         # slots 46-52; slot 0 is the machine's id
+    EXTRA_IDS = range(164, 164 + EXTRAS)
+    extra_slots = list(range(46, 46 + EXTRAS))
     descriptor = 0x401A9D9C if release.version == '1.53' else 0x401AA09C
     following = descriptor + 164 * 52
     original_descriptors = image[descriptor - dev.main_load:following - dev.main_load]
@@ -86,22 +89,25 @@ def probe_storage(stock_path, Machine, call, pc_register):
     native(0x40078B20, [])
     assert bytes(m.uc.mem_read(descriptor, 164 * 52)) == original_descriptors
     assert bytes(m.uc.mem_read(linked.map['mp_legacy_tables'], 600)) == original_tables
-    installed = bytes(m.uc.mem_read(following, 416))
+    installed = bytes(m.uc.mem_read(following, 52 * EXTRAS))
     native(0x40078B20, [])
-    assert bytes(m.uc.mem_read(following, 416)) == installed
+    assert bytes(m.uc.mem_read(following, 52 * EXTRAS)) == installed
+    # Seven descriptors overwrite 364 of the 600 preserved bytes; the rest stay stock.
+    assert bytes(m.uc.mem_read(following + 52 * EXTRAS, 600 - 52 * EXTRAS)) == original_tables[52 * EXTRAS:]
     assert bytes(m.uc.mem_read(linked.map['mp_legacy_tables'], 600)) == original_tables
-    for parameter, slot in zip(range(164, 172), [*range(46, 53), 0]):
+    for parameter, slot in zip(EXTRA_IDS, extra_slots):
         assert native(0x40078D80, [parameter]) == slot
-    for parameter in (172, 0xFFFFFFFF):
+    for parameter in (171, 172, 0xFFFFFFFF):
         assert native(0x40078D80, [parameter]) == 0xFFFFFFFF
+    stock_slot0 = native(0x40078F44, [0, 3])
     for machine in (0, 1, 2, 3, 120, 121, 122, 123, 127):
         for slot in range(53):
             got = native(0x40078F44, [slot, machine])
             if slot >= 46:
-                count = 8 if machine in (120, 121) else 0
+                count = EXTRAS if machine in (120, 121) else 0
                 assert got == (164 + slot - 46 if slot - 46 < count else 0)
-            elif slot == 0:
-                assert got == (171 if machine in (120, 121) else 17)
+            elif slot == 0:  # the machine's id slot: native for every machine
+                assert got == stock_slot0, (machine, got)
             elif 17 <= slot <= 24:
                 params = machine if machine <= 3 else 3
                 expected = 108 + 8 * params + slot - 17
@@ -127,7 +133,7 @@ def probe_storage(stock_path, Machine, call, pc_register):
     m.uc.mem_write(parameter, struct.pack('>5I', 0x4017EB58 + relocation, 0, 0, 0, reference))
     m.uc.mem_write(reference, struct.pack('>10I', 0x40181330 + relocation, 0, 0, 0, sound, 0, 0, 0, 0, 0))
     native(0x40084EF6, [sound, 0, 121])
-    for parameter_id, offset, default in ((164, 112, 13), (171, 20, 8)):
+    for parameter_id, offset, default in ((164, 112, 13), (170, 124, 7)):
         got = native(0x40010026, [parameter, parameter_id, 256, 0, 0, 0, 0, 0])
         assert got == default + 256, (parameter_id, got)
         assert bytes(m.uc.mem_read(sound + offset, 2)) == struct.pack('>h', default + 256)
@@ -205,17 +211,17 @@ def probe_storage(stock_path, Machine, call, pc_register):
     step = 3
     assert native(0x4001589C, [context, 0]) == context + 2812 + 112 + 48
     assert native(0x40024700, [context + 2812 + 112]) == 64
-    # Processed identities remain independent across all eight extras and tracks.
+    # Processed identities remain independent across all seven extras and tracks.
     m.uc.mem_write(linked.map['core_track_machine'], bytes([120]) + bytes(6) + bytes([120]))
     processed = linked.map['fw_voice_params']
     m.uc.mem_write(processed - 34, bytes(8 * 106))
-    extra_slots = [*range(46, 53), 0]
     for track in (0, 7):
-        values = tuple(1000 + 100 * track + 111 * k for k in range(8))
+        values = tuple(1000 + 100 * track + 111 * k for k in range(EXTRAS))
         for slot, value in zip(extra_slots, values):
             m.uc.mem_write(processed + 106 * track + 2 * (slot - 17), struct.pack('>h', value))
-        assert tuple(native(linked.map['cm_src_value'], [track, k]) for k in range(8, 16)) == values
-    for track, index in ((8, 8), (0, 16), (0xFFFFFFFF, 0), (1, 8)):
+        assert tuple(native(linked.map['cm_src_value'], [track, k])
+                     for k in range(8, 8 + EXTRAS)) == values
+    for track, index in ((8, 8), (0, 15), (0, 16), (0xFFFFFFFF, 0), (1, 8)):
         assert native(linked.map['cm_src_value'], [track, index]) == 0
 
     # Resolve real SRC-view knob IDs through native press/release handling. The
@@ -392,17 +398,23 @@ def probe_storage(stock_path, Machine, call, pc_register):
             first, last = struct.unpack('>2I', m.uc.mem_read(pointer, 8))
             return [long_at(p) for p in range(first, last, stride)]
         try:
-            for logical in range(16):
-                slot = 17 + logical if logical < 8 else 0 if logical == 15 else 46 + logical - 8
+            for logical in range(8 + EXTRAS):
+                slot = 17 + logical if logical < 8 else 46 + logical - 8
                 m.uc.mem_write(sound + 20 + 2 * slot, struct.pack('>h', 1000 + logical))
+            machine_id = struct.pack('>H', 0x5A5B)  # slot 0: a hashed machine id, never an SRC value
+            m.uc.mem_write(sound + 20, machine_id)
             native(action_stub, [clipboard, parameter, 4])
             assert collected(clipboard, 8) == list(range(132, 140))
             click()
             native(action_stub, [clipboard, parameter, 5])
-            page_ids = list(range(164, 172))
-            assert collected(clipboard, 8) == page_ids
+            page_ids = list(EXTRA_IDS)
+            def page_two(ids):  # the eighth knob is blank
+                return [i for i in ids if i] == page_ids and set(ids) <= {0, *page_ids}
+            got = collected(clipboard, 8)
+            assert page_two(got), got
             native(action_stub + 32, [id_list, 4])
-            assert collected(id_list, 4) == page_ids
+            got = collected(id_list, 4)
+            assert page_two(got), got
             # Extras borrow the native randomizer from look 134.
             record = native(0x40065794, [134])
             m.uc.mem_write(record + 52, struct.pack('>4I', action_stub + 64, 0, 0x40062914, 0x400632D4))
@@ -411,13 +423,13 @@ def probe_storage(stock_path, Machine, call, pc_register):
             assert bytes(m.uc.mem_read(sound + 54, 2)) == struct.pack('>h', 1000)
             native(0x4000F0E4, [parameter, id_list])
             assert bytes(m.uc.mem_read(sound + 112, 14)) == bytes(14)
-            assert bytes(m.uc.mem_read(sound + 20, 2)) == bytes(2)
+            assert bytes(m.uc.mem_read(sound + 20, 2)) == machine_id
             click()
             native(0x40011BD8, [parameter, clipboard, 0, 0])
             assert bytes(m.uc.mem_read(sound + 112, 4)) == struct.pack('>2h', 1008, 1009)
             assert bytes(m.uc.mem_read(sound + 54, 2)) == struct.pack('>h', 1000)
             assert bytes(m.uc.mem_read(sound + 112, 14)) == struct.pack('>7h', *range(1008, 1015))
-            assert bytes(m.uc.mem_read(sound + 20, 2)) == struct.pack('>h', 1015)
+            assert bytes(m.uc.mem_read(sound + 20, 2)) == machine_id
             for parameter_id in (132, 164, 165):
                 assert native(0x400107D2, [parameter, parameter_id, 2000, step]) & 0xFF == 1
             for parameter_id in collected(id_list, 4):
@@ -467,24 +479,26 @@ def probe_storage(stock_path, Machine, call, pc_register):
     finally:
         m.uc.hook_del(hook)
 
-    # One sixteen-value lifecycle: native edits/locks, real destination choices,
+    # One fifteen-value lifecycle: native edits/locks, real destination choices,
     # processed LFO output, then lossless serialized sound.
     def extras_at(pointer):
         return tuple(struct.unpack('>h', m.uc.mem_read(pointer + 20 + 2 * slot, 2))[0]
                      for slot in extra_slots)
+    probe_defaults = (13, 29, 3, 4, 5, 6, 7)
 
     native(0x40084EF6, [sound, 0, 121])
-    assert extras_at(sound) == (13, 29, 3, 4, 5, 6, 7, 8)
+    assert extras_at(sound) == probe_defaults
     m.uc.mem_write(sound + 22, b'\xff\xff')
-    m.uc.mem_write(sound + 20, b'\xff\xff')
+    m.uc.mem_write(sound + 20, b'\xff\xff')  # slot 0 is raw: whatever id it holds comes back
     normalized_source = bytes(m.uc.mem_read(sound, 162))
     assert native(0x4007A5A0, [saved, sound, 0]) & 255 == 1
     assert bytes(m.uc.mem_read(sound, 162)) == normalized_source
     assert load(bytes(m.uc.mem_read(saved, 160)))[0] == 1
     assert bytes(m.uc.mem_read(loaded + 22, 2)) == bytes(2)
-    assert extras_at(loaded) == (13, 29, 3, 4, 5, 6, 7, 8)
+    assert bytes(m.uc.mem_read(loaded + 20, 2)) == b'\xff\xff'
+    assert extras_at(loaded) == probe_defaults
     native(0x40084EF6, [sound, 0, 120])
-    assert extras_at(sound) == (0,) * 8
+    assert extras_at(sound) == (0,) * EXTRAS
     original_src = bytes(m.uc.mem_read(sound + 54, 16))
     for k, slot in enumerate(extra_slots):
         value = 777 * (k + 1)
@@ -493,7 +507,7 @@ def probe_storage(stock_path, Machine, call, pc_register):
         assert native(0x4001076E, [parameter, 164 + k, step]) == value + 256
         assert native(0x4000F18C, [parameter, 164 + k, 256, step]) == value + 512
         assert native(0x4001083E, [parameter, 164 + k, step]) & 255 == 1
-    assert extras_at(sound) == tuple(777 * (k + 1) for k in range(8))
+    assert extras_at(sound) == tuple(777 * (k + 1) for k in range(EXTRAS))
     assert bytes(m.uc.mem_read(sound + 54, 16)) == original_src
     note_lock = bytes(m.uc.mem_read(pattern_data + step * 108, 2))
     native(0x40024942, [context + 2812 + 112, step, 60])
@@ -502,26 +516,33 @@ def probe_storage(stock_path, Machine, call, pc_register):
     hooks = [m.uc.hook_add(unicorn.UC_HOOK_CODE, allocate, begin=a, end=a)
              for a in (allocator, allocator + 12)]
     try:
+        # The stock chooser itself reaches the extras' slots: no extra destination is added.
         for parameter_id, offset in ((55, 28), (64, 44)):
-            m.uc.mem_write(sound + offset, struct.pack('>h', 52 << 8))
-            assert native(0x40010026, [parameter, parameter_id, 256, 0, 0, 0, 0, 0]) == 53 << 8
-            assert native(0x40010026, [parameter, parameter_id, 0xFFFFFF00, 0, 0, 0, 0, 0]) == 52 << 8
-            eighth = extras_at(sound)[7]
+            m.uc.mem_write(sound + offset, struct.pack('>h', 51 << 8))
+            got = native(0x40010026, [parameter, parameter_id, 256, 0, 0, 0, 0, 0])
+            assert got == 52 << 8, (parameter_id, hex(got))
+            got = native(0x40010026, [parameter, parameter_id, 256, 0, 0, 0, 0, 0])
+            assert got == 52 << 8, (parameter_id, hex(got))  # the last destination
+            got = native(0x40010026, [parameter, parameter_id, 0xFFFFFF00, 0, 0, 0, 0, 0])
+            assert got == 51 << 8, (parameter_id, hex(got))
+            last = extras_at(sound)[-1]
             assert native(0x4000FEF6, [parameter, parameter_id, 0, 0, 0, 0, 0]) == 0
-            assert extras_at(sound)[7] == eighth
+            assert extras_at(sound)[-1] == last
         assert native(0x4000F3B4, [parameter, 0]) == 17
-        assert native(0x4000F3B4, [parameter, 53]) == 171
+        for slot, parameter_id in zip(extra_slots, EXTRA_IDS):
+            assert native(0x4000F3B4, [parameter, slot]) == parameter_id
     finally:
         for hook in hooks:
             m.uc.hook_del(hook)
 
     lfo_state = 0x421F3E10 + (0x1000 if release.version == '1.54' else 0)
     m.ensure(lfo_state)
-    for destinations in ((46, 53), (0, 0)):
+    for destinations in ((46, 52), (0, 0)):
         native(0x40084EF6, [sound, 0, 120])
         values = list(struct.unpack('>53h', m.uc.mem_read(sound + 20, 106)))
         for slot in extra_slots:
             values[slot] = 8000
+        values[0] = 0x5A5B  # a machine id; an LFO with no destination must not reach the extras
         values[4], values[12] = (d << 8 for d in destinations)
         values[1] = values[9] = 0x5000
         values[5] = values[13] = 2 << 8
@@ -537,31 +558,35 @@ def probe_storage(stock_path, Machine, call, pc_register):
         m.uc.emu_start(0x4006A868, 0x4006A86E, count=1)
         native(0x400ED53E + (0x228 if release.version == '1.54' else 0), [output, 14400, 255])
         got = extras_at(output - 2)
-        assert got == ((12095,) + (8000,) * 6 + (12095,) if destinations[0] else (8000,) * 8)
-        assert extras_at(sound) == (8000,) * 8
-        assert native(linked.map['cm_src_value'], [0, 15]) == got[7]
+        assert got == ((12095,) + (8000,) * 5 + (12095,) if destinations[0] else (8000,) * EXTRAS), got
+        assert extras_at(sound) == (8000,) * EXTRAS
+        assert bytes(m.uc.mem_read(sound + 20, 2)) == b'\x5a\x5b'  # the id is read from the sound
+        assert native(linked.map['cm_src_value'], [0, 8 + EXTRAS - 1]) == got[-1]
 
     native(0x40084EF6, [sound, 0, 120])
-    m.uc.mem_write(sound + 4, b'SIXTEEN VALUES\0\0')
+    m.uc.mem_write(sound + 4, b'FIFTEEN VALUES\0\0')
     words = [slot * 173 for slot in range(1, 46)]
     words[16] = 0xFF85  # Original SRC words retain custom signed representations.
     words[19] = 0      # The fixture has no sample reference.
-    words[3], words[11] = 53 << 8, 46 << 8
+    words[3], words[11] = 52 << 8, 46 << 8
     m.uc.mem_write(sound + 22, struct.pack('>45H', *words))
-    extra_values = (0, 1, 255, 256, 0x1234, 0x4500, 0x7F00, 0x6A5B)
+    extra_values = (0, 1, 255, 256, 0x1234, 0x4500, 0x7F00)
     for slot, value in zip(extra_slots, extra_values):
         m.uc.mem_write(sound + 20 + 2 * slot, struct.pack('>h', value))
+    m.uc.mem_write(sound + 20, b'\xa5\xc3')  # slot 0: a machine id, its last bit set
     source_before = bytes(m.uc.mem_read(sound, 162))
     protect(saved, 160)
     assert native(0x4007A5A0, [saved, sound, 0]) & 255 == 1
     guarded(saved, 160)
     packed16 = bytes(m.uc.mem_read(saved, 160))
     assert struct.unpack_from('>I', packed16, 4)[0] == 4
+    assert packed16[131] & 0x1F == 0x10  # bit 803, the id's last, ends the stream
     assert bytes(m.uc.mem_read(sound, 162)) == source_before
     ok, restored16 = load(packed16)
     assert ok == 1 and extras_at(loaded) == extra_values
+    assert restored16[20:22] == b'\xa5\xc3'
     assert list(struct.unpack_from('>45H', restored16, 22)) == words
-    assert restored16[4:20] == b'SIXTEEN VALUES\0\0'
+    assert restored16[4:20] == b'FIFTEEN VALUES\0\0'
     assert restored16[129:134] == b'\xcc' * 5
     hooks = [m.uc.hook_add(unicorn.UC_HOOK_CODE, allocate, begin=a, end=a)
              for a in (allocator, allocator + 12)]
@@ -574,6 +599,7 @@ def probe_storage(stock_path, Machine, call, pc_register):
                 assert bytes(m.uc.mem_read(event, 1)) == bytes(1)
         assert native(0x4007F930, [loaded, saved, 0]) & 255 == 1
         assert extras_at(loaded) == extra_values
+        assert bytes(m.uc.mem_read(loaded + 20, 2)) == b'\xa5\xc3'
     finally:
         for hook in hooks:
             m.uc.hook_del(hook)
@@ -591,7 +617,7 @@ def probe_storage(stock_path, Machine, call, pc_register):
     assert load(changed) == unchanged
     changed[124] = 121
     assert load(changed)[0] == 1
-    assert extras_at(loaded) == (13, 29, 3, 4, 5, 6, 7, 8)
+    assert extras_at(loaded) == probe_defaults
     assert native(0x4007A5A0, [saved, 0, 0]) & 255 == 0
     assert native(0x4007A236, [loaded, 0]) & 255 == 0
     invalid = bytearray(baseline)
@@ -613,11 +639,11 @@ def probe_storage(stock_path, Machine, call, pc_register):
         for i, machine in enumerate(machines):
             initialize(machine)
             m.uc.mem_write(sound + 112, struct.pack('>2h', i, i * 123))
+            m.uc.mem_write(sound + 20, struct.pack('>H', 0x8000 + 0x101 * i))  # every sound's id
             if machine in (120, 121):
                 for k, slot in enumerate(extra_slots):
                     m.uc.mem_write(sound + 20 + 2 * slot, struct.pack('>h', i + 777 * k))
-            if machine in (120, 121):
-                m.uc.mem_write(sound + 28, struct.pack('>h', 53 << 8))
+                m.uc.mem_write(sound + 28, struct.pack('>h', 52 << 8))
                 m.uc.mem_write(sound + 44, struct.pack('>h', 47 << 8))
             m.uc.mem_write(source + source_head + 162 * i, bytes(m.uc.mem_read(sound, 162)))
         protect(packed, saved_len)
@@ -629,19 +655,20 @@ def probe_storage(stock_path, Machine, call, pc_register):
         for i, machine in enumerate(machines):
             got = bytes(m.uc.mem_read(restored + source_head + 162 * i, 162))
             assert got[126] == machine
+            assert struct.unpack_from('>H', got, 20)[0] == (0x8000 + 0x101 * i) & 0xFFFF, (machine, i)
             if machine in (120, 121):
-                assert tuple(struct.unpack_from('>h', got, 20 + 2 * slot)[0] for slot in extra_slots) == tuple(i + 777 * k for k in range(8))
-                assert struct.unpack_from('>h', got, 28)[0] == 53 << 8
+                assert tuple(struct.unpack_from('>h', got, 20 + 2 * slot)[0] for slot in extra_slots) == tuple(i + 777 * k for k in range(EXTRAS))
+                assert struct.unpack_from('>h', got, 28)[0] == 52 << 8
                 assert struct.unpack_from('>h', got, 44)[0] == 47 << 8
             else:
                 assert got[112:126] == bytes(14)
 
     for machine in (0, 3, 119, 120, 121, 122, 123, 127):
-        for parameter_id in (163, 164, 165, 166, 171):
+        for parameter_id in (163, 164, 165, 166, 170, 171):
             got = native(linked.map['mp_randomize_owner_s'],
                          [parameter_id, 0, 0, 0, 0, 0, 0, machine])
-            count = 8 if machine in (120, 121) else 0
-            expected = ((3 if parameter_id - 164 < count else 0xFFFFFFFF) if parameter_id >= 164
+            extended = machine in (120, 121)
+            expected = ((3 if extended else 0xFFFFFFFF) if parameter_id in EXTRA_IDS
                         else native(0x40079034, [parameter_id]))
             assert got == expected, (machine, parameter_id, got)
 
@@ -674,7 +701,7 @@ def probe_storage(stock_path, Machine, call, pc_register):
     m.uc.mem_write(reference, struct.pack('>I', 0x40181330 + relocation))
 
     # Pattern lock records hold 79 usable parameter/track lanes. Preserve
-    # ordinary/MIDI permutations and round-trip all eight added audio lanes.
+    # ordinary/MIDI permutations and round-trip the seven added audio lanes (and slot 0's).
     lock_runtime, lock_saved, lock_loaded = 0x43700100, 0x43800100, 0x43900100
     for pointer, length in ((lock_runtime, 111440), (lock_saved, 10400), (lock_loaded, 111440)):
         m.load(bytes(length), pointer)
@@ -711,8 +738,8 @@ def probe_storage(stock_path, Machine, call, pc_register):
 
     return {
         'mode': 'shared implementation; runtime loaded directly, no boot',
-        'sixteen_value_native_lifecycle_and_standalone_codec': True,
-        'virtual_lfo_53_and_none_survive_null_sound_pointers': True,
+        'fifteen_value_native_lifecycle_and_standalone_codec': True,
+        'slot_0_machine_id_survives_codec_actions_kits_pools_and_lfo_none': True,
         'stock_and_legacy_records_ignore_extension': True,
         'legacy_ui3_reset_popup_and_lfo_names_match_main': True,
         'invalid_extended_descriptors_rejected_by_companion': True,
@@ -724,8 +751,8 @@ def probe_storage(stock_path, Machine, call, pc_register):
         'native_encoder_edits_and_clamps_both_extra_base_values': True,
         'individual_and_all_parameter_resets_use_metadata_defaults': True,
         'native_held_step_edit_and_removal_leave_base_values_unchanged': True,
-        'both_native_lfo_destination_choosers_select_virtual_53_and_none': True,
-        'processed_accessor_keeps_eight_extra_identities_and_tracks': True,
+        'stock_lfo_destination_chooser_reaches_slots_46_52_and_none': True,
+        'processed_accessor_keeps_seven_extra_identities_and_tracks': True,
         'native_src_view_knobs_follow_per_track_page_selection': True,
         'native_src_release_cycles_while_held_copy_clear_paste_keep_the_page': True,
         'native_lfo_cycle_and_long_press_behavior_preserved': True,
@@ -735,7 +762,7 @@ def probe_storage(stock_path, Machine, call, pc_register):
         'actual_src_vtable_routes_extended_actions_and_preserves_stock_legacy_handlers': True,
         'bounded_ui_endpoints_supplied_by_fixture': ['allocator', 'sound-lock RTOS executor',
                                                     'redraw/page-name popup', 'page-action callbacks/route endpoints', 'MIDI UI dispatch'],
-        '79_persisted_lock_lanes_include_eight_extras_on_first_and_last_audio_tracks': True,
+        '79_persisted_lock_lanes_include_seven_extras_on_first_and_last_audio_tracks': True,
         'ordinary_and_midi_lock_permutations_preserved': True,
         'native_machine_reset_uses_metadata_defaults': True,
         'randomize_reload_extra_ownership_is_machine_specific': True,

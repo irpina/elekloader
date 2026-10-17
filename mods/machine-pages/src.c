@@ -4,21 +4,21 @@
 
 _Static_assert(sizeof(struct cm_ui) == 336, "legacy UI layout");
 _Static_assert(sizeof(struct cm_src_page) == 12, "SRC page layout");
-_Static_assert(sizeof(struct cm_ui5) == 664, "sixteen-value UI layout");
-_Static_assert(offsetof(struct cm_ui5, extra) == 336, "extra parameters");
-_Static_assert(offsetof(struct cm_ui5, page_count) == 656, "page count");
-_Static_assert(offsetof(struct cm_ui5, pages) == 660, "pages pointer");
+_Static_assert(sizeof(struct cm_ui32) == 624, "extra-value UI layout");
+_Static_assert(offsetof(struct cm_ui32, extra) == 336, "extra parameters");
+_Static_assert(offsetof(struct cm_ui32, page_count) == 616, "page count");
+_Static_assert(offsetof(struct cm_ui32, pages) == 620, "pages pointer");
 
-const char cm_ui_v5[] = "machine-pages 5";
+const char cm_ui_v32[] = "machine-pages 3.2";
 extern const struct cm_machine *const core_machines[];
 extern const uint32_t SAVE_MAP[];
 extern uint32_t mp_native_save(uint8_t *, const uint8_t *, int32_t);
 extern uint32_t mp_native_load(uint8_t *, const uint8_t *);
 extern uint32_t mp_native_upgrade(uint8_t *, uint8_t *, int32_t);
-static const struct cm_ui5 *extended[128];
+static const struct cm_ui32 *extended[128];
 static int ready;
 
-static int valid(const struct cm_machine *m, const struct cm_ui5 *u)
+static int valid(const struct cm_machine *m, const struct cm_ui32 *u)
 {
     /* shortcut: the POC uses SLICE's bank; add other banks when a consumer needs them. */
     if (m->id < 4 || m->id > 127 || m->params != 3 ||
@@ -26,7 +26,7 @@ static int valid(const struct cm_machine *m, const struct cm_ui5 *u)
         u->page_count < 1 || u->page_count > 2 || !u->pages ||
         u->reserved[0] || u->reserved[1] || u->reserved[2])
         return 0;
-    for (int k = 0; k < 8; ++k) {
+    for (int k = 0; k < CM_EXTRAS; ++k) {
         const struct cm_knob *p = &u->extra[k];
         if (!p->look || p->look >= 164 || p->reserved || (p->flags & ~31) ||
             (p->flags & (CM_RANGE | CM_DEFAULT)) != (CM_RANGE | CM_DEFAULT) ||
@@ -38,7 +38,7 @@ static int valid(const struct cm_machine *m, const struct cm_ui5 *u)
             return 0;
         for (int k = 0; k < 8; ++k)
             if (u->pages[page].parameter[k] != CM_SRC_BLANK &&
-                u->pages[page].parameter[k] >= 16)
+                u->pages[page].parameter[k] >= 8 + CM_EXTRAS)
                 return 0;
     }
     return 1;
@@ -59,36 +59,35 @@ void mp_src_init(void)
             ++count;
             continue;
         }
-        const struct cm_ui5 *u = (const struct cm_ui5 *)m->ui;
-        if (m->ui->abi == cm_ui_v5 && count < 32 && valid(m, u)) {
+        const struct cm_ui32 *u = (const struct cm_ui32 *)m->ui;
+        if (m->ui->abi == cm_ui_v32 && count < 32 && valid(m, u)) {
             extended[m->id] = u;
             ++count;
         }
     }
 }
 
-const struct cm_ui5 *mp_src_for(int32_t machine)
+const struct cm_ui32 *mp_src_for(int32_t machine)
 {
     if (!ready)
         mp_src_init();
     return machine >= 4 && machine < 128 ? extended[machine] : 0;
 }
 
-uint32_t mp_ui5(int32_t machine)
+uint32_t mp_ui32(int32_t machine)
 {
     return (uint32_t)mp_src_for(machine);
 }
 
 int32_t cm_src_value(int32_t track, int32_t parameter)
 {
-    if ((uint32_t)track >= 8 || (uint32_t)parameter >= 16)
+    if ((uint32_t)track >= 8 || (uint32_t)parameter >= 8 + CM_EXTRAS)
         return 0;
     if (parameter < 8)
         return fw_voice_params[53 * track + parameter];
-    const struct cm_ui5 *u = mp_src_for(core_track_machine[track]);
-    if (!u)
+    if (!mp_src_for(core_track_machine[track]))
         return 0;
-    return fw_voice_params[53 * track + (parameter == 15 ? -17 : 29 + parameter - 8)];
+    return fw_voice_params[53 * track + MP_EXTRA_SLOT(parameter - 8) - 17];  /* fw_voice_params is slot 17 */
 }
 
 static uint16_t word(const uint8_t *p)
@@ -107,17 +106,16 @@ static void put(uint8_t *p, uint16_t value)
     p[1] = value;
 }
 
-static int extra_slot(int k)
+static int32_t extra_value(const struct cm_ui32 *u, const uint8_t *sound, int k)
 {
-    return k == 7 ? 0 : 46 + k;
-}
-
-static int32_t extra_value(const struct cm_ui5 *u, const uint8_t *sound, int k)
-{
-    int32_t value = (int16_t)word(sound + 20 + 2 * extra_slot(k));
+    int32_t value = (int16_t)word(sound + 20 + 2 * MP_EXTRA_SLOT(k));
     return value < 0 || value > 0x7f00 ? u->extra[k].def : value;
 }
 
+/* Version 4 keeps the native 160-byte record. Its payload, bytes 28-123 and 127-131 (124-126 stay
+ * the native machine bytes), is a bit stream: slots 1-45 (the SRC slots 17-24 16 bits, the rest 15),
+ * the extras (15 bits) and slot 0 raw (16 bits: the machine's id) = 804 bits; the last byte's low four
+ * bits stay zero. */
 static int payload_offset(int bit)
 {
     int byte = bit >> 3;
@@ -145,7 +143,7 @@ static uint16_t unpack(const uint8_t *saved, int *bit, int width)
 static int packed_sound(const uint8_t *saved)
 {
     return saved && longword(saved) == 0xbeefbace && longword(saved + 4) == 4 &&
-        longword(saved + 156) == 0xbacef00c && !(saved[131] & 31) && mp_ui5(saved[124]);
+        longword(saved + 156) == 0xbacef00c && !(saved[131] & 15) && mp_ui32(saved[124]);
 }
 
 uint32_t mp_sound_save(uint8_t *saved, const uint8_t *sound, int32_t mode)
@@ -153,7 +151,7 @@ uint32_t mp_sound_save(uint8_t *saved, const uint8_t *sound, int32_t mode)
     uint32_t result = mp_native_save(saved, sound, mode);
     if (!(result & 255))
         return result;
-    const struct cm_ui5 *u = mp_src_for(sound[126]);
+    const struct cm_ui32 *u = mp_src_for(sound[126]);
     if (!u)
         return result;
     for (int k = 28; k < 124; ++k)
@@ -168,8 +166,9 @@ uint32_t mp_sound_save(uint8_t *saved, const uint8_t *sound, int32_t mode)
             value = 0;
         pack(saved, &bit, value, src ? 16 : 15);
     }
-    for (int k = 0; k < 8; ++k)
+    for (int k = 0; k < CM_EXTRAS; ++k)
         pack(saved, &bit, extra_value(u, sound, k), 15);
+    pack(saved, &bit, word(sound + 20), 16);
     put(saved + 4, 0);
     put(saved + 6, 4);
     return result;
@@ -181,19 +180,19 @@ uint32_t mp_sound_load(uint8_t *sound, const uint8_t *saved)
         uint32_t result = mp_native_load(sound, saved);
         if (!(result & 255))
             return result;
-        const struct cm_ui5 *u = mp_src_for(sound[126]);
+        const struct cm_ui32 *u = mp_src_for(sound[126]);
         if (u) {
-            for (int k = 0; k < 8; ++k) {
-                put(sound + 20 + 2 * extra_slot(k), u->extra[k].def);
+            for (int k = 0; k < CM_EXTRAS; ++k) {
+                put(sound + 20 + 2 * MP_EXTRA_SLOT(k), u->extra[k].def);
             }
         }
         return result;
     }
     if (!packed_sound(saved))
         return 0;
-    const struct cm_ui5 *u = mp_src_for(saved[124]);
+    const struct cm_ui32 *u = mp_src_for(saved[124]);
     uint8_t native_saved[160], native_sound[162];
-    uint16_t values[53];
+    uint16_t values[45 + CM_EXTRAS], id;
     for (int k = 0; k < 160; ++k)
         native_saved[k] = saved[k];
     for (int k = 0; k < 162; ++k)
@@ -208,16 +207,19 @@ uint32_t mp_sound_load(uint8_t *sound, const uint8_t *saved)
         values[slot - 1] = value;
         put(native_saved + 28 + 2 * SAVE_MAP[slot], slot == 4 || slot == 12 ? 0 : value);
     }
-    for (int k = 0; k < 8; ++k) {
+    for (int k = 0; k < CM_EXTRAS; ++k) {
         uint16_t value = unpack(saved, &bit, 15);
         values[45 + k] = value <= 0x7f00 ? value : u->extra[k].def;
     }
+    id = unpack(saved, &bit, 16);
+    put(native_saved + 28 + 2 * SAVE_MAP[0], id);
     uint32_t result = mp_native_load(native_sound, native_saved);
     if (result & 255) {
+        put(native_sound + 20, id);
         for (int slot = 1; slot < 46; ++slot)
             put(native_sound + 20 + 2 * slot, values[slot - 1]);
-        for (int k = 0; k < 8; ++k)
-            put(native_sound + 20 + 2 * extra_slot(k), values[45 + k]);
+        for (int k = 0; k < CM_EXTRAS; ++k)
+            put(native_sound + 20 + 2 * MP_EXTRA_SLOT(k), values[45 + k]);
         for (int k = 0; k < 162; ++k)
             sound[k] = native_sound[k];
     }

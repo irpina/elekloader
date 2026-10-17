@@ -30,12 +30,28 @@
 | (A-H), 0 a blank knob. The page asks for it with its track's machine
 | before it draws or turns a knob, so the hooks after this one answer for
 | that machine. At its entry (was: moveq #3,d1 ; move.l 4(sp),d0), by jmp.
+| Called by the SRC view's knob getter (jsr (a3) at 0x4003ab2a, returning to
+| VIEW_LAYOUT_RET), a2 is that view: a page with extra values is the one
+| its own track shows. A mod that takes the getter's lea first and goes on
+| here by jmp (digistring) keeps both. Otherwise the active track's.
         .globl  mp_layout_s
 mp_layout_s:
-        move.l  4(%sp), -(%sp)
+        move.l  (%sp), %d0
+        cmpi.l  #VIEW_LAYOUT_RET, %d0
+        bne.s   1f
+        move.l  4(%sp), -(%sp)          | [machine]
+        move.l  %a2, -(%sp)
+        jsr     mp_view_track           | d0 = the view's track
+        addq.l  #4, %sp
+        move.l  %d0, -(%sp)             | [track][machine]
+        move.l  4(%sp), -(%sp)          | [machine][track][machine]
+        jsr     mp_layout_track         | -> the machine's own layout, or 0
+        lea     12(%sp), %sp
+        bra.s   2f
+1:      move.l  4(%sp), -(%sp)
         jsr     mp_layout               | -> the machine's own layout, or 0
         addq.l  #4, %sp
-        tst.l   %d0
+2:      tst.l   %d0
         bne.s   9f
         moveq   #3, %d1
         move.l  4(%sp), %d0
@@ -48,23 +64,6 @@ mp_stock_layout:
         moveq   #3, %d1
         move.l  4(%sp), %d0
         jmp     LAYOUT_ON
-
-| The SRC view's knob getter keeps its view in a2. Its track may differ
-| from the globally active track when inspecting a locked sound.
-        .globl  mp_view_layout_s
-mp_view_layout_s:
-        move.l  4(%sp), -(%sp)
-        move.l  %a2, -(%sp)
-        jsr     mp_view_track
-        addq.l  #4, %sp
-        move.l  %d0, -(%sp)
-        move.l  4(%sp), -(%sp)
-        jsr     mp_layout_track
-        lea     12(%sp), %sp
-        tst.l   %d0
-        bne.s   9f
-        bra     mp_stock_layout
-9:      rts
 
         .globl  mp_view_track, mp_view_knob
 mp_view_track:
@@ -182,7 +181,7 @@ mp_lab_short_s:
         tst.l   %d0
         bne.s   9f
         move.l  8(%sp), %d1
-        cmpi.l  #172, %d1
+        cmpi.l  #171, %d1
         jmp     LAB_SHORT_ON
 9:      rts
 
@@ -194,7 +193,7 @@ mp_lab_long_s:
         tst.l   %d0
         bne.s   9f
         move.l  8(%sp), %d1
-        cmpi.l  #172, %d1
+        cmpi.l  #171, %d1
         jmp     LAB_LONG_ON
 9:      rts
 

@@ -73,7 +73,7 @@ mp_randomize_owner_s:
         move.l  4(%sp), %d0
         cmpi.l  #164, %d0
         bcs.s   1f
-        cmpi.l  #172, %d0
+        cmpi.l  #171, %d0
         bcc.s   1f
         move.l  32(%sp), -(%sp)
         move.l  8(%sp), -(%sp)

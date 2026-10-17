@@ -79,7 +79,8 @@ struct cm_knob {                    /* 40 bytes; knobs A-H by their place on the
 } __attribute__((aligned(4)));
 
 struct cm_ui {                      /* 336 bytes */
-    const void *abi;                /* +0  cm_ui_v3, or cm_ui_v31 for CM_DRAW: links only beside a machine-pages that reads it */
+    const void *abi;                /* +0  cm_ui_v3, cm_ui_v31 for CM_DRAW, cm_ui_v32 for extra values (struct cm_ui32):
+                                       links only beside a machine-pages that reads it */
     uint8_t page_from;              /* +4  the stock machine whose SRC page it copies: 0 ONESHOT ... 3 SLICE */
     uint8_t flags;                  /* +5  0 */
     uint16_t reserved;              /* +6  0 */
@@ -97,23 +98,27 @@ struct cm_machine {                 /* what a mod contributes to core_machines p
     const struct cm_ui *ui;         /* +28 */
 } __attribute__((aligned(4)));
 
+/* machine-pages 1.2: up to seven more SRC values, on a second page. They live in the sound's slots
+ * 46-52 (parameter ids 164-170), the seven the firmware leaves unregistered. Slot 0 is not one of
+ * them: it is kept for the machine's id. */
+#define CM_EXTRAS    7
 #define CM_SRC_BLANK 255
 struct cm_src_page {                /* 12 bytes: fixed logical parameter references, not native IDs */
     const char *title;
-    uint8_t parameter[8];           /* 0-15, or CM_SRC_BLANK */
+    uint8_t parameter[8];           /* 0-14 (8-14 = extra[0-6]), or CM_SRC_BLANK */
 } __attribute__((aligned(4)));
 
-struct cm_ui5 {                     /* experimental: params=3, sixteen values across up to two pages */
-    struct cm_ui base;              /* +0: abi=cm_ui_v5; original eight logical parameters */
-    struct cm_knob extra[8];        /* +336: parameters 8-15; look 1-163, range 0..0x7f00 */
-    uint8_t page_count;             /* +656: 1 or 2 */
+struct cm_ui32 {                    /* params=3 only (SLICE's bank): fifteen values across up to two pages */
+    struct cm_ui base;              /* +0: abi=cm_ui_v32; original eight logical parameters */
+    struct cm_knob extra[CM_EXTRAS]; /* +336: parameters 8-14; look 1-163, CM_RANGE|CM_DEFAULT, 0..0x7f00 */
+    uint8_t page_count;             /* +616: 1 or 2 */
     uint8_t reserved[3];            /* zero */
-    const struct cm_src_page *pages; /* +660 */
+    const struct cm_src_page *pages; /* +620 */
 } __attribute__((aligned(4)));
 
-extern const char cm_ui_v5[];
-/* Render task: final values after native locks, smoothing and LFOs. Invalid track/index, or an
- * unavailable extra parameter, returns 0. Do not index past the old fw_voice_params A-H contract. */
+extern const char cm_ui_v32[];                      /* machine-pages 1.2's: a page with extra values names it */
+/* Render task: final values after native locks, smoothing and LFOs, for parameters 0-14. Invalid
+ * track/index, or an extra parameter of a machine without them, returns 0. */
 extern int32_t cm_src_value(int32_t track, int32_t parameter);
 
 extern const char cm_ui_v3[];                       /* machine-pages' marker (cm_ui.abi) */

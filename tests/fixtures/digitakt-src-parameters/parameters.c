@@ -6,12 +6,12 @@
 
 static const struct cm_src_page pages[] = {
     { "PARAM 1/2", {0, 1, 2, 3, 4, 5, 6, 7} },
-    { "PARAM 2/2", {8, 9, 10, 11, 12, 13, 14, 15} },
+    { "PARAM 2/2", {8, 9, 10, 11, 12, 13, 14, CM_SRC_BLANK} },
 };
 
-static const struct cm_ui5 ui = {
+static const struct cm_ui32 ui = {
     .base = {
-        .abi = cm_ui_v5, .page_from = 3, .group = "PARAM",
+        .abi = cm_ui_v32, .page_from = 3, .group = "PARAM",
         .knob = {
             PARAMETER(1, 0), PARAMETER(2, 0), PARAMETER(3, 0),
             PARAMETER(4, CM_NOT_SAMPLE),
@@ -20,7 +20,7 @@ static const struct cm_ui5 ui = {
     },
     .extra = {
         PARAMETER(9, 0), PARAMETER(10, 0), PARAMETER(11, 0), PARAMETER(12, 0),
-        PARAMETER(13, 0), PARAMETER(14, 0), PARAMETER(15, 0), PARAMETER(16, 0),
+        PARAMETER(13, 0), PARAMETER(14, 0), PARAMETER(15, 0),
     },
     .page_count = 2, .pages = pages,
 };

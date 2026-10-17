@@ -19,14 +19,15 @@
 #define LAY_LONGS   11
 
 /* The markers a page's abi names: a machine whose page reads this layout links only beside this mod. 3.1
- * is 3 with knobs that draw their own graphic (CM_DRAW), which machine-pages 1.0 does not read. */
+ * is 3 with knobs that draw their own graphic (CM_DRAW), which machine-pages 1.0 does not read; 3.2
+ * (src.c) is 3.1 with up to seven extra values on a second page (struct cm_ui32), from machine-pages 1.2. */
 const char cm_ui_v3[] = "machine-pages 3";
 const char cm_ui_v31[] = "machine-pages 3.1";
 
 struct page {
     int32_t id;
     const struct cm_ui *ui;
-    const struct cm_ui5 *extended;
+    const struct cm_ui32 *extended;            /* its extra values (cm_ui_v32), or 0 */
     uint32_t params;                           /* its params machine */
     uint32_t ready;                            /* lay is copied */
     uint32_t lay[2][LAY_LONGS];
@@ -54,11 +55,11 @@ static void find(void)
         const struct cm_machine *d = core_machines[i];
         const struct cm_ui *ui = (const struct cm_ui *)core_machine_ui(d->id);
         if (!ui || (ui->abi != cm_ui_v3 && ui->abi != cm_ui_v31 &&
-                    ui->abi != cm_ui_v5) ||
+                    ui->abi != cm_ui_v32) ||
             ui->page_from > 3 || d->id <= 3)
             continue;                          /* no page, or not one this mod reads */
-        const struct cm_ui5 *extended = mp_src_for(d->id);
-        if (ui->abi == cm_ui_v5 && !extended)
+        const struct cm_ui32 *extended = mp_src_for(d->id);
+        if (ui->abi == cm_ui_v32 && !extended)
             continue;
         pages[npages].id = d->id;
         pages[npages].ui = ui;
@@ -82,11 +83,11 @@ static struct page *page_of(uint32_t m)
     return 0;
 }
 
-/* The knob (0-7) a parameter id is on a page, or -1. */
+/* The knob (0-7, or 8-14 an extra value) a parameter id is on a page, or -1. */
 static int knob_of(const struct page *p, uint32_t id)
 {
-    if (p->extended && id >= 164 && id < 172)
-        return 8 + id - 164;
+    if (p->extended && id >= MP_EXTRA_ID && id < MP_EXTRA_END)
+        return 8 + id - MP_EXTRA_ID;
     uint32_t k = id - ID_BASE(p->ui->page_from);
     if (k < KNOBS)
         return (int)k;
@@ -127,7 +128,7 @@ uint32_t mp_layout_track(int32_t m, uint32_t track)
                 if (k == CM_SRC_BLANK || (knob(p, k)->flags & CM_HIDDEN))
                     p->lay[page][2 + i] = 0;
                 else if (p->extended)
-                    p->lay[page][2 + i] = k < 8 ? ID_BASE(p->params) + k : 164 + k - 8;
+                    p->lay[page][2 + i] = k < 8 ? ID_BASE(p->params) + k : MP_EXTRA_ID + k - 8;
             }
         }
         p->ready = 1;
@@ -247,11 +248,6 @@ void mp_range(uint32_t id, int32_t *out, int32_t machine)
     const struct page *p;
     const struct cm_knob *k;
     int i;
-    if ((id == 55 || id == 64) && mp_ui5(machine)) {
-        out[0] = out[2] = 0;
-        out[1] = 53 << 8;
-        return;
-    }
     if (machine < 0 || !(p = page_of((uint32_t)machine)) || (i = knob_of(p, id)) < 0)
         return;
     k = knob(p, i);
@@ -265,7 +261,7 @@ void mp_range(uint32_t id, int32_t *out, int32_t machine)
 
 void mp_reset_range(uint32_t id, int32_t *out, int32_t machine)
 {
-    if (mp_ui5(machine))
+    if (mp_ui32(machine))
         mp_range(id, out, machine);
 }
 
@@ -292,9 +288,9 @@ uint32_t mp_lfo(uint32_t id, int32_t what, uint32_t stock)
         return stock;
     i = id - ID_BASE(p->params);
     if (i >= KNOBS) {
-        if (!p->extended || id < 164 || id >= 172)
+        if (!p->extended || id < MP_EXTRA_ID || id >= MP_EXTRA_END)
             return stock;
-        i = 8 + id - 164;
+        i = 8 + id - MP_EXTRA_ID;
     }
     if (what == 0)
         return p->ui->group ? (uint32_t)p->ui->group : stock;

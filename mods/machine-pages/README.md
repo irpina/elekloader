@@ -17,10 +17,11 @@ the mod shop: tick it there and the page takes core 3.0 for it.
 | | |
 |---|---|
 | needs | core 3.0 (`resources.core`), and refuses beside digichain, which owns the same places |
-| sites | 20, listed in `mod.json`: 7 on the SRC page, 4 range lookups, 5 on the LFO page, 2 SAMP compares, the machine menu's icon row and the render point 0x40077fba |
-| exports | `cm_ui_v3` and, from 1.1, `cm_ui_v31`: the markers a machine's page names |
+| sites | 97, listed in `mod.json`. 1.1's 20: 7 on the SRC page, 4 range lookups, 5 on the LFO page, 2 SAMP compares, the machine menu's icon row and the render point 0x40077fba. 1.2's extra values add 77: 50 one-byte bounds (the parameter-id compares, 164 to 171), and 27 hooks: the SRC page's page flip, title and copy/clear/paste, the id-slot maps, the descriptor table and its 7 readers, defaults, Randomize, locks and the sound file's save/load/upgrade and LFO destinations |
+| exports | `cm_ui_v3`, from 1.1 `cm_ui_v31`, from 1.2 `cm_ui_v32`: the markers a machine's page names; from 1.2 `cm_src_value` |
+| claims | from 1.2, `soundslot:46` to `soundslot:52`, the extra values' slots |
 | declares | `ev_render_voices`, the render event |
-| RAM | 2.4 KB code, 2 KB for up to 32 machines' pages |
+| RAM | 7.6 KB code, 4.5 KB for up to 32 machines' pages (1.1: 2.4 KB and 2 KB) |
 
 ## What a machine describes
 
@@ -75,6 +76,26 @@ ALGO diagram and OP number are drawn this way. 1.1 still reads every
 `cm_ui_v3` page as 1.0 did. A knob with flag 16 on a `cm_ui_v3` page (one
 that forgot `cm_ui_v31`) gets the stock graphic: its +36 is never called,
 as a `gfx` or as a `draw`.
+
+**A second page of seven more values (1.2).** A page naming `cm_ui_v32`
+is a `struct cm_ui32`: `extra[7]` knobs after the eight, and one or two
+`pages`, each a title and eight entries naming a value (0-7 the page's
+knobs, 8-14 the extras) or `CM_SRC_BLANK`. SRC flips the track's page;
+held SRC with a transport key still copies, clears and pastes the page
+shown. The extras are the sound's slots 46-52 (ids 164-170), the seven
+the firmware leaves unregistered: they lock, the LFOs reach them from
+the stock DEST list, Randomize takes them, and `cm_src_value(track, k)`
+reads value k (0-14) after locks and LFOs. A sound of such a machine is
+saved as version 4 of the 160-byte record, which only machine-pages reads.
+Slot 0 is not used: it is kept for a machine's id, and version 4 carries
+it as it is. Only a machine whose params machine is 3 (SLICE's bank) can
+have extras. The page a view shows is its own track's: the layout's
+entry (1.1's site) knows the SRC view's knob getter by its return address,
+so the getter's own instruction (0x4003ab02) stays free for digistring
+0.8.0, which hooks it and links beside 1.2 as beside 1.1. Simon
+Johansson's PARAM machine
+(`tests/fixtures/digitakt-src-parameters`) is the example: silent, two
+pages, P1-P15.
 
 ## Whose machine a site answers for
 
