@@ -1,0 +1,12 @@
+{
+ "id": "src-parameters-test", "version": "0.1",
+ "title": "Silent parameter test", "category": "Examples",
+ "license": "GPL-2.0-or-later",
+ "description": "PARAM: sixteen editable SRC values across two pages, with no audio renderer or other event handlers.",
+ "device": "digitakt-mk1", "os": "1.53",
+ "sources": ["parameters.c"],
+ "ports": {"1.54": {}},
+ "machines": [{"id": 120, "descriptor": "parameter_machine"}],
+ "requires": ["core", "machine-pages"],
+ "resources": {"core": "3.0"}
+}

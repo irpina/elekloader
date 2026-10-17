@@ -97,6 +97,25 @@ struct cm_machine {                 /* what a mod contributes to core_machines p
     const struct cm_ui *ui;         /* +28 */
 } __attribute__((aligned(4)));
 
+#define CM_SRC_BLANK 255
+struct cm_src_page {                /* 12 bytes: fixed logical parameter references, not native IDs */
+    const char *title;
+    uint8_t parameter[8];           /* 0-15, or CM_SRC_BLANK */
+} __attribute__((aligned(4)));
+
+struct cm_ui5 {                     /* experimental: params=3, sixteen values across up to two pages */
+    struct cm_ui base;              /* +0: abi=cm_ui_v5; original eight logical parameters */
+    struct cm_knob extra[8];        /* +336: parameters 8-15; look 1-163, range 0..0x7f00 */
+    uint8_t page_count;             /* +656: 1 or 2 */
+    uint8_t reserved[3];            /* zero */
+    const struct cm_src_page *pages; /* +660 */
+} __attribute__((aligned(4)));
+
+extern const char cm_ui_v5[];
+/* Render task: final values after native locks, smoothing and LFOs. Invalid track/index, or an
+ * unavailable extra parameter, returns 0. Do not index past the old fw_voice_params A-H contract. */
+extern int32_t cm_src_value(int32_t track, int32_t parameter);
+
 extern const char cm_ui_v3[];                       /* machine-pages' marker (cm_ui.abi) */
 extern const char cm_ui_v31[];                      /* machine-pages 1.1's: a page with CM_DRAW names it */
 extern volatile uint8_t core_track_machine[8];      /* each track's own machine, as the render last took it */

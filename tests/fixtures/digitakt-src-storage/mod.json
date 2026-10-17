@@ -1,0 +1,19 @@
+{
+ "id": "src-storage-probe", "version": "0.1",
+ "license": "GPL-2.0-or-later",
+ "device": "digitakt-mk1", "os": "1.53",
+ "sources": ["fixture.c"],
+ "ports": {"1.54": {}},
+ "machines": [
+  {"id": 119, "descriptor": "probe_machine119"},
+  {"id": 121, "descriptor": "probe_machine121"},
+  {"id": 122, "descriptor": "probe_machine122"},
+  {"id": 123, "descriptor": "probe_machine123"},
+  {"id": 124, "descriptor": "probe_machine124"},
+  {"id": 125, "descriptor": "probe_machine125"},
+  {"id": 126, "descriptor": "probe_machine126"},
+  {"id": 127, "descriptor": "probe_machine127"}
+ ],
+ "requires": ["core", "machine-pages"],
+ "resources": {"core": "3.0"}
+}

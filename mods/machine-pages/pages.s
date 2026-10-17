@@ -49,6 +49,128 @@ mp_stock_layout:
         move.l  4(%sp), %d0
         jmp     LAYOUT_ON
 
+| The SRC view's knob getter keeps its view in a2. Its track may differ
+| from the globally active track when inspecting a locked sound.
+        .globl  mp_view_layout_s
+mp_view_layout_s:
+        move.l  4(%sp), -(%sp)
+        move.l  %a2, -(%sp)
+        jsr     mp_view_track
+        addq.l  #4, %sp
+        move.l  %d0, -(%sp)
+        move.l  4(%sp), -(%sp)
+        jsr     mp_layout_track
+        lea     12(%sp), %sp
+        tst.l   %d0
+        bne.s   9f
+        bra     mp_stock_layout
+9:      rts
+
+        .globl  mp_view_track, mp_view_knob
+mp_view_track:
+        movea.l 4(%sp), %a0
+        move.l  116(%a0), 4(%sp)
+        jmp     SRC_TRACK_FN
+mp_view_knob:
+        jmp     SRC_KNOB_FN
+
+| The two native action collectors keep their stock eight-entry loops.
+| Copy's A3 is its source parameter object; the ID collector uses the active kit.
+        .globl  mp_action_ids_s, mp_action_values_s
+mp_action_ids_s:
+        moveq   #-2, %d0
+        bra.s   1f
+mp_action_values_s:
+        movea.l %a3, %a1
+        bsr.w   mp_rmach
+1:      move.l  %d0, -(%sp)
+        move.l  8(%sp), -(%sp)
+        jsr     mp_action_layout
+        addq.l  #8, %sp
+        tst.l   %d0
+        bne.s   9f
+        jmp     ACTION_LAYOUT_FN
+9:      rts
+
+| UI4 pages use the native parameter clipboard; stock SRC keeps its machine bank.
+        .globl  mp_src_copy_s, mp_src_paste_s, mp_src_clear_s
+mp_src_copy_s:
+        pea     SRC_COPY_FN
+        pea     PAGE_COPY_FN
+        bra.s   1f
+mp_src_paste_s:
+        pea     SRC_PASTE_FN
+        pea     PAGE_PASTE_FN
+        bra.s   1f
+mp_src_clear_s:
+        pea     SRC_CLEAR_FN
+        pea     PAGE_CLEAR_FN
+1:      move.l  12(%sp), -(%sp)
+        jsr     mp_src_title
+        addq.l  #4, %sp
+        tst.l   %d0
+        beq.s   2f
+        movea.l (%sp), %a0
+        bra.s   3f
+2:      movea.l 4(%sp), %a0
+3:      addq.l  #8, %sp
+        jmp     (%a0)
+
+| Native click-release eligibility keeps held page-copy/clear/paste gestures intact.
+        .globl  mp_src_cycle_s
+mp_src_cycle_s:
+        lea     -16(%sp), %sp
+        movem.l %d0-%d1/%a0-%a1, (%sp)
+        move.l  %d2, -(%sp)
+        move.l  %a2, -(%sp)
+        jsr     mp_src_key
+        addq.l  #8, %sp
+        tst.l   %d0
+        beq.s   1f
+        clr.l   144(%a2)                | UI4 pages share the native graphical SRC page.
+        move.l  #SRC_CYCLE_DONE, %d0
+        move.l  %d0, 16(%sp)
+1:
+        movem.l (%sp), %d0-%d1/%a0-%a1
+        lea     16(%sp), %sp
+        move.l  128(%a2), %d0
+        moveq   #1, %d2
+        rts
+
+        .globl  mp_src_title_s
+mp_src_title_s:
+        move.l  %a2, -(%sp)
+        jsr     mp_src_title
+        addq.l  #4, %sp
+        tst.l   %d0
+        bne.s   9f
+        jmp     M_SHORT_FN
+9:      rts
+
+        .globl  mp_page_changed
+mp_page_changed:
+        move.l  %a2, -(%sp)
+        move.l  %a3, -(%sp)
+        movea.l 12(%sp), %a2
+        movea.l 16(%sp), %a3
+        move.l  %a2, -(%sp)
+        jsr     SRC_UPDATE_FN
+        addq.l  #4, %sp
+        move.l  %a2, -(%sp)
+        jsr     SRC_DIRTY_FN
+        pea     148(%a2)
+        jsr     SRC_KNOBS_RESET_FN
+        addq.l  #8, %sp
+        move.l  108(%a2), -(%sp)
+        jsr     SRC_INVALIDATE_FN
+        addq.l  #4, %sp
+        move.l  %a3, -(%sp)
+        jsr     SRC_CONSUME_FN
+        addq.l  #4, %sp
+        movea.l (%sp)+, %a3
+        movea.l (%sp)+, %a2
+        rts
+
 | 0x4000fe8a(obj, id), a knob's label, and 0x4000feac(obj, id), its long
 | name (was: move.l 8(sp),d1 ; cmpi.l #164,d1), by jmp.
         .globl  mp_lab_short_s, mp_lab_long_s
@@ -60,7 +182,7 @@ mp_lab_short_s:
         tst.l   %d0
         bne.s   9f
         move.l  8(%sp), %d1
-        cmpi.l  #164, %d1
+        cmpi.l  #172, %d1
         jmp     LAB_SHORT_ON
 9:      rts
 
@@ -72,7 +194,7 @@ mp_lab_long_s:
         tst.l   %d0
         bne.s   9f
         move.l  8(%sp), %d1
-        cmpi.l  #164, %d1
+        cmpi.l  #172, %d1
         jmp     LAB_LONG_ON
 9:      rts
 
@@ -133,42 +255,57 @@ mp_pop_text_s:
         bne.s   9f
         move.l  4(%sp), %d1
         cmpi.l  #164, %d1
+        bcs.s   1f
+        move.l  %d1, -(%sp)
+        jsr     mp_look
+        addq.l  #4, %sp
+        move.l  %d0, %d1
+1:      cmpi.l  #164, %d1
         jmp     POP_TEXT_ON
 9:      rts
 
 | ---- parameter ranges --------------------------------------------------------
 | The range lookup 0x40078f0c(id), a0 the result {min, max, default}, has
-| four callers: 0x4000ff20 (the setter's clamp), 0x400100c4 (a turn's
+| five callers: 0x4000ff20 (the setter's clamp), 0x400100c4 (a turn's
 | scaling) and 0x4000f534 (a list's stepper), by jsr with the parameter
 | object in a2; and 0x4000f5fc (the validator), by lea into a2, called
-| later with the object as its caller's first argument (36(sp) here). Each
+| later with the object as its caller's first argument (36(sp) here).
+| 0x4000ffac resets to the default, with its object at 28(sp). Each
 | goes here instead (keep2): the stock range, then the one the sound's
 | machine describes. d0 = a0 = the result, as the stock lookup leaves them.
-        .globl  mp_prange_s, mp_prange_f_s
-mp_prange_s:
-        movea.l %a2, %a1
-        bra.s   1f
-mp_prange_f_s:
-        movea.l 36(%sp), %a1
-1:      move.l  %a1, -(%sp)             | the object
+        .macro range_lookup handler
+        move.l  %a1, -(%sp)             | the object
         move.l  %a0, -(%sp)             | the result's place
         move.l  12(%sp), -(%sp)         | the id
         jsr     PRANGE_FN
         addq.l  #4, %sp
         movea.l (%sp), %a0
         movea.l 4(%sp), %a1
-        bsr.s   mp_rmach                | d0 = the sound's machine, or -1
+        bsr.w   mp_rmach                | d0 = the sound's machine, or -1
         move.l  %d0, 4(%sp)             | [out][machine]
         move.l  12(%sp), -(%sp)         | [id][out][machine]
-        jsr     mp_range
+        jsr     \handler
         addq.l  #4, %sp
         movea.l (%sp), %a0
         addq.l  #8, %sp
         move.l  %a0, %d0
         rts
+        .endm
+
+        .globl  mp_prange_s, mp_prange_f_s, mp_prange_reset_s
+mp_prange_s:
+        movea.l %a2, %a1
+        bra.s   1f
+mp_prange_f_s:
+        movea.l 36(%sp), %a1
+1:      range_lookup mp_range
+mp_prange_reset_s:
+        movea.l 28(%sp), %a1
+        range_lookup mp_reset_range
 
 | a1 = a parameter object -> d0 = its sound's machine, or -1 when it is not
 | a sound's parameter. Changes d0 and a1.
+        .globl  mp_rmach
 mp_rmach:
         move.l  (%a1), %d0
         cmpi.l  #PARAM_VT, %d0
