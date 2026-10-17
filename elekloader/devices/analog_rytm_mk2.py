@@ -4,6 +4,12 @@ platform, an MCF54418); the main OS runs from DDR at 0x40000400. Measured
 on OS 1.73, by comparison with the Digitakt mk1 1.54 (elekloader's
 digitakt-mk1 profile and mods/core, whose 1.54 port is the core this one
 starts from) in Ghidra and on the stock images. Proof-of-concept profile.
+1.74's file differs from 1.73's only in the main OS (and the version
+string's section 5): the same bootstrap, FPGA bitstream and ARM image. Its
+main OS is 1.73's with code added in two places (Outbox 8's main-output
+routing), and the same OS entry, SRAM operands, cleared RAM and stack, with
+no operand near the mods' area, so what follows holds for both, at 1.73's
+addresses (docs/DEVICES.md says how far each moved).
 
 - The container: ELE3, sysex id 0x0C, sections 5 (meta), 2 (bootstrap,
   with the STARTUP menu), 1 (FPGA bitstream), 3 (MAIN OS, packed) and 8
@@ -74,6 +80,11 @@ DEVICE = Device(
             version='1.73',
             syx_sha256='8ad671087ec30433d5407c7380d2396e0915ab931c5d3dd18a78bf284d3d1e52',
             main_sha256='28d9ef40c895e03f17dfce096543109adaf708947392db72818fc2a412d685d6',
+            main_len=3005432),
+        '1.74': Release(
+            version='1.74',
+            syx_sha256='cb0f99d620edde994fb860c0e79cc2464e427d06882828cfdfb00fc53700e123',
+            main_sha256='34cd0c4da8e4b810d1b25284475a99ea53821e2ab7d30a978bf15dc578251f3b',
             main_len=3005432),
     },
     main_section=3,

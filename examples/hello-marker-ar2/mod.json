@@ -9,6 +9,9 @@
  "os": "1.73",
  "sources": ["../hello-marker/hello.c"],
  "cflags": ["-DFILLRECT_AT=0x400706ba"],
+ "ports": {
+  "1.74": {"cflags": ["-DFILLRECT_AT=0x40070726"]}
+ },
  "subscribe": [
   {"event": "ev_draw", "fn": "hello_draw", "order": 60}
  ],

@@ -10,6 +10,9 @@
  "sources": ["hooks.c", "label.s"],
  "cflags": ["-DFILLRECT_AT=0x400706ba"],
  "defsym": {"STRING_CTOR": "0x401bcd4c"},
+ "ports": {
+  "1.74": {"cflags": ["-DFILLRECT_AT=0x40070726"], "defsym": {"STRING_CTOR": "0x401bcff0"}}
+ },
  "subscribe": [
   {"event": "ev_tick", "fn": "hc_tick", "order": 60},
   {"event": "ev_draw", "fn": "hc_draw", "order": 60},

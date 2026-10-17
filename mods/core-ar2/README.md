@@ -1,6 +1,6 @@
 # core-ar2
 
-The boot copier and the hook bus for the Analog Rytm MKII, OS 1.73. A proof
+The boot copier and the hook bus for the Analog Rytm MKII, OS 1.73 and 1.74. A proof
 of concept: no new code. It builds the Digitakt mk1's `core.s`, `settings.s`
 and `render.s` with the Rytm's addresses, which `mod.json` gives (`defsym`,
 `sites`). On its own it changes nothing the unit does.
@@ -11,16 +11,21 @@ the counterpart of one the Digitakt mk1 core hooks, found by matching the two
 images and checked by the code around it
 (`elekloader/devices/analog_rytm_mk2.py` has the platform evidence).
 
-| event | Rytm 1.73 | Digitakt 1.54 | note |
-|---|---|---|---|
-| boot | 0x400008c0 | 0x40000538 | the OS entry's third call, VBR := 0x40000000 |
-| `ev_tick` | 0x400a2bee | 0x4000a770 | about 20 Hz (the Digitakt's 30) |
-| `ev_draw` | 0x400a2c56 | 0x4000a7d6 | drawAll(ctrl, bmp), 128 x 64 |
-| `ev_key` | 0x400a47cc | 0x4000b770 | |
-| `ev_enc` | 0x400a4816 | 0x4000b7ba | |
-| `ev_settings` | 0x400db87e | 0x40058800 | the SETTINGS menu's builder, 0x400db174; rejoins at 0x400db884 |
-| `ev_render_in` | 0x4011fb02 | 0x40077428 | the audio interrupt (vector 191), 32 frames a block |
-| `ev_render_out` | 0x40121656 | 0x400784c8 | its only exit; the frame is 0xb4 (the Digitakt's 0xa8) |
+| event | Rytm 1.73 | Rytm 1.74 | Digitakt 1.54 | note |
+|---|---|---|---|---|
+| boot | 0x400008c0 | 0x400008c0 | 0x40000538 | the OS entry's third call, VBR := 0x40000000 |
+| `ev_tick` | 0x400a2bee | 0x400a2c5a | 0x4000a770 | about 20 Hz (the Digitakt's 30) |
+| `ev_draw` | 0x400a2c56 | 0x400a2cc2 | 0x4000a7d6 | drawAll(ctrl, bmp), 128 x 64 |
+| `ev_key` | 0x400a47cc | 0x400a4838 | 0x4000b770 | |
+| `ev_enc` | 0x400a4816 | 0x400a4882 | 0x4000b7ba | |
+| `ev_settings` | 0x400db87e | 0x400db8ea | 0x40058800 | the SETTINGS menu's builder, 0x400db174 (1.73); rejoins 6 bytes on |
+| `ev_render_in` | 0x4011fb02 | 0x4011fb6e | 0x40077428 | the audio interrupt (vector 191), 32 frames a block |
+| `ev_render_out` | 0x40121656 | 0x401216c2 | 0x400784c8 | its only exit; the frame is 0xb4 (the Digitakt's 0xa8) |
+
+1.74's main OS is 1.73's with code added for Outbox 8's main-output
+routing, so its sites and routines are 1.73's moved (+0x6c, `FN_MGR`
++0x1cc), each found again by its own bytes; `mod.json`'s `ports` gives
+them. A core built for one release is refused with the other's stock file.
 
 The routines `core_additem` calls are the Digitakt's, the same code with the
 addresses in it masked: `OP_NEW` 0x400829d4, `ITEM_CTOR` 0x40072f50,

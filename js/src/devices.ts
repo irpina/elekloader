@@ -157,6 +157,8 @@ export const ANALOG_RYTM_MK2: Device = {
   releases: [
     rel('1.73', '8ad671087ec30433d5407c7380d2396e0915ab931c5d3dd18a78bf284d3d1e52',
       '28d9ef40c895e03f17dfce096543109adaf708947392db72818fc2a412d685d6', 3005432),
+    rel('1.74', 'cb0f99d620edde994fb860c0e79cc2464e427d06882828cfdfb00fc53700e123',
+      '34cd0c4da8e4b810d1b25284475a99ea53821e2ab7d30a978bf15dc578251f3b', 3005432),
   ],
   stage: 0x40200000, flashAt: 0x80000, flashLimit: 0x300000,
   areas: { ddr: [0x47be0000, 0x47c00000] },

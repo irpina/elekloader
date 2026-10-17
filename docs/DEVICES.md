@@ -333,7 +333,7 @@ profiles: `model_cycles.py` keeps the evidence for each fact, and
   FUNC while powering on, TRIG 4 (OS UPGRADE), and the stock `.syx` over
   5-pin MIDI.
 
-## The Analog Rytm MKII (1.73)
+## The Analog Rytm MKII (1.73, 1.74)
 
 A proof of concept: the profile (`analog_rytm_mk2.py`, where each fact's
 evidence is) and a core (mods/core-ar2) built from the Digitakt mk1's sources.
@@ -385,6 +385,23 @@ Digitakt's in the places elekloader depends on.
   refusals) give the same files, messages and checks as the Python (11 Oct
   2026). The web page's list of where to download each stock OS does not
   name the Rytm yet.
+- **1.74.** Its file differs from 1.73's only in the main OS and section 5:
+  the same bootstrap, FPGA bitstream and ARM image, so the same staging,
+  flash layout and recovery; the writer reproduces it, and its main OS
+  depacks in place. The main OS is 1.73's with code added in two places
+  (Outbox 8's main-output routing, the release's one change): from
+  0x40057xxx everything sits 0x6c further on, from 0x40123exx 0x1cc, and
+  the data after the code further still. The OS entry, the SRAM operands,
+  the RAM it clears (0x402CE000-0x42FBB250) and its stack are 1.73's, and
+  no operand points into the mods' area. core-ar2, hello-marker-ar2 and
+  hooks-check-ar2 have 1.74 ports (every site and routine is 1.73's, moved;
+  STRING_CTOR, in the data-shifted region, +0x2a4); built for 1.73 they
+  are byte for byte what they were. tests/test_rytm_mk2.py passes with
+  either file, and the TypeScript engine builds core-ar2 with each example
+  for 1.74 byte for byte as the Python does. On a unit (17 Oct 2026), the
+  1.74 builds of core-ar2 with hello-marker-ar2 (HM74) and with
+  hooks-check-ar2 (HC74) work as the 1.73 ones do; in rytm-emu both boot
+  as stock 1.74 does, differing only where the mod draws.
 
 ## What a new device needs besides its profile
 

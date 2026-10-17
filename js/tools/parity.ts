@@ -7,7 +7,7 @@
 //                                                              refusal, the log, the live check, every describe
 //
 // config.json names your files: {"root": "/tmp/elekparity", "map": [["C:/", "/mnt/c/"]], "scratch": "<a folder>",
-// "stocks": {"dt153": ..., "dt154": ..., "dt153zip": ..., "dn143": ..., "dn144": ..., "ot": ..., "otbin": ..., "ar173": ...},
+// "stocks": {"dt153": ..., "dt154": ..., "dt153zip": ..., "dn143": ..., "dn144": ..., "ot": ..., "otbin": ..., "ar173": ..., "ar174": ...},
 // "dirs": {"dt": ..., "release": ..., "octabam": ..., "dtmod": ..., "ar": ...}, "files": {"octatrick": ..., "bundle": ...}}.
 // Both sides see each file under the same path (root/<case>/stock/<name>, root/<case>/mods/<name>), so the
 // manifests, which name those paths, must match byte for byte too.
@@ -89,6 +89,17 @@ function plan(configPath: string, casesPath: string) {
     add('ar173 hooks-check without core', 'ar173', [hooks])
     add('ar173 version too long', 'ar173', [core], 'TOOLONG')
     add('ar173 check only', 'ar173', [core, hooks], 'TEST', { check_only: true })
+  }
+  // and its 1.74 ports (optional: stocks.ar174, with the *-os1.74.elemod builds in dirs.ar)
+  if (cfg.stocks.ar174 && cfg.dirs.ar) {
+    const core = f('ar', 'core-0.1-os1.74.elemod'), hello = f('ar', 'hello-marker-1.0-os1.74.elemod')
+    const hooks = f('ar', 'hooks-check-0.1-os1.74.elemod')
+    add('ar174 core alone', 'ar174', [core])
+    add('ar174 core + hello-marker', 'ar174', [core, hello])
+    add('ar174 core + hooks-check', 'ar174', [core, hooks])
+    add('ar174 core + both', 'ar174', [core, hello, hooks])
+    add('ar174 hooks-check without core', 'ar174', [hooks])
+    add('ar174 core for 1.73', 'ar174', [f('ar', 'core-0.1.elemod')])
   }
 
   const scratch = cfg.scratch
