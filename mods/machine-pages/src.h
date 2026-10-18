@@ -9,3 +9,4 @@
 const struct cm_ui32 *mp_src_for(int32_t machine);
 uint32_t mp_ui32(int32_t machine);
 void mp_src_init(void);
+int mp_stock_sound_parameter(uint32_t id);

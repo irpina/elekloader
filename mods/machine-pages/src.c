@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 _Static_assert(sizeof(struct cm_ui) == 336, "legacy UI layout");
-_Static_assert(sizeof(struct cm_src_page) == 12, "SRC page layout");
+_Static_assert(sizeof(struct cm_src_page) == 16, "SRC page layout");
 _Static_assert(sizeof(struct cm_ui32) == 624, "extra-value UI layout");
 _Static_assert(offsetof(struct cm_ui32, extra) == 336, "extra parameters");
 _Static_assert(offsetof(struct cm_ui32, page_count) == 616, "page count");
@@ -12,6 +12,7 @@ _Static_assert(offsetof(struct cm_ui32, pages) == 620, "pages pointer");
 const char cm_ui_v32[] = "machine-pages 3.2";
 extern const struct cm_machine *const core_machines[];
 extern const uint32_t SAVE_MAP[];
+extern uint32_t mp_descriptor_table[];                    /* params.s: the stock descriptors, 13 longs an id */
 extern uint32_t mp_native_save(uint8_t *, const uint8_t *, int32_t);
 extern uint32_t mp_native_load(uint8_t *, const uint8_t *);
 extern uint32_t mp_native_upgrade(uint8_t *, uint8_t *, int32_t);
@@ -34,14 +35,29 @@ static int valid(const struct cm_machine *m, const struct cm_ui32 *u)
             return 0;
     }
     for (int page = 0; page < u->page_count; ++page) {
-        if (!u->pages[page].title)
+        const struct cm_src_page *p = &u->pages[page];
+        if (!p->title || p->reserved[0] || p->reserved[1] || p->reserved[2])
             return 0;
-        for (int k = 0; k < 8; ++k)
-            if (u->pages[page].parameter[k] != CM_SRC_BLANK &&
-                u->pages[page].parameter[k] >= 8 + CM_EXTRAS)
+        for (int k = 0; k < 8; ++k) {
+            if (p->stock & CM_SRC_STOCK(k)) {
+                if (!mp_stock_sound_parameter(p->parameter[k]))
+                    return 0;
+            } else if (p->parameter[k] != CM_SRC_BLANK && p->parameter[k] >= 8 + CM_EXTRAS)
                 return 0;
+        }
     }
     return 1;
+}
+
+/* A stock parameter a page may show: one of the sound's own, by its descriptor's owner (+0): 6 the
+ * filter, 4 the amp, 15 and 16 the LFOs. Not the trig's, a machine bank's (the SRC page's own), the
+ * kit effects', the master's or MIDI's. */
+int mp_stock_sound_parameter(uint32_t id)
+{
+    if (id >= 164)
+        return 0;
+    uint32_t owner = mp_descriptor_table[13 * id];
+    return owner == 4 || owner == 6 || owner == 15 || owner == 16;
 }
 
 void mp_src_init(void)

@@ -12,7 +12,9 @@
   {"id": 124, "descriptor": "probe_machine124"},
   {"id": 125, "descriptor": "probe_machine125"},
   {"id": 126, "descriptor": "probe_machine126"},
-  {"id": 127, "descriptor": "probe_machine127"}
+  {"id": 127, "descriptor": "probe_machine127"},
+  {"id": 117, "descriptor": "probe_machine117"},
+  {"id": 118, "descriptor": "probe_machine118"}
  ],
  "requires": ["core", "machine-pages"],
  "resources": {"core": "3.0"}

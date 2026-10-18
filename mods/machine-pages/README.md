@@ -80,7 +80,10 @@ as a `gfx` or as a `draw`.
 **A second page of seven more values (1.2).** A page naming `cm_ui_v32`
 is a `struct cm_ui32`: `extra[7]` knobs after the eight, and one or two
 `pages`, each a title and eight entries naming a value (0-7 the page's
-knobs, 8-14 the extras) or `CM_SRC_BLANK`. SRC flips the track's page;
+knobs, 8-14 the extras), `CM_SRC_BLANK`, or, with `CM_SRC_STOCK(k)` in the
+page's `stock`, a stock sound parameter by its id (the filter's, the amp's
+or the LFOs', 30-69): the firmware's own knob, shown on this page too, so a
+second page can still have eight. SRC flips the track's page;
 held SRC with a transport key still copies, clears and pastes the page
 shown. The extras are the sound's slots 46-52 (ids 164-170), the seven
 the firmware leaves unregistered: they lock, the LFOs reach them from
@@ -95,7 +98,7 @@ so the getter's own instruction (0x4003ab02) stays free for digistring
 0.8.0, which hooks it and links beside 1.2 as beside 1.1. Simon
 Johansson's PARAM machine
 (`tests/fixtures/digitakt-src-parameters`) is the example: silent, two
-pages, P1-P15.
+pages, P1-P15, and the amp's VOL as page 2's knob H.
 
 ## Whose machine a site answers for
 

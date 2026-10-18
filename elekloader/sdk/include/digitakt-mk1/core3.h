@@ -103,9 +103,15 @@ struct cm_machine {                 /* what a mod contributes to core_machines p
  * them: it is kept for the machine's id. */
 #define CM_EXTRAS    7
 #define CM_SRC_BLANK 255
-struct cm_src_page {                /* 12 bytes: fixed logical parameter references, not native IDs */
+/* A page's knob may instead be a stock sound parameter, by its id: one of the filter's (30-43), the
+ * amp's (44-51) or the LFOs' (52-69). It is the firmware's own knob there (its label, range, locks,
+ * LFO and saving), only shown on this page too. */
+#define CM_SRC_STOCK(knob) (1u << (knob))
+struct cm_src_page {                /* 16 bytes: fixed logical parameter references */
     const char *title;
-    uint8_t parameter[8];           /* 0-14 (8-14 = extra[0-6]), or CM_SRC_BLANK */
+    uint8_t parameter[8];           /* 0-14 (8-14 = extra[0-6]), CM_SRC_BLANK, or with stock a stock id */
+    uint8_t stock;                  /* CM_SRC_STOCK(k): parameter[k] is a stock parameter's id */
+    uint8_t reserved[3];            /* zero */
 } __attribute__((aligned(4)));
 
 struct cm_ui32 {                    /* params=3 only (SLICE's bank): fifteen values across up to two pages */
