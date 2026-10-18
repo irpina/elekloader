@@ -360,7 +360,7 @@ The page (`struct cm_ui`, 336 bytes; `digitakt-mk1/core3.h`):
 
 | offset | field | |
 |---|---|---|
-| +0 | abi | `cm_ui_v3`, which machine-pages exports: the machine links only beside it; `cm_ui_v31` for a page with a knob that draws itself (`CM_DRAW`), which only machine-pages 1.1 and newer export |
+| +0 | abi | `cm_ui_v3`, which machine-pages exports: the machine links only beside it; `cm_ui_v31` for a page with a knob that draws itself (`CM_DRAW`), which only machine-pages 1.1 and newer export; `cm_ui_v32` for a page with extra values (below), machine-pages 1.2 and newer |
 | +4 | page_from | the stock machine whose SRC page it copies (byte): 3 SLICE, 0 ONESHOT |
 | +5, +6 | | 0 |
 | +8 | group | the LFO page's group for its parameters, or 0 for the stock one |
@@ -407,6 +407,27 @@ playback has written every track's block and before the overdrive
 (0x40077fba): order 10-49 for a machine that makes a track's sound
 (SOPHIE: 20), 50-89 for one that takes or changes sound already made
 (NEIGHBOR: 60).
+
+**Extra values on a second page (machine-pages 1.2).** A page that names
+`cm_ui_v32` is a `struct cm_ui32` (624 bytes): the `struct cm_ui` above, then
+`extra[7]` (+336, knobs as above; each needs flags 2 and 4, min 0, max
+0x7F00 and a `look` below 164), `page_count` (+616, 1 or 2) and `pages`
+(+620, `struct cm_src_page[page_count]`: a title and eight bytes, each a
+value 0-14, 8-14 being `extra[0-6]`, or 255 for a blank knob). SRC flips
+the track's page. Only a machine whose params machine is 3 (SLICE's bank)
+can have them. They are the sound's slots 46-52, the seven the firmware
+leaves unregistered, as parameter ids 164-170: they lock, the LFOs reach
+them from their stock DEST list, Randomize and copy/clear/paste take them,
+and a sound with them saves as version 4 of the 160-byte record (machine-pages
+packs it; the firmware alone cannot read it back). In the render task
+`cm_src_value(track, k)` is value k after locks and LFOs. machine-pages
+claims `soundslot:46` to `soundslot:52` for them.
+
+**Sound slots on the Digitakt mk1.** A sound has 53 slots (+0x14, s16);
+stock parameters use 1-45. Slot 0 is no parameter's (an LFO's "no
+destination" is index 0) and is kept for a machine's own id: no extra
+value goes there, and version 4 carries it raw. Slots 46-52 are
+machine-pages' (above). No other slot is free.
 
 What it took, and what each port was checked against, is in
 `mods/machine-pages/README.md`. A machine that keeps hooking the page
